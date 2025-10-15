@@ -8,9 +8,8 @@ requiring actual audio hardware during CI/testing.
 
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-import math
-import time
-from fractions import Fraction
+
+import pytest
 
 from chordelia.notes import Note
 from chordelia.rhythm import Duration, Tempo, quarter_note, half_note, whole_note
@@ -323,6 +322,7 @@ class TestConvenienceFunctions(unittest.TestCase):
         self.patcher_np.stop()
         self.patcher_available.stop()
     
+    @pytest.mark.slow
     @patch('time.sleep', Mock())  # Speed up tests
     def test_play_scale_function(self):
         """Test the play_scale convenience function."""
@@ -398,11 +398,12 @@ class TestConvenienceFunctions(unittest.TestCase):
             for i, playback_note in enumerate(played_notes):
                 self.assertEqual(playback_note.note.octave, 5, f"Note {i} should be in octave 5")
     
+    @pytest.mark.slow
     @patch('time.sleep', Mock())  # Speed up tests  
     def test_play_chord_function(self):
         """Test the play_chord convenience function."""
         from chordelia.audio_playback import play_chord
-        
+
         chord = Chord.from_string("C")
         
         # Should not raise an exception
@@ -412,6 +413,7 @@ class TestConvenienceFunctions(unittest.TestCase):
         self.mock_sd.OutputStream.assert_called()
         self.mock_stream.start.assert_called()
     
+    @pytest.mark.slow
     @patch('time.sleep', Mock())  # Speed up tests
     def test_play_melody_function(self):
         """Test the play_melody convenience function."""

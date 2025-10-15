@@ -22,8 +22,8 @@ class TestIntervalQuality:
         assert IntervalQuality.PERFECT.value == "P"
         assert IntervalQuality.MAJOR.value == "M"
         assert IntervalQuality.MINOR.value == "m"
-        assert IntervalQuality.AUGMENTED.value == "A"
-        assert IntervalQuality.DIMINISHED.value == "d"
+        assert IntervalQuality.AUGMENTED.value == "#"
+        assert IntervalQuality.DIMINISHED.value == "b"
 
 
 class TestIntervalCreation:
@@ -74,16 +74,6 @@ class TestIntervalCreation:
         dim_fifth = Interval(IntervalQuality.DIMINISHED, 5)
         assert dim_fifth.quality == IntervalQuality.DIMINISHED
         assert dim_fifth.number == 5
-    
-    def test_string_quality_input(self):
-        """Test creating intervals with string quality input."""
-        interval = Interval("P", 5)
-        assert interval.quality == IntervalQuality.PERFECT
-        assert interval.number == 5
-        
-        interval = Interval("M", 3)
-        assert interval.quality == IntervalQuality.MAJOR
-        assert interval.number == 3
     
     def test_invalid_combinations(self):
         """Test that invalid quality/number combinations raise errors."""
@@ -192,6 +182,49 @@ class TestIntervalFromSemitones:
         eleventh = Interval.from_semitones(17, prefer_simple=False)
         assert eleventh.quality == IntervalQuality.PERFECT
         assert eleventh.number == 11
+
+class TestIntervalFromString:
+    @pytest.mark.parametrize("input_str, expected_quality, expected_number", [
+        ("P1", IntervalQuality.PERFECT, 1),
+        ("m2", IntervalQuality.MINOR, 2),
+        ("M3", IntervalQuality.MAJOR, 3),
+        ("P4", IntervalQuality.PERFECT, 4),
+        ("A4", IntervalQuality.AUGMENTED, 4),
+        ("P5", IntervalQuality.PERFECT, 5),
+        ("4", IntervalQuality.PERFECT, 4),
+        ("5", IntervalQuality.PERFECT, 5),
+        ("6", IntervalQuality.MAJOR, 6),
+        ("7", IntervalQuality.MINOR, 7),
+        ("9", IntervalQuality.MAJOR, 9),
+        ("11", IntervalQuality.PERFECT, 11),
+        ("13", IntervalQuality.MAJOR, 13),
+        ("M6", IntervalQuality.MAJOR, 6),
+        ("m7", IntervalQuality.MINOR, 7),
+        ("P8", IntervalQuality.PERFECT, 8),
+        ("M9", IntervalQuality.MAJOR, 9),
+        ("P11", IntervalQuality.PERFECT, 11),
+        ("b5", IntervalQuality.DIMINISHED, 5),
+        ("bb5", IntervalQuality.DOUBLY_DIMINISHED, 5),
+        ("#5", IntervalQuality.AUGMENTED, 5),
+        ("##5", IntervalQuality.DOUBLY_AUGMENTED, 5),
+        ("b6", IntervalQuality.DIMINISHED, 6),
+        ("bb6", IntervalQuality.DOUBLY_DIMINISHED, 6),
+        ("#6", IntervalQuality.AUGMENTED, 6),
+        ("##6", IntervalQuality.DOUBLY_AUGMENTED, 6),
+        ("b7", IntervalQuality.DIMINISHED, 7),
+        ("bb7", IntervalQuality.DOUBLY_DIMINISHED, 7),
+        ("#7", IntervalQuality.AUGMENTED, 7),
+        ("##7", IntervalQuality.DOUBLY_AUGMENTED, 7),
+        ("b9", IntervalQuality.DIMINISHED, 9),
+        ("bb9", IntervalQuality.DOUBLY_DIMINISHED, 9),
+        ("#9", IntervalQuality.AUGMENTED, 9),
+        ("##9", IntervalQuality.DOUBLY_AUGMENTED, 9),
+        ("#11", IntervalQuality.AUGMENTED, 11),
+    ])
+    def test_valid_interval_strings(self, input_str, expected_quality, expected_number):
+        """Test creating intervals from valid string representations."""
+        interval = Interval.from_string(input_str)
+        assert interval == Interval(expected_quality, expected_number)
 
 
 class TestIntervalProperties:
@@ -324,19 +357,21 @@ class TestIntervalConstants:
 class TestIntervalStringRepresentation:
     """Test string representations of intervals."""
     
-    def test_str_representation(self):
+    @pytest.mark.parametrize("quality, number, expected_str", [
+        (IntervalQuality.PERFECT, 5, "5"),
+        (IntervalQuality.MAJOR, 3, "3"),
+        (IntervalQuality.MINOR, 7, "7"),
+        (IntervalQuality.MAJOR, 7, "M7"),
+        (IntervalQuality.MINOR, 9, "m9"),
+        (IntervalQuality.MAJOR, 9, "9"),
+        (IntervalQuality.AUGMENTED, 4, "#4"),
+        (IntervalQuality.DIMINISHED, 5, "b5"),
+    ])
+    def test_str_representation(self, quality, number, expected_str):
         """Test __str__ method."""
-        assert str(Interval(IntervalQuality.PERFECT, 5)) == "P5"
-        assert str(Interval(IntervalQuality.MAJOR, 3)) == "M3"
-        assert str(Interval(IntervalQuality.MINOR, 7)) == "m7"
-        assert str(Interval(IntervalQuality.AUGMENTED, 4)) == "A4"
-        assert str(Interval(IntervalQuality.DIMINISHED, 5)) == "d5"
+        assert str(Interval(quality, number)) == expected_str
     
     def test_repr_representation(self):
         """Test __repr__ method."""
         interval = Interval(IntervalQuality.PERFECT, 5)
-        repr_str = repr(interval)
-        
-        assert "Interval" in repr_str
-        assert "Perfect 5th" in repr_str
-        assert "7 semitones" in repr_str
+        assert repr(interval) == "Interval(IntervalQuality.PERFECT, 5)"

@@ -1,117 +1,127 @@
 """
 Musical chords implementation with parsing and proper enharmonic spelling.
 
-This module provides classes for representing chords, including const    def __init__(self, 
-                 root: Union[Note, str],
-                 quality: Union[ChordQuality, str] = ChordQuality.MAJOR,
-                 extensions: Optional[Iterable[Union[ChordExtension, int, str]]] = None,
-                 additions: Optional[Iterable[Union[int, str]]] = None,
-                 omissions: Optional[Iterable[Union[int, str]]] = None,
-                 bass_note: Optional[Union[Note, str]] = None,
-                 inversion: Optional[int] = None,
-                 notes: Optional[Iterable[Union[Note, str]]] = None):from parts, string parsing, inversions, and extensions with proper enharmonic
-spelling based on underlying scales.
+This module provides classes for representing chords, including constructing
+chords from parts, string parsing, additions, extensions, and inversions with
+proper enharmonic spelling based on underlying scales.
 """
 
 from enum import Enum
-from typing import Iterable, List, Optional, Union, Dict, Tuple
-import re
 from functools import lru_cache, cached_property
-from chordelia.notes import Note, NoteName, Accidental
+import logging
+import re
+from typing import Iterable, List, Optional, Union, Dict, Tuple
+
+from chordelia import intervals
 from chordelia.intervals import Interval, IntervalQuality
+from chordelia.notes import Note, NoteName, Accidental
 from chordelia.scales import Scale, ScaleType
 
-# Pre-compiled regex patterns for faster parsing
-_ROOT_PATTERN = re.compile(r'^([A-G][#b]*)')
-_CHORD_PATTERNS_COMPILED = {
-    'maj': re.compile(r'maj(?=\d|$)'),
-    'min': re.compile(r'min(?=\d|$)'),
-    'dim': re.compile(r'dim(?=\d|$)'), 
-    'aug': re.compile(r'aug(?=\d|$)'),
-    'sus2': re.compile(r'sus2'),
-    'sus4': re.compile(r'sus4'),
-    'sus': re.compile(r'sus(?!\d)'),
-    'numbers': re.compile(r'\d+'),
-    'parens': re.compile(r'\(([^)]+)\)')
-}
+_logger = logging.getLogger(__name__)
+_logger.setLevel(logging.DEBUG)
 
-
+_MODIFICATION = r'(maj|add|no)?[#b]?[0-9]+'
+_MODIFICATION_RE = re.compile(rf'^({_MODIFICATION}|\({_MODIFICATION}\))')
+_ROOT_PATTERN_RE = re.compile(r'^([A-G][#b]*)')
 
 
 class ChordQuality(Enum):
     """Enumeration of basic chord qualities."""
-    MAJOR = "major"
-    MINOR = "minor"
-    DIMINISHED = "diminished"
-    AUGMENTED = "augmented"
-    SUSPENDED_2 = "sus2"
-    SUSPENDED_4 = "sus4"
-    POWER = "power"  # Just root and fifth
+    MAJOR = ("major", ("", "M", "maj", "major"), (0, 4, 7))
+    MINOR = ("minor", ("-", "m", "min", "minor"), (0, 3, 7))
+    DIMINISHED = ("diminished", ("dim", "diminished", "°"), (0, 3, 6))
+    AUGMENTED = ("augmented", ("+", "aug", "augmented"), (0, 4, 8))
+    SUSPENDED_2 = ("sus2", ("sus2",), (0, 2, 7))
+    SUSPENDED_4 = ("sus4", ("sus", "sus4"), (0, 5, 7))
+    POWER = ("power", ("5", "power"), (0, 7))
+
+    def __init__(self, quality_str: str, abbreviations: Tuple[str, ...], semitone_intervals: Tuple[int, ...]):
+        self._quality_str = quality_str
+        self._abbreviations = abbreviations
+        self._semitone_intervals = semitone_intervals
+
+    @classmethod
+    def from_string(cls, quality_str: str) -> 'ChordQuality':
+        """Get ChordQuality from string."""
+        if not hasattr(cls, "_from_string_map"):
+            cls._from_string_map: Dict[str, 'ChordQuality'] = {
+                abbr: quality
+                for quality in cls
+                for abbr in quality.abbreviations
+            }
+        try:
+            return cls._from_string_map[quality_str]
+        except KeyError:
+            raise ValueError(f"Unknown ChordQuality string: {quality_str!r}")
+
+    @property
+    def quality_str(self) -> str:
+        return self._quality_str
+
+    @property
+    def semitone_intervals(self) -> Tuple[int, ...]:
+        return self._semitone_intervals
+
+    @property
+    def abbreviations(self) -> Tuple[str, ...]:
+        return self._abbreviations
+
+    def __str__(self):
+        return self._quality_str
+
+    def __repr__(self):
+        return f"<ChordQuality({self._quality_str})>"
 
 
 class ChordExtension(Enum):
-    """Enumeration of chord extensions with semitone values."""
-    SEVENTH = ("7", 10)         # (extension_string, semitones_from_root)
-    MAJOR_SEVENTH = ("maj7", 11)
-    NINTH = ("9", 14)
-    MAJOR_NINTH = ("maj9", 14)
-    ELEVENTH = ("11", 17)
-    THIRTEENTH = ("13", 21)
-    
-    def __init__(self, extension_str, semitones):
-        self.extension_str = extension_str
-        self.semitones = semitones
+    """
+    Enumeration of chord extensions with semitone values.
+
+    Extensions represent additional chord tones beyond the basic triad. An
+    even-numbered extension adds just that single note, while an odd-numbered
+    extension implies the presence of the lower odd extensions as well.
+    """
+    SIXTH = ("6", (intervals.MAJOR_SIXTH,))
+    SEVENTH = ("7", (intervals.MINOR_SEVENTH,))
+    MAJOR_SEVENTH = ("maj7", (intervals.MAJOR_SEVENTH,))
+    NINTH = ("9", (intervals.MINOR_SEVENTH, intervals.MAJOR_NINTH,))
+    MAJOR_NINTH = ("maj9", (intervals.MAJOR_SEVENTH, intervals.MAJOR_NINTH,))
+    ELEVENTH = ("11", (intervals.MINOR_SEVENTH, intervals.MAJOR_NINTH, intervals.PERFECT_ELEVENTH,))
+    MAJOR_ELEVENTH = ("maj11", (intervals.MAJOR_SEVENTH, intervals.MAJOR_NINTH, intervals.PERFECT_ELEVENTH,))
+    THIRTEENTH = ("13", (intervals.MINOR_SEVENTH, intervals.MAJOR_NINTH, intervals.PERFECT_ELEVENTH, intervals.MAJOR_THIRTEENTH))
+    MAJOR_THIRTEENTH = ("maj13", (intervals.MAJOR_SEVENTH, intervals.MAJOR_NINTH, intervals.PERFECT_ELEVENTH, intervals.MAJOR_THIRTEENTH))
+
+    def __init__(self, extension_str, intervals):
+        self._extension_str = extension_str
+        self._intervals = intervals
     
     @classmethod
-    def from_string(cls, extension_str: str):
+    def from_string(cls, extension_str: str) -> 'ChordExtension':
         """Get ChordExtension from string."""
         for ext in cls:
-            if ext.extension_str == extension_str:
+            if ext._extension_str == extension_str:
                 return ext
-        return None
-    
-    @classmethod 
-    def get_semitones(cls, extension_str: str) -> int:
-        """Get semitones for extension string."""
-        ext = cls.from_string(extension_str)
-        return ext.semitones if ext else None
+        raise ValueError(f"Unknown ChordExtension string: {extension_str!r}")
 
+    @classmethod
+    def from_unknown(cls, extension: Union['ChordExtension', str]) -> 'ChordExtension':
+        """Convert unknown extension representation to ChordExtension."""
+        if isinstance(extension, ChordExtension):
+            return extension
+        elif isinstance(extension, str):
+            return cls.from_string(extension)
+        else:
+            raise ValueError(f"Unknown ChordExtension representation: {extension!r}")
 
-# Quality hash table with all variants for O(1) lookup
-_QUALITY_HASH = {
-    "": ChordQuality.MAJOR,
-    "major": ChordQuality.MAJOR,
-    "maj": ChordQuality.MAJOR,
-    "M": ChordQuality.MAJOR,
-    "minor": ChordQuality.MINOR,
-    "min": ChordQuality.MINOR,
-    "m": ChordQuality.MINOR,
-    "-": ChordQuality.MINOR,
-    "diminished": ChordQuality.DIMINISHED,
-    "dim": ChordQuality.DIMINISHED,
-    "°": ChordQuality.DIMINISHED,
-    "augmented": ChordQuality.AUGMENTED,
-    "aug": ChordQuality.AUGMENTED,
-    "+": ChordQuality.AUGMENTED,
-    "sus2": ChordQuality.SUSPENDED_2,
-    "sus4": ChordQuality.SUSPENDED_4,
-    "sus": ChordQuality.SUSPENDED_4,
-    "power": ChordQuality.POWER,
-    "5": ChordQuality.POWER,
-}
+    @property
+    def intervals(self) -> List[Interval]:
+        return self._intervals
 
-# Extension semitones are now handled by ChordExtension.get_semitones()
+    def __str__(self):
+        return self._extension_str
 
-# Standard chord patterns (semitones from root) - tuples for immutability and speed
-_CHORD_INTERVALS = {
-    ChordQuality.MAJOR: (0, 4, 7),
-    ChordQuality.MINOR: (0, 3, 7),
-    ChordQuality.DIMINISHED: (0, 3, 6),
-    ChordQuality.AUGMENTED: (0, 4, 8),
-    ChordQuality.SUSPENDED_2: (0, 2, 7),
-    ChordQuality.SUSPENDED_4: (0, 5, 7),
-    ChordQuality.POWER: (0, 7),
-}
+    def __repr__(self):
+        return f"ChordExtension({self._extension_str})"
 
 
 class Chord:
@@ -144,24 +154,21 @@ class Chord:
         >>> complex_chord = Chord("C").with_quality("minor").with_extension("7").with_bass("Bb")  # Cm7/Bb
         
         Combined modifications:
-        >>> chord.with_(root="F#", quality="minor", extensions=["7", "9"])  # F#m7add9
+        >>> chord.with_(root="F#", quality="minor", extension="maj9")  # F#m(maj9)
         
         All methods preserve immutability - the original chord is never modified.
     """
     
-    __slots__ = ('_root', '_quality', '_extensions', '_additions', '_omissions', '_bass_note', '_inversion', '_custom_notes', '__dict__')
-    
-    # Extension intervals (in semitones from root) - derived from enum semitone values
-    EXTENSION_INTERVALS = {ext: ext.semitones for ext in ChordExtension}
+    __slots__ = ('_root', '_quality', '_extension', '_additions', '_omissions', '_bass_note', '_inversion', '_custom_notes', '__dict__')
     
     def __init__(self, 
                  root: Union[Note, str],
                  quality: Union[ChordQuality, str] = ChordQuality.MAJOR,
-                 extensions: Optional[Iterable[Union[ChordExtension, int, str]]] = None,
-                 additions: Optional[Iterable[Union[int, str]]] = None,
-                 omissions: Optional[Iterable[Union[int, str]]] = None,
+                 extension: Optional[Union[ChordExtension, str]] = None,
+                 additions: Optional[Iterable[Union[Interval, int, str]]] = None,
+                 omissions: Optional[Iterable[Union[Interval, int, str]]] = None,
                  bass_note: Optional[Union[Note, str]] = None,
-                 inversion: Optional[int] = None,
+                 inversion: int = 0,
                  notes: Optional[Iterable[Union[Note, str]]] = None):
         """
         Initialize an immutable chord.
@@ -180,12 +187,12 @@ class Chord:
             root = Note.from_string(root)
         
         if isinstance(quality, str):
-            quality = _QUALITY_HASH.get(quality.lower(), ChordQuality.MAJOR)
+            quality = ChordQuality.from_string(quality)
         
         # Convert extensions, additions, omissions to tuples for immutability
-        extensions = tuple(extensions or [])
-        additions = tuple(additions or [])
-        omissions = tuple(omissions or [])
+        extension = ChordExtension.from_unknown(extension) if extension else None
+        additions = tuple((Interval.from_unknown(a) for a in additions) if additions else [])
+        omissions = tuple((Interval.from_unknown(o) for o in omissions) if omissions else [])
         
         bass_note = Note.from_string(bass_note) if isinstance(bass_note, str) else bass_note
         
@@ -213,7 +220,7 @@ class Chord:
         # Set attributes directly - rely on Python conventions for immutability
         self._root = root
         self._quality = quality
-        self._extensions = extensions
+        self._extension = extension
         self._additions = additions
         self._omissions = omissions
         self._bass_note = bass_note
@@ -231,18 +238,18 @@ class Chord:
         return self._quality
     
     @property
-    def extensions(self) -> Tuple[Union[ChordExtension, int, str], ...]:
-        """Tuple of chord extensions."""
-        return self._extensions
+    def extension(self) -> ChordExtension:
+        """Chord extension."""
+        return self._extension
     
     @property
-    def additions(self) -> Tuple[Union[int, str], ...]:
+    def additions(self) -> Tuple[Interval, ...]:
         """Tuple of added chord tones."""
         return self._additions
     
     @property
-    def omissions(self) -> Tuple[Union[int, str], ...]:
-        """Tuple of omitted chord tones."""
+    def omissions(self) -> Tuple[Interval, ...]:
+        """Tuple of omitted chord tones as Interval objects."""
         return self._omissions
     
     @property
@@ -251,7 +258,7 @@ class Chord:
         return self._bass_note
     
     @property
-    def inversion(self) -> Optional[int]:
+    def inversion(self) -> int:
         """Inversion number (1 = first inversion, etc.)."""
         return self._inversion
     
@@ -265,8 +272,25 @@ class Chord:
         Returns:
             A new Chord with the same properties but different root
         """
-        return Chord(root, self._quality, self._extensions, self._additions, 
+        return Chord(root, self._quality, self._extension, self._additions,
                     self._omissions, self._bass_note, self._inversion)
+
+    def with_octave(self, octave: int|None) -> 'Chord':
+        """
+        Create a copy of this chord with the given root note octave.
+
+        Can be used to give an octave to a chord that lacks one, or to replace
+        the octave.
+        
+        Args:
+            octave: The octave of the root note
+            
+        Returns:
+            A new Chord with the same properties but different root octave
+        """
+        return Chord(self._root.with_octave(octave), self._quality, self._extension, self._additions,
+                    self._omissions, self._bass_note, self._inversion)
+
     
     def with_quality(self, quality: Union[ChordQuality, str]) -> 'Chord':
         """
@@ -278,34 +302,21 @@ class Chord:
         Returns:
             A new Chord with the same properties but different quality
         """
-        return Chord(self._root, quality, self._extensions, self._additions,
+        return Chord(self._root, quality, self._extension, self._additions,
                     self._omissions, self._bass_note, self._inversion)
     
-    def with_extension(self, extension: Union[ChordExtension, int, str]) -> 'Chord':
+    def with_extension(self, extension: Union[ChordExtension, str]) -> 'Chord':
         """
-        Create a copy of this chord with an added extension.
+        Create a copy of this chord with a different extension.
         
         Args:
-            extension: The extension to add
+            extension: The new chord extension
             
         Returns:
-            A new Chord with the extension added
+            A new Chord with the given extension
         """
-        new_extensions = list(self._extensions) + [extension]
-        return Chord(self._root, self._quality, new_extensions, self._additions,
-                    self._omissions, self._bass_note, self._inversion)
-    
-    def with_extensions(self, extensions: Iterable[Union[ChordExtension, int, str]]) -> 'Chord':
-        """
-        Create a copy of this chord with different extensions.
-        
-        Args:
-            extensions: The new iterable of extensions (list, tuple, set, etc.)
-            
-        Returns:
-            A new Chord with the specified extensions
-        """
-        return Chord(self._root, self._quality, extensions, self._additions,
+        extension = ChordExtension.from_unknown(extension)
+        return Chord(self._root, self._quality, extension, self._additions,
                     self._omissions, self._bass_note, self._inversion)
     
     def with_bass(self, bass_note: Union[Note, str, None]) -> 'Chord':
@@ -318,10 +329,10 @@ class Chord:
         Returns:
             A new Chord with the specified bass note
         """
-        return Chord(self._root, self._quality, self._extensions, self._additions,
+        return Chord(self._root, self._quality, self._extension, self._additions,
                     self._omissions, bass_note, self._inversion)
     
-    def with_inversion(self, inversion: Optional[int]) -> 'Chord':
+    def with_inversion(self, inversion: int) -> 'Chord':
         """
         Create a copy of this chord with a different inversion.
         
@@ -331,15 +342,15 @@ class Chord:
         Returns:
             A new Chord with the specified inversion
         """
-        return Chord(self._root, self._quality, self._extensions, self._additions,
+        return Chord(self._root, self._quality, self._extension, self._additions,
                     self._omissions, self._bass_note, inversion)
     
     def with_(self,
               root: Optional[Union[Note, str]] = None,
               quality: Optional[Union[ChordQuality, str]] = None,
-              extensions: Optional[Iterable[Union[ChordExtension, int, str]]] = None,
-              additions: Optional[Iterable[Union[int, str]]] = None,
-              omissions: Optional[Iterable[Union[int, str]]] = None,
+              extension: Optional[Union[ChordExtension, str]] = None,
+              additions: Optional[Iterable[Union[Interval, int, str]]] = None,
+              omissions: Optional[Iterable[Union[Interval, int, str]]] = None,
               bass_note: Optional[Union[Note, str, None]] = ...,
               inversion: Optional[int] = ...) -> 'Chord':
         """
@@ -348,7 +359,7 @@ class Chord:
         Args:
             root: New root note (defaults to current)
             quality: New chord quality (defaults to current)
-            extensions: New extensions iterable (defaults to current) - can be list, tuple, set, etc.
+            extension: New chord extension (defaults to current) - can be ChordExtension or str
             additions: New additions iterable (defaults to current) - can be list, tuple, set, etc.
             omissions: New omissions iterable (defaults to current) - can be list, tuple, set, etc.
             bass_note: New bass note (defaults to current, use explicit None to remove)
@@ -360,31 +371,31 @@ class Chord:
         Examples:
             >>> chord = Chord("C")
             >>> chord.with_(quality="minor")  # Cm
-            >>> chord.with_(root="F", extensions=["7"])  # F7
+            >>> chord.with_(root="F", extension="7")  # F7
             >>> chord.with_(bass_note="E")  # C/E
             >>> chord.with_(bass_note=None)  # Remove bass note
         """
         # Use current values as defaults, but allow explicit None/... for optional fields
         new_root = root if root is not None else self._root
         new_quality = quality if quality is not None else self._quality
-        new_extensions = extensions if extensions is not None else self._extensions
+        new_extension = ChordExtension.from_unknown(extension) if extension is not None else self._extension
         new_additions = additions if additions is not None else self._additions
         new_omissions = omissions if omissions is not None else self._omissions
         new_bass_note = self._bass_note if bass_note is ... else bass_note
         new_inversion = self._inversion if inversion is ... else inversion
         
-        return Chord(new_root, new_quality, new_extensions, new_additions,
+        return Chord(new_root, new_quality, new_extension, new_additions,
                     new_omissions, new_bass_note, new_inversion)
     
     @classmethod
     @lru_cache(maxsize=256)
-    def from_string(cls, chord_string: str) -> 'Chord':
+    def from_string(cls, chord_string: str, octave: int|None = None) -> 'Chord':
         """
         Parse a chord from string notation with optimized regex parsing.
         
         Supports formats like:
-        - C, Cmaj, CM
-        - Cm, Cmin, C-
+        - C, Cmaj, Cmajor, CM
+        - Cm, Cmin, Cminor, C-
         - C7, Cmaj7, CM7
         - C(add9), C(add2)
         - C/E (slash chord)
@@ -407,7 +418,7 @@ class Chord:
             bass_note = bass_part.strip()
         
         # Extract root note using pre-compiled regex
-        root_match = _ROOT_PATTERN.match(chord_string)
+        root_match = _ROOT_PATTERN_RE.match(chord_string)
         if not root_match:
             raise ValueError(f"Invalid chord string: {chord_string}")
         
@@ -416,19 +427,17 @@ class Chord:
         
         # Initialize parsing variables
         quality = ChordQuality.MAJOR
-        extensions = []
+        extension = None
         additions = []
         omissions = []
-        is_major_extension = False
         
         # Fast quality detection using hash table
         remaining_lower = remaining.lower()
         
         # Check for quality markers in order of specificity
-        if remaining_lower.startswith('maj'):
-            quality = ChordQuality.MAJOR
-            is_major_extension = True
-            remaining = remaining[3:]
+        if remaining_lower.startswith('minor'):
+            quality = ChordQuality.MINOR
+            remaining = remaining[5:]
         elif remaining_lower.startswith('min'):
             quality = ChordQuality.MINOR
             remaining = remaining[3:]
@@ -447,10 +456,13 @@ class Chord:
         elif remaining_lower.startswith('sus'):
             quality = ChordQuality.SUSPENDED_4
             remaining = remaining[3:]
-        elif remaining and remaining[0] in 'm-':
+        elif remaining_lower.startswith('maj'):
+            # it's probably an extension leave the quality as major without consuming remainder
+            quality = ChordQuality.MAJOR
+        elif re.match(r'^([m-])', remaining):
             quality = ChordQuality.MINOR
             remaining = remaining[1:]
-        elif remaining and remaining[0] == 'M':
+        elif re.match(r'^M\b', remaining):
             quality = ChordQuality.MAJOR
             remaining = remaining[1:]
         elif remaining and remaining[0] == '°':
@@ -462,37 +474,34 @@ class Chord:
         elif remaining and remaining[0] == '5':
             quality = ChordQuality.POWER
             remaining = remaining[1:]
-        
-        # Extract numbers using pre-compiled regex
-        for match in _CHORD_PATTERNS_COMPILED['numbers'].finditer(remaining):
-            num = int(match.group())
-            
-            # Use hash table for fast extension lookup
-            if ChordExtension.get_semitones(str(num)) is not None:
-                if num == 7:
-                    extensions.append(ChordExtension.MAJOR_SEVENTH if is_major_extension else ChordExtension.SEVENTH)
-                elif num == 9:
-                    extensions.append(ChordExtension.MAJOR_NINTH if is_major_extension else ChordExtension.NINTH)
-                else:
-                    extensions.append(num)
+
+        print(f"{quality=}, {remaining=}")
+
+        # True until we've found the first modification.
+        first_modification = True
+
+        def _process_modifications(content: str):
+            nonlocal first_modification
+            nonlocal extension
+            if content.startswith('no'):
+                omissions.append(Interval.from_string(content[2:]))
+            elif content.startswith('add'):
+                additions.append(Interval.from_string(content[3:]))
             else:
-                # Other numbers might be additions
-                additions.append(num)
-        
-        # Extract parenthetical content using pre-compiled regex
-        for match in _CHORD_PATTERNS_COMPILED['parens'].finditer(remaining):
-            paren_content = match.group(1)
-            
-            if paren_content.startswith('add'):
-                add_num_str = paren_content[3:]
-                if add_num_str.isdigit():
-                    additions.append(int(add_num_str))
-            elif paren_content.startswith('no'):
-                omit_num_str = paren_content[2:]
-                if omit_num_str.isdigit():
-                    omissions.append(int(omit_num_str))
-        
-        return cls(root_str, quality, extensions, additions, omissions, bass_note)
+                # No prefix. Assume chord extension if it's the first modification, otherwise addition.
+                if first_modification:
+                    extension = ChordExtension.from_string(content)
+                else: 
+                    additions.append(Interval.from_string(content))
+            first_modification = False
+
+        while match := _MODIFICATION_RE.match(remaining):
+            mod_str = match.group(0)
+            print(f"Found modification: {mod_str}")
+            _process_modifications(mod_str.strip("()"))
+            remaining = remaining[len(mod_str):]
+
+        return cls(root_str, quality, extension=extension, additions=additions, omissions=omissions, bass_note=bass_note)
     
     @classmethod
     def from_notes(cls, notes: Iterable[Union[Note, str]], bass_note: Optional[Union[Note, str]] = None) -> 'Chord':
@@ -560,77 +569,39 @@ class Chord:
         notes = []
         
         # Start with basic chord pattern using pre-computed intervals
-        base_pattern = list(_CHORD_INTERVALS[self.quality])
+        base_pattern = list(self.quality.semitone_intervals)
+        _logger.debug(f"Base pattern for {self.quality}: {base_pattern}")
         
-        # Add extensions using fast hash table lookup
-        for ext in self.extensions:
-            if isinstance(ext, ChordExtension):
-                interval = self.EXTENSION_INTERVALS[ext]
-                base_pattern.append(interval)
-            elif isinstance(ext, int) and ChordExtension.get_semitones(str(ext)) is not None:
-                base_pattern.append(ChordExtension.get_semitones(str(ext)))
-            # Skip invalid extensions silently
-            
-            # For extended chords, include lower extensions too
-            if ext == ChordExtension.NINTH or ext == 9:
-                if 10 not in base_pattern:  # Add minor 7th for regular 9th
-                    base_pattern.append(10)
-            elif ext == ChordExtension.MAJOR_NINTH:
-                if 11 not in base_pattern:  # Add major 7th for major 9th
-                    base_pattern.append(11)
-            elif ext in [11, ChordExtension.ELEVENTH]:
-                if 10 not in base_pattern:
-                    base_pattern.append(10)
-                if 14 not in base_pattern:
-                    base_pattern.append(14)
-            elif ext in [13, ChordExtension.THIRTEENTH]:
-                if 10 not in base_pattern:
-                    base_pattern.append(10)
-                if 14 not in base_pattern:
-                    base_pattern.append(14)
-                if 17 not in base_pattern:
-                    base_pattern.append(17)
+        if self.extension:
+            base_pattern.extend([interval.semitones for interval in self.extension.intervals])
+            _logger.debug(f"  Extension {self.extension}: {base_pattern}")
         
         # Add additional notes
         for add in self.additions:
-            if isinstance(add, int):
-                if add == 2:
-                    base_pattern.append(2)  # Major 2nd
-                elif add == 4:
-                    base_pattern.append(5)  # Perfect 4th
-                elif add == 6:
-                    base_pattern.append(9)  # Major 6th
-                elif add == 9:
-                    base_pattern.append(14)  # Major 9th
-                elif add == 11:
-                    base_pattern.append(17)  # Perfect 11th
+            base_pattern.append(add.semitones)
+            _logger.debug(f"  Added {add}: {base_pattern}")
         
         # Remove omitted notes
         for omit in self.omissions:
-            if isinstance(omit, int):
-                if omit == 3:
-                    # Remove third
-                    if 3 in base_pattern:
-                        base_pattern.remove(3)
-                    if 4 in base_pattern:
-                        base_pattern.remove(4)
-                elif omit == 5:
-                    # Remove fifth
-                    if 7 in base_pattern:
-                        base_pattern.remove(7)
+            base_pattern.remove(omit.semitones)
+            _logger.debug(f"  Omitted {omit}: {base_pattern}")
         
-        # Remove duplicates and sort
+        # Remove duplicates and sort semitone (intervals)
         base_pattern = sorted(list(set(base_pattern)))
+        _logger.debug(f"  Sorted: {base_pattern}")
         
         # Get reference scale for enharmonic spelling
         ref_scale = self._get_reference_scale()
+        _logger.debug(f"  Reference scale: {ref_scale}: {[str(n) for n in ref_scale.notes]}")
         
         # Calculate notes with proper voice leading octave distribution
         if self.root.octave is not None:
             notes = list(self._calculate_notes_with_voice_leading(base_pattern, ref_scale))
+            _logger.debug(f"  Notes with voice leading: {notes}")
         else:
             # No octave information, calculate without octaves
             notes = [self._get_chord_tone_with_spelling(semitones, ref_scale) for semitones in base_pattern]
+            _logger.debug(f"  Notes without octave: {notes}")
         
         # Handle inversion or bass note
         if self.bass_note:
@@ -638,11 +609,24 @@ class Chord:
             bass_in_chord = any(note.pitch_class == self.bass_note.pitch_class for note in notes)
             if not bass_in_chord:
                 notes.insert(0, self.bass_note)
-        elif self.inversion and self.inversion > 0:
-            # Apply inversion
-            if self.inversion < len(notes):
-                inverted_notes = notes[self.inversion:] + notes[:self.inversion]
-                notes = inverted_notes
+                _logger.debug(f"  Inserted bass note {self.bass_note} at bottom: {notes}")
+            else:
+                # TODO - We could consider moving base note down to the bottom
+                # and/or adding another base note to the bottom.
+                _logger.debug(f"  Bass note {self.bass_note} already in chord, no insertion needed")
+
+
+        elif self.inversion != 0:
+            inversions = self.inversion
+            while inversions > 0:
+                inversions -= 1
+                inverted_note = notes[0].with_octave(notes[0].octave + 1 if notes[0].octave is not None else None)
+                notes = notes[1:] + [inverted_note]
+            while inversions < 0:
+                inversions += 1
+                inverted_note = notes[-1].with_octave(notes[-1].octave - 1 if notes[-1].octave is not None else None)
+                notes =  [inverted_note] + notes[:-1]
+            _logger.debug(f"  Notes after inversion {self.inversion}: {notes}")
         
         return tuple(notes)
     
@@ -653,6 +637,9 @@ class Chord:
         """
         notes = []
         current_midi = self.root.midi_number
+
+        _logger.debug(f"Calculating notes with voice leading from root {self.root}({current_midi}), "
+                      f"base pattern: {base_pattern}, and reference scale: {reference_scale}")
         
         for semitones in base_pattern:
             # Calculate target MIDI note
@@ -722,7 +709,7 @@ class Chord:
         """
         return self.with_inversion(inversion_number)
     
-    def add_extension(self, extension: Union[ChordExtension, int, str]) -> 'Chord':
+    def add_extension(self, extension: Union[ChordExtension, str]) -> 'Chord':
         """
         Add an extension to this chord.
         
@@ -771,18 +758,9 @@ class Chord:
         }
         name += quality_symbols[self.quality]
         
-        # Add extensions
-        for ext in self.extensions:
-            if ext == ChordExtension.SEVENTH:
-                name += "7"
-            elif ext == ChordExtension.MAJOR_SEVENTH:
-                name += "maj7"
-            elif ext == ChordExtension.NINTH:
-                name += "9"
-            elif ext == ChordExtension.MAJOR_NINTH:
-                name += "maj9"
-            elif isinstance(ext, int):
-                name += str(ext)
+        # Add extension
+        if self._extension:
+            name += f"({self._extension})"
         
         # Add additions
         for add in self.additions:
@@ -797,6 +775,24 @@ class Chord:
             name += f"/{self.bass_note}"
         
         return name
+
+    def as_dict(self) -> Dict:
+        """
+        Get a dictionary representation of the chord.
+        
+        Returns:
+            A dictionary with chord attributes
+        """
+        return {
+            "root": str(self.root),
+            "quality": str(self.quality),
+            "extension": str(self._extension) if self._extension else None,
+            "additions": [str(add) for add in self.additions],
+            "omissions": [str(omit) for omit in self.omissions],
+            "bass_note": str(self.bass_note) if self.bass_note else None,
+            "inversion": self.inversion,
+            "notes": [str(note) for note in self.notes]
+        }
     
     def __iter__(self) -> Iterable[Note]:
         """Iterate over the notes in the chord."""
@@ -809,7 +805,7 @@ class Chord:
     def __repr__(self) -> str:
         """Detailed string representation."""
         notes_str = ", ".join(str(note) for note in self.notes)
-        return f"Chord({self.name}) - Notes: [{notes_str}]"
+        return f'<Chord({self.name})[{notes_str}]>'
     
     def __eq__(self, other) -> bool:
         """Check equality with another chord."""
@@ -817,7 +813,7 @@ class Chord:
             return False
         return (self.root == other.root and 
                 self.quality == other.quality and
-                self.extensions == other.extensions and
+                self.extension == other.extension and
                 self.additions == other.additions and
                 self.omissions == other.omissions and
                 self.bass_note == other.bass_note and
@@ -827,7 +823,7 @@ class Chord:
         """Hash function for use in sets and dictionaries."""
         return hash((
             self.root, self.quality, 
-            tuple(self.extensions), tuple(self.additions), tuple(self.omissions),
+            self.extension, tuple(self.additions), tuple(self.omissions),
             self.bass_note, self.inversion
         ))
 
@@ -851,15 +847,15 @@ def augmented_chord(root: Union[Note, str]) -> Chord:
 
 def dominant_seventh_chord(root: Union[Note, str]) -> Chord:
     """Create a dominant 7th chord."""
-    return Chord(root, ChordQuality.MAJOR, [ChordExtension.SEVENTH])
+    return Chord(root, ChordQuality.MAJOR, ChordExtension.SEVENTH)
 
 def major_seventh_chord(root: Union[Note, str]) -> Chord:
     """Create a major 7th chord."""
-    return Chord(root, ChordQuality.MAJOR, [ChordExtension.MAJOR_SEVENTH])
+    return Chord(root, ChordQuality.MAJOR, ChordExtension.MAJOR_SEVENTH)
 
 def minor_seventh_chord(root: Union[Note, str]) -> Chord:
     """Create a minor 7th chord."""
-    return Chord(root, ChordQuality.MINOR, [ChordExtension.SEVENTH])
+    return Chord(root, ChordQuality.MINOR, ChordExtension.SEVENTH)
 
 def sus2_chord(root: Union[Note, str]) -> Chord:
     """Create a sus2 chord."""

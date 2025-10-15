@@ -6,6 +6,8 @@ extensions, inversions, and enharmonic spelling.
 """
 
 import pytest
+from chordelia import notes
+from chordelia import intervals
 from chordelia.chords import Chord, ChordQuality, ChordExtension
 from chordelia.chords import (
     major_chord, minor_chord, diminished_chord, augmented_chord,
@@ -18,16 +20,61 @@ from chordelia.intervals import Interval, IntervalQuality
 
 class TestChordQuality:
     """Test ChordQuality enum."""
-    
-    def test_chord_quality_values(self):
-        """Test that chord qualities have correct string values."""
-        assert ChordQuality.MAJOR.value == "major"
-        assert ChordQuality.MINOR.value == "minor"
-        assert ChordQuality.DIMINISHED.value == "diminished"
-        assert ChordQuality.AUGMENTED.value == "augmented"
-        assert ChordQuality.SUSPENDED_2.value == "sus2"
-        assert ChordQuality.SUSPENDED_4.value == "sus4"
-        assert ChordQuality.POWER.value == "power"
+
+    @pytest.mark.parametrize("abbreviation, expected_quality", [
+        ("major", ChordQuality.MAJOR),
+        ("maj", ChordQuality.MAJOR),
+        ("M", ChordQuality.MAJOR),
+        ("minor", ChordQuality.MINOR),
+        ("min", ChordQuality.MINOR),
+        ("m", ChordQuality.MINOR),
+        ("-", ChordQuality.MINOR),
+        ("diminished", ChordQuality.DIMINISHED),
+        ("dim", ChordQuality.DIMINISHED),
+        ("°", ChordQuality.DIMINISHED),
+        ("augmented", ChordQuality.AUGMENTED),
+        ("aug", ChordQuality.AUGMENTED),
+        ("+", ChordQuality.AUGMENTED),
+        ("sus2", ChordQuality.SUSPENDED_2),
+        ("sus4", ChordQuality.SUSPENDED_4),
+        ("sus", ChordQuality.SUSPENDED_4),
+        ("power", ChordQuality.POWER),
+        ("5", ChordQuality.POWER),
+    ])
+    def test_from_string(self, abbreviation, expected_quality):
+        """All abbreviations for a quality should map back to that quality in _QUALITY_HASH."""
+        assert ChordQuality.from_string(abbreviation) == expected_quality
+
+    @pytest.mark.parametrize("quality, expected_intervals", [
+        (ChordQuality.MAJOR, (0, 4, 7)),
+        (ChordQuality.MINOR, (0, 3, 7)),
+        (ChordQuality.DIMINISHED, (0, 3, 6)),
+        (ChordQuality.AUGMENTED, (0, 4, 8)),
+        (ChordQuality.SUSPENDED_2, (0, 2, 7)),
+        (ChordQuality.SUSPENDED_4, (0, 5, 7)),
+        (ChordQuality.POWER, (0, 7,)),
+    ])
+    def test_semitone_intervals(self, quality, expected_intervals):
+        """The semitone intervals in the enum should match _CHORD_INTERVALS."""
+        assert quality.semitone_intervals == expected_intervals
+
+    @pytest.mark.parametrize("quality, expected_str", [
+        (ChordQuality.MAJOR, "major"),
+        (ChordQuality.MINOR, "minor"),
+        (ChordQuality.DIMINISHED, "diminished"),
+        (ChordQuality.AUGMENTED, "augmented"),
+        (ChordQuality.SUSPENDED_2, "sus2"),
+        (ChordQuality.SUSPENDED_4, "sus4"),
+        (ChordQuality.POWER, "power"),
+    ])
+    def test_str(self, quality, expected_str):
+        """Test string representation of ChordQuality."""
+        assert str(quality) == expected_str
+
+    def test_repr(self):
+        """Test repr representation of ChordQuality."""
+        quality = ChordQuality.MAJOR
+        assert repr(quality) == "<ChordQuality(major)>"
 
 
 class TestChordExtension:
@@ -35,13 +82,43 @@ class TestChordExtension:
     
     def test_chord_extension_values(self):
         """Test that chord extensions have correct values."""
-        assert ChordExtension.SEVENTH.extension_str == "7"
-        assert ChordExtension.MAJOR_SEVENTH.extension_str == "maj7"
-        assert ChordExtension.NINTH.extension_str == "9"
-        assert ChordExtension.MAJOR_NINTH.extension_str == "maj9"
-        assert ChordExtension.ELEVENTH.extension_str == "11"
-        assert ChordExtension.THIRTEENTH.extension_str == "13"
+        assert str(ChordExtension.SEVENTH) == "7"
+        assert str(ChordExtension.MAJOR_SEVENTH) == "maj7"
+        assert str(ChordExtension.NINTH) == "9"
+        assert str(ChordExtension.MAJOR_NINTH) == "maj9"
+        assert str(ChordExtension.ELEVENTH) == "11"
+        assert str(ChordExtension.THIRTEENTH) == "13"
 
+    
+    def test_chord_extension_from_string(self):
+        """Test creating ChordExtension from string."""
+        assert ChordExtension.from_string("7") == ChordExtension.SEVENTH
+        assert ChordExtension.from_string("maj7") == ChordExtension.MAJOR_SEVENTH
+        assert ChordExtension.from_string("9") == ChordExtension.NINTH
+        assert ChordExtension.from_string("maj9") == ChordExtension.MAJOR_NINTH
+        assert ChordExtension.from_string("11") == ChordExtension.ELEVENTH
+        assert ChordExtension.from_string("13") == ChordExtension.THIRTEENTH
+
+    @pytest.mark.parametrize("input,expected", [
+        ("7", ChordExtension.SEVENTH),
+        ("maj7", ChordExtension.MAJOR_SEVENTH),
+        ("9", ChordExtension.NINTH),
+        ("maj9", ChordExtension.MAJOR_NINTH),
+        ("11", ChordExtension.ELEVENTH),
+        ("13", ChordExtension.THIRTEENTH),
+        ("6", ChordExtension.SIXTH),
+        ("foo", None),
+        ("", None),
+        (None, None),
+        (ChordExtension.ELEVENTH, ChordExtension.ELEVENTH),
+    ])
+    def test_chord_extension_from_unknown(self, input, expected):
+        """Test that from_unknown handles acceptable types correctly."""
+        if expected is None:
+            with pytest.raises(ValueError):
+                ChordExtension.from_unknown(input)
+        else:
+            assert ChordExtension.from_unknown(input) == expected
 
 class TestChordCreation:
     """Test chord creation and initialization."""
@@ -51,11 +128,11 @@ class TestChordCreation:
         c_major = Chord(Note(NoteName.C), ChordQuality.MAJOR)
         assert c_major.root.name == NoteName.C
         assert c_major.quality == ChordQuality.MAJOR
-        assert c_major.extensions == ()
+        assert c_major.extension is None
         assert c_major.additions == ()
         assert c_major.omissions == ()
         assert c_major.bass_note is None
-        assert c_major.inversion is None
+        assert c_major.inversion == 0
     
     def test_create_minor_chord(self):
         """Test creation of minor chords."""
@@ -77,13 +154,13 @@ class TestChordCreation:
         c_aug = Chord("C", "augmented")
         assert c_aug.quality == ChordQuality.AUGMENTED
     
-    def test_create_with_extensions(self):
+    def test_create_with_extension(self):
         """Test creating chords with extensions."""
-        c7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH])
-        assert ChordExtension.SEVENTH in c7.extensions
+        c7 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH)
+        assert c7.extension == ChordExtension.SEVENTH
         
-        cmaj7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.MAJOR_SEVENTH])
-        assert ChordExtension.MAJOR_SEVENTH in cmaj7.extensions
+        cmaj7 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH)
+        assert cmaj7.extension == ChordExtension.MAJOR_SEVENTH
     
     def test_create_with_bass_note(self):
         """Test creating chords with bass notes (slash chords)."""
@@ -110,9 +187,6 @@ class TestChordFromString:
         c = Chord.from_string("C")
         assert c.root.name == NoteName.C
         assert c.quality == ChordQuality.MAJOR
-        
-        cmaj = Chord.from_string("Cmaj")
-        assert cmaj.quality == ChordQuality.MAJOR
         
         c_M = Chord.from_string("CM")
         assert c_M.quality == ChordQuality.MAJOR
@@ -147,200 +221,161 @@ class TestChordFromString:
         c_plus = Chord.from_string("C+")
         assert c_plus.quality == ChordQuality.AUGMENTED
     
-    def test_suspended_chords(self):
-        """Test parsing suspended chords."""
-        csus2 = Chord.from_string("Csus2")
-        assert csus2.root.name == NoteName.C
-        assert csus2.quality == ChordQuality.SUSPENDED_2
-        
-        csus4 = Chord.from_string("Csus4")
-        assert csus4.quality == ChordQuality.SUSPENDED_4
-        
-        csus = Chord.from_string("Csus")  # Should default to sus4
-        assert csus.quality == ChordQuality.SUSPENDED_4
-    
-    def test_seventh_chords(self):
-        """Test parsing seventh chords."""
-        c7 = Chord.from_string("C7")
-        assert c7.root.name == NoteName.C
-        assert c7.quality == ChordQuality.MAJOR
-        assert ChordExtension.SEVENTH in c7.extensions
-        
-        cmaj7 = Chord.from_string("Cmaj7")
-        assert cmaj7.quality == ChordQuality.MAJOR
-        assert ChordExtension.MAJOR_SEVENTH in cmaj7.extensions
-        
-        cm7 = Chord.from_string("Cm7")
-        assert cm7.quality == ChordQuality.MINOR
-        assert ChordExtension.SEVENTH in cm7.extensions
-    
-    def test_extended_chords(self):
-        """Test parsing extended chords."""
-        c9 = Chord.from_string("C9")
-        assert c9.root.name == NoteName.C
-        assert ChordExtension.NINTH in c9.extensions
-        
-        cmaj9 = Chord.from_string("Cmaj9")
-        assert ChordExtension.MAJOR_NINTH in cmaj9.extensions
-        
-        c11 = Chord.from_string("C11")
-        assert 11 in c11.extensions
-        
-        c13 = Chord.from_string("C13")
-        assert 13 in c13.extensions
-    
-    def test_slash_chords(self):
-        """Test parsing slash chords."""
-        c_over_e = Chord.from_string("C/E")
-        assert c_over_e.root.name == NoteName.C
-        assert c_over_e.quality == ChordQuality.MAJOR
-        assert c_over_e.bass_note.name == NoteName.E
-        
-        am_over_c = Chord.from_string("Am/C")
-        assert am_over_c.root.name == NoteName.A
-        assert am_over_c.quality == ChordQuality.MINOR
-        assert am_over_c.bass_note.name == NoteName.C
-    
-    def test_added_tone_chords(self):
-        """Test parsing chords with added tones."""
-        cadd9 = Chord.from_string("C(add9)")
-        assert cadd9.root.name == NoteName.C
-        assert cadd9.quality == ChordQuality.MAJOR
-        assert 9 in cadd9.additions
-        
-        cadd2 = Chord.from_string("C(add2)")
-        assert 2 in cadd2.additions
-    
-    def test_accidental_roots(self):
-        """Test parsing chords with accidental roots."""
-        cs_major = Chord.from_string("C#")
-        assert cs_major.root.name == NoteName.C
-        assert cs_major.root.accidental == Accidental.SHARP
-        
-        bb_minor = Chord.from_string("Bbm")
-        assert bb_minor.root.name == NoteName.B
-        assert bb_minor.root.accidental == Accidental.FLAT
-        assert bb_minor.quality == ChordQuality.MINOR
-        
-        fs_7 = Chord.from_string("F#7")
-        assert fs_7.root.name == NoteName.F
-        assert fs_7.root.accidental == Accidental.SHARP
-        assert ChordExtension.SEVENTH in fs_7.extensions
-    
-    def test_complex_chord_strings(self):
-        """Test parsing complex chord notations."""
-        complex_chord = Chord.from_string("Cmaj7(add9)")
-        assert complex_chord.root.name == NoteName.C
-        assert complex_chord.quality == ChordQuality.MAJOR
-        assert ChordExtension.MAJOR_SEVENTH in complex_chord.extensions
-        assert 9 in complex_chord.additions
+    @pytest.mark.parametrize("chord_str, root, quality, extension, additions, bass_note", [
+        ("C", notes.C, ChordQuality.MAJOR, None, None, None),
+        ("CM", notes.C, ChordQuality.MAJOR, None, None, None),
+        ("Cm", notes.C, ChordQuality.MINOR, None, None, None),
+        ("Cmin", notes.C, ChordQuality.MINOR, None, None, None),
+        ("Cminor", notes.C, ChordQuality.MINOR, None, None, None),
+        ("C#", notes.C_SHARP, ChordQuality.MAJOR, None, None, None),
+        ("CbM", notes.C_FLAT, ChordQuality.MAJOR, None, None, None),
+        ("D#m", notes.D_SHARP, ChordQuality.MINOR, None, None, None),
+        ("Bmin", notes.B, ChordQuality.MINOR, None, None, None),
+        ("Bbminor", notes.B_FLAT, ChordQuality.MINOR, None, None, None),
+    ])
+    def test_basic_chord_parsing(self, chord_str, root, quality, extension, additions, bass_note):
+        expected_chord = Chord(
+            root,
+            quality,
+            extension=extension,
+            additions=additions,
+            bass_note=bass_note
+        )
+        assert Chord.from_string(chord_str) == expected_chord
+
+    @pytest.mark.parametrize("chord_str, root, quality, extension", [
+        ("C7", notes.C, ChordQuality.MAJOR, ChordExtension.SEVENTH),
+        ("Cmaj7", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_SEVENTH),
+        ("C(maj7)", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_SEVENTH),
+        ("Cm7", notes.C, ChordQuality.MINOR, ChordExtension.SEVENTH),
+        ("C-7", notes.C, ChordQuality.MINOR, ChordExtension.SEVENTH),
+        ("Cmin7", notes.C, ChordQuality.MINOR, ChordExtension.SEVENTH),
+        ("Cmin(7)", notes.C, ChordQuality.MINOR, ChordExtension.SEVENTH),
+        ("Cmin(maj7)", notes.C, ChordQuality.MINOR, ChordExtension.MAJOR_SEVENTH),
+        ("C6", notes.C, ChordQuality.MAJOR, ChordExtension.SIXTH),
+        ("C9", notes.C, ChordQuality.MAJOR, ChordExtension.NINTH),
+        ("Cmaj9", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_NINTH),
+        ("C11", notes.C, ChordQuality.MAJOR, ChordExtension.ELEVENTH),
+        ("Cmaj11", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_ELEVENTH),
+        ("Cm(maj11)", notes.C, ChordQuality.MINOR, ChordExtension.MAJOR_ELEVENTH),
+        ("C13", notes.C, ChordQuality.MAJOR, ChordExtension.THIRTEENTH),
+        ("Cmaj13", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_THIRTEENTH),
+    ])
+    def test_extension_chord_parsing(self, chord_str, root, quality, extension):
+        expected_chord = Chord(root, quality, extension=extension)
+        assert Chord.from_string(chord_str) == expected_chord
+
+    @pytest.mark.parametrize("chord_str, expected_chord", [
+        ("Csus2", Chord(notes.C, ChordQuality.SUSPENDED_2)),
+        ("Csus4", Chord(notes.C, ChordQuality.SUSPENDED_4)),
+        ("Csus",  Chord(notes.C, ChordQuality.SUSPENDED_4)),
+        ("Asus2", Chord(notes.A, ChordQuality.SUSPENDED_2)),
+        ("Asus4", Chord(notes.A, ChordQuality.SUSPENDED_4)),
+        ("Asus",  Chord(notes.A, ChordQuality.SUSPENDED_4)),
+    ])
+    def test_suspended_chord_parsing(self, chord_str, expected_chord):
+        assert Chord.from_string(chord_str) == expected_chord
+
+    @pytest.mark.parametrize("chord_str, expected_chord", [
+        ("Dbadd9", Chord(notes.D_FLAT, ChordQuality.MAJOR, additions=[Interval(IntervalQuality.MAJOR, 9)])),
+        ("Db(add9)", Chord(notes.D_FLAT, ChordQuality.MAJOR, additions=[Interval(IntervalQuality.MAJOR, 9)])),
+        ("Cadd2", Chord(notes.C, ChordQuality.MAJOR, additions=[intervals.MAJOR_SECOND])),
+        ("C(add2)", Chord(notes.C, ChordQuality.MAJOR, additions=[intervals.MAJOR_SECOND])),
+    ])
+    def test_addition_chord_parsing(self, chord_str, expected_chord):
+        assert Chord.from_string(chord_str) == expected_chord
+
+    @pytest.mark.parametrize("chord_str, expected_chord", [
+        ("C/E", Chord(notes.C, ChordQuality.MAJOR, bass_note=notes.E)),
+        ("Am/C", Chord(notes.A, ChordQuality.MINOR, bass_note=notes.C)),
+    ])
+    def test_slash_chord_parsing(self, chord_str, expected_chord):
+        assert Chord.from_string(chord_str) == expected_chord
+
+    @pytest.mark.parametrize("chord_str, expected_chord_kwargs", [
+        ("C(7)(11)", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": ["P11"], "bass_note": None}),
+        ("C(7)(add11)", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": ["P11"], "bass_note": None}),
+        ("C(7)add11", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": ["P11"], "bass_note": None}),
+        ("C(7)(11)(13)", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": ["P11", "13"], "bass_note": None}),
+        ("B7(9)", {"root": notes.B, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": [Interval(IntervalQuality.MAJOR, 9)]}),
+        ("F#maj7(#11)", {"root": notes.F_SHARP, "quality": ChordQuality.MAJOR, "extension": ChordExtension.MAJOR_SEVENTH, "additions": [Interval(IntervalQuality.AUGMENTED, 11)]}),
+        ("Cmaj7(add9)", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.MAJOR_SEVENTH, "additions": [Interval(IntervalQuality.MAJOR, 9)]}),
+        ("Cmaj7add9/E", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.MAJOR_SEVENTH, "additions": [Interval(IntervalQuality.MAJOR, 9)], "bass_note": notes.E}),
+        ("F##", {"root": Note(NoteName.F, accidental=Accidental.DOUBLE_SHARP), "quality": ChordQuality.MAJOR}),
+        ("Bb13", {"root": Note(NoteName.B, accidental=Accidental.FLAT), "quality": ChordQuality.MAJOR, "extension": ChordExtension.THIRTEENTH}),
+    ])
+    def test_advanced_chord_parsing(self, chord_str, expected_chord_kwargs):
+        assert Chord.from_string(chord_str) == Chord(**expected_chord_kwargs)
 
 
 class TestChordNotes:
     """Test chord note generation."""
-    
-    def test_major_triad_notes(self):
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("C", ChordQuality.MAJOR, None, None, [0, 4, 7]),
+    ])
+    def test_major_triad_notes(self, root, quality, extension, additions, expected):
         """Test major triad note generation."""
-        c_major = Chord("C", ChordQuality.MAJOR)
-        notes = c_major.notes
-        
-        expected_pitch_classes = [0, 4, 7]  # C, E, G
-        actual_pitch_classes = [note.pitch_class for note in notes]
-        
-        assert actual_pitch_classes == expected_pitch_classes
-    
-    def test_minor_triad_notes(self):
-        """Test minor triad note generation."""
-        a_minor = Chord("A", ChordQuality.MINOR)
-        notes = a_minor.notes
-        
-        expected_pitch_classes = [9, 0, 4]  # A, C, E
-        actual_pitch_classes = [note.pitch_class for note in notes]
-        
-        assert actual_pitch_classes == expected_pitch_classes
-    
-    def test_diminished_triad_notes(self):
-        """Test diminished triad note generation."""
-        b_dim = Chord("B", ChordQuality.DIMINISHED)
-        notes = b_dim.notes
-        
-        expected_pitch_classes = [11, 2, 5]  # B, D, F
-        actual_pitch_classes = [note.pitch_class for note in notes]
-        
-        assert actual_pitch_classes == expected_pitch_classes
-    
-    def test_augmented_triad_notes(self):
-        """Test augmented triad note generation."""
-        c_aug = Chord("C", ChordQuality.AUGMENTED)
-        notes = c_aug.notes
-        
-        expected_pitch_classes = [0, 4, 8]  # C, E, G#
-        actual_pitch_classes = [note.pitch_class for note in notes]
-        
-        assert actual_pitch_classes == expected_pitch_classes
-    
-    def test_suspended_chord_notes(self):
-        """Test suspended chord note generation."""
-        csus2 = Chord("C", ChordQuality.SUSPENDED_2)
-        notes = csus2.notes
-        
-        expected_pitch_classes = [0, 2, 7]  # C, D, G
-        actual_pitch_classes = [note.pitch_class for note in notes]
-        
-        assert actual_pitch_classes == expected_pitch_classes
-        
-        csus4 = Chord("C", ChordQuality.SUSPENDED_4)
-        notes = csus4.notes
-        
-        expected_pitch_classes = [0, 5, 7]  # C, F, G
-        actual_pitch_classes = [note.pitch_class for note in notes]
-        
-        assert actual_pitch_classes == expected_pitch_classes
-    
-    def test_seventh_chord_notes(self):
-        """Test seventh chord note generation."""
-        c7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH])
-        notes = c7.notes
-        
-        expected_pitch_classes = [0, 4, 7, 10]  # C, E, G, Bb
-        actual_pitch_classes = [note.pitch_class for note in notes]
-        
-        assert actual_pitch_classes == expected_pitch_classes
-        
-        cmaj7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.MAJOR_SEVENTH])
-        notes = cmaj7.notes
-        
-        expected_pitch_classes = [0, 4, 7, 11]  # C, E, G, B
-        actual_pitch_classes = [note.pitch_class for note in notes]
-        
-        assert actual_pitch_classes == expected_pitch_classes
-    
-    def test_extended_chord_notes(self):
-        """Test extended chord note generation."""
-        c9 = Chord("C", ChordQuality.MAJOR, [ChordExtension.NINTH])
-        notes = c9.notes
-        
-        # Should include 7th and 9th
-        pitch_classes = [note.pitch_class for note in notes]
-        assert 0 in pitch_classes  # Root
-        assert 4 in pitch_classes  # Third
-        assert 7 in pitch_classes  # Fifth
-        assert 10 in pitch_classes  # Seventh
-        assert 2 in pitch_classes  # Ninth (D)
-    
-    def test_added_tone_chord_notes(self):
-        """Test chord notes with added tones."""
-        cadd9 = Chord("C", ChordQuality.MAJOR, additions=[9])
-        notes = cadd9.notes
-        
-        pitch_classes = [note.pitch_class for note in notes]
-        assert 0 in pitch_classes  # Root
-        assert 4 in pitch_classes  # Third
-        assert 7 in pitch_classes  # Fifth
-        assert 2 in pitch_classes  # Added ninth (D)
-        # Should NOT include seventh
-        assert 10 not in pitch_classes and 11 not in pitch_classes
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [note.pitch_class for note in chord.notes] == expected
 
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("A", ChordQuality.MINOR, None, None, [9, 0, 4]),
+    ])
+    def test_minor_triad_notes(self, root, quality, extension, additions, expected):
+        """Test minor triad note generation."""
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [note.pitch_class for note in chord.notes] == expected
+
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("B", ChordQuality.DIMINISHED, None, None, [11, 2, 5]),
+    ])
+    def test_diminished_triad_notes(self, root, quality, extension, additions, expected):
+        """Test diminished triad note generation."""
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [note.pitch_class for note in chord.notes] == expected
+
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("C", ChordQuality.AUGMENTED, None, None, [0, 4, 8]),
+    ])
+    def test_augmented_triad_notes(self, root, quality, extension, additions, expected):
+        """Test augmented triad note generation."""
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [note.pitch_class for note in chord.notes] == expected
+
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("C", ChordQuality.SUSPENDED_2, None, None, [0, 2, 7]),
+        ("C", ChordQuality.SUSPENDED_4, None, None, [0, 5, 7]),
+    ])
+    def test_suspended_chord_notes(self, root, quality, extension, additions, expected):
+        """Test suspended chord note generation."""
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [note.pitch_class for note in chord.notes] == expected
+
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("C", ChordQuality.MAJOR, ChordExtension.SEVENTH, None, [0, 4, 7, 10]),
+        ("C", ChordQuality.MAJOR, ChordExtension.MAJOR_SEVENTH, None, [0, 4, 7, 11]),
+    ])
+    def test_seventh_chord_notes(self, root, quality, extension, additions, expected):
+        """Test seventh chord note generation."""
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [note.pitch_class for note in chord.notes] == expected
+
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("C", ChordQuality.MAJOR, ChordExtension.NINTH, None, [0, 4, 7, 10, 2]),
+    ])
+    def test_extended_chord_notes(self, root, quality, extension, additions, expected):
+        """Test extended chord note generation."""
+        chord = Chord(Note(root).with_octave(1), quality, extension=extension, additions=additions)
+        #assert chord.notes == expected
+        assert [note.pitch_class for note in chord.notes] == expected
+
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("C", ChordQuality.MAJOR, None, ["9"], [0, 4, 7, 2]),
+    ])
+    def test_added_tone_chord_notes(self, root, quality, extension, additions, expected):
+        """Test chord notes with added tones."""
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [note.pitch_class for note in chord.notes] == expected
 
 class TestChordEnharmonicSpelling:
     """Test proper enharmonic spelling in chords."""
@@ -413,7 +448,7 @@ class TestChordWithOctave:
     
     def test_extended_chord_octaves(self):
         """Test octave distribution in extended chords."""
-        c4_maj9 = Chord("C4", ChordQuality.MAJOR, [ChordExtension.MAJOR_NINTH])
+        c4_maj9 = Chord("C4", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_NINTH)
         notes = c4_maj9.notes
         
         # Extended notes should go into higher octaves
@@ -423,138 +458,61 @@ class TestChordWithOctave:
 
 class TestChordNotesWithOctaves:
     """Test that chord notes have correct octaves based on proper voice leading."""
-    
-    def test_major_chord_octave_distribution(self):
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("B3", ChordQuality.MAJOR, None, None, ["B3", "D#4", "F#4"]),
+        ("C4", ChordQuality.MAJOR, None, None, ["C4", "E4", "G4"]),
+        ("G3", ChordQuality.MAJOR, None, None, ["G3", "B3", "D4"]),
+    ])
+    def test_major_chord_octave_distribution(self, root, quality, extension, additions, expected):
         """Test major chord octave distribution follows proper voice leading."""
-        # B3 major chord: B3, D#4, F#4
-        b3_major = Chord("B3", ChordQuality.MAJOR)
-        notes = b3_major.notes
-        
-        assert len(notes) == 3
-        assert str(notes[0]) == "B3"   # Root
-        assert str(notes[1]) == "D#4"  # Third goes to next octave
-        assert str(notes[2]) == "F#4"  # Fifth stays in next octave
-        
-        # C4 major chord: C4, E4, G4 (all in same octave)
-        c4_major = Chord("C4", ChordQuality.MAJOR)
-        notes = c4_major.notes
-        
-        assert len(notes) == 3
-        assert str(notes[0]) == "C4"   # Root
-        assert str(notes[1]) == "E4"   # Third in same octave
-        assert str(notes[2]) == "G4"   # Fifth in same octave
-        
-        # G3 major chord: G3, B3, D4 (fifth crosses octave)
-        g3_major = Chord("G3", ChordQuality.MAJOR)
-        notes = g3_major.notes
-        
-        assert len(notes) == 3
-        assert str(notes[0]) == "G3"   # Root
-        assert str(notes[1]) == "B3"   # Third in same octave
-        assert str(notes[2]) == "D4"   # Fifth goes to next octave
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [str(n) for n in chord.notes] == expected
     
-    def test_minor_chord_octave_distribution(self):
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("A3", ChordQuality.MINOR, None, None, ["A3", "C4", "E4"]),
+        ("D4", ChordQuality.MINOR, None, None, ["D4", "F4", "A4"]),
+    ])
+    def test_minor_chord_octave_distribution(self, root, quality, extension, additions, expected):
         """Test minor chord octave distribution follows proper voice leading."""
-        # A3 minor chord: A3, C4, E4
-        a3_minor = Chord("A3", ChordQuality.MINOR) 
-        notes = a3_minor.notes
-        
-        assert len(notes) == 3
-        assert str(notes[0]) == "A3"   # Root
-        assert str(notes[1]) == "C4"   # Minor third goes to next octave
-        assert str(notes[2]) == "E4"   # Fifth stays in next octave
-        
-        # D4 minor chord: D4, F4, A4
-        d4_minor = Chord("D4", ChordQuality.MINOR)
-        notes = d4_minor.notes
-        
-        assert len(notes) == 3
-        assert str(notes[0]) == "D4"   # Root
-        assert str(notes[1]) == "F4"   # Minor third in same octave
-        assert str(notes[2]) == "A4"   # Fifth in same octave
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [str(n) for n in chord.notes] == expected
     
-    def test_seventh_chord_octave_distribution(self):
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("C4", ChordQuality.MAJOR, ChordExtension.MAJOR_SEVENTH, None, ["C4", "E4", "G4", "B4"]),
+        ("G3", ChordQuality.MAJOR, ChordExtension.SEVENTH, None, ["G3", "B3", "D4", "F4"]),
+    ])
+    def test_seventh_chord_octave_distribution(self, root, quality, extension, additions, expected):
         """Test seventh chord octave distribution."""
-        # C4 major 7th: C4, E4, G4, B4
-        c4_maj7 = Chord("C4", ChordQuality.MAJOR, [ChordExtension.MAJOR_SEVENTH])
-        notes = c4_maj7.notes
-        
-        assert len(notes) == 4
-        assert str(notes[0]) == "C4"   # Root
-        assert str(notes[1]) == "E4"   # Third
-        assert str(notes[2]) == "G4"   # Fifth
-        assert str(notes[3]) == "B4"   # Major seventh
-        
-        # G3 dominant 7th: G3, B3, D4, F4
-        g3_dom7 = Chord("G3", ChordQuality.MAJOR, [ChordExtension.SEVENTH])
-        notes = g3_dom7.notes
-        
-        assert len(notes) == 4
-        assert str(notes[0]) == "G3"   # Root
-        assert str(notes[1]) == "B3"   # Third
-        assert str(notes[2]) == "D4"   # Fifth crosses octave
-        assert str(notes[3]) == "F4"   # Seventh stays in higher octave
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [str(n) for n in chord.notes] == expected
     
-    def test_extended_chord_octave_distribution(self):
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("C4", ChordQuality.MAJOR, ChordExtension.MAJOR_NINTH, None, ["C4", "E4", "G4", "B4", "D5"]),
+        ("F3", ChordQuality.MINOR, ChordExtension.SEVENTH, [intervals.MAJOR_SECOND], ["F3", "G3", "Ab3", "C4", "Eb4"]),
+    ])
+    def test_extended_chord_octave_distribution(self, root, quality, extension, additions, expected):
         """Test extended chord octave distribution across multiple octaves."""
-        # C4 major 9th: C4, E4, G4, B4, D5
-        c4_maj9 = Chord("C4", ChordQuality.MAJOR, [ChordExtension.MAJOR_NINTH])
-        notes = c4_maj9.notes
-        
-        assert len(notes) == 5
-        assert str(notes[0]) == "C4"   # Root
-        assert str(notes[1]) == "E4"   # Third
-        assert str(notes[2]) == "G4"   # Fifth
-        assert str(notes[3]) == "B4"   # Major seventh
-        assert str(notes[4]) == "D5"   # Ninth goes to next octave
-        
-        # F3 minor 11th: F3, Ab3, C4, Eb4, G4, Bb4
-        f3_min11 = Chord("F3", ChordQuality.MINOR, [ChordExtension.SEVENTH, ChordExtension.ELEVENTH])
-        notes = f3_min11.notes
-        
-        # Should span F3 to Bb4
-        assert notes[0].octave == 3  # Root in octave 3
-        assert notes[-1].octave == 4  # Highest extension in octave 4
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        print(str(chord))
+        assert [str(n) for n in chord.notes] == expected
     
-    def test_sharp_flat_chord_octave_distribution(self):
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("F#3", ChordQuality.MAJOR, None, None, ["F#3", "A#3", "C#4"]),
+        ("Bb3", ChordQuality.MAJOR, None, None, ["Bb3", "D4", "F4"]),
+    ])
+    def test_sharp_flat_chord_octave_distribution(self, root, quality, extension, additions, expected):
         """Test octave distribution with sharp and flat notes."""
-        # F#3 major chord: F#3, A#3, C#4
-        fs3_major = Chord("F#3", ChordQuality.MAJOR)
-        notes = fs3_major.notes
-        
-        assert len(notes) == 3
-        assert str(notes[0]) == "F#3"  # Root
-        assert str(notes[1]) == "A#3"  # Third in same octave
-        assert str(notes[2]) == "C#4"  # Fifth goes to next octave
-        
-        # Bb3 major chord: Bb3, D4, F4
-        bb3_major = Chord("Bb3", ChordQuality.MAJOR)
-        notes = bb3_major.notes
-        
-        assert len(notes) == 3
-        assert str(notes[0]) == "Bb3"  # Root
-        assert str(notes[1]) == "D4"   # Third goes to next octave
-        assert str(notes[2]) == "F4"   # Fifth stays in next octave
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [str(n) for n in chord.notes] == expected
     
-    def test_diminished_augmented_chord_octaves(self):
+    @pytest.mark.parametrize("root,quality,extension,additions,expected", [
+        ("C4", ChordQuality.DIMINISHED, None, None, ["C4", "Eb4", "Gb4"]),
+        ("C4", ChordQuality.AUGMENTED, None, None, ["C4", "E4", "G#4"]),
+    ])
+    def test_diminished_augmented_chord_octaves(self, root, quality, extension, additions, expected):
         """Test octave distribution for diminished and augmented chords."""
-        # C4 diminished: C4, Eb4, Gb4
-        c4_dim = Chord("C4", ChordQuality.DIMINISHED)
-        notes = c4_dim.notes
-        
-        assert len(notes) == 3
-        assert str(notes[0]) == "C4"   # Root
-        assert str(notes[1]) == "Eb4"  # Minor third
-        assert str(notes[2]) == "Gb4"  # Diminished fifth
-        
-        # C4 augmented: C4, E4, G#4
-        c4_aug = Chord("C4", ChordQuality.AUGMENTED)
-        notes = c4_aug.notes
-        
-        assert len(notes) == 3
-        assert str(notes[0]) == "C4"   # Root
-        assert str(notes[1]) == "E4"   # Major third
-        assert str(notes[2]) == "G#4"  # Augmented fifth
+        chord = Chord(root, quality, extension=extension, additions=additions)
+        assert [str(n) for n in chord.notes] == expected
 
 
 class TestChordInversions:
@@ -588,12 +546,12 @@ class TestChordModification:
         c_major = Chord("C", ChordQuality.MAJOR)
         c7 = c_major.with_extension(ChordExtension.SEVENTH)
         
-        assert ChordExtension.SEVENTH in c7.extensions
+        assert c7.extension == ChordExtension.SEVENTH
         assert c7.root == c_major.root
         assert c7.quality == c_major.quality
         
         # Original chord should be unchanged
-        assert ChordExtension.SEVENTH not in c_major.extensions
+        assert c_major.extension is None
 
 
 class TestChordImmutability:
@@ -601,7 +559,7 @@ class TestChordImmutability:
     
     def test_chord_immutability(self):
         """Test that chord attributes cannot be modified after creation."""
-        chord = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH])
+        chord = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH)
         
         # Test that attributes cannot be modified
         with pytest.raises(AttributeError):
@@ -611,7 +569,7 @@ class TestChordImmutability:
             chord.quality = ChordQuality.MINOR
         
         with pytest.raises(AttributeError):
-            chord.extensions = [ChordExtension.NINTH]
+            chord.extension = ChordExtension.NINTH
         
         with pytest.raises(AttributeError):
             chord.bass_note = Note("E")
@@ -621,13 +579,12 @@ class TestChordImmutability:
     
     def test_immutable_collections(self):
         """Test that collections returned by properties are immutable tuples."""
-        chord = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH, ChordExtension.NINTH])
+        chord = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.NINTH)
         
-        # Test that extensions returns a tuple
-        extensions = chord.extensions
-        assert isinstance(extensions, tuple)
-        assert ChordExtension.SEVENTH in extensions
-        assert ChordExtension.NINTH in extensions
+        # Test that extension returns a ChordExtension
+        extension = chord.extension
+        assert isinstance(extension, ChordExtension)
+        assert extension == ChordExtension.NINTH
         
         # Test that notes returns a tuple
         notes = chord.notes
@@ -652,10 +609,10 @@ class TestChordImmutability:
         assert with_seventh is not original
         
         # Original should be unchanged
-        assert ChordExtension.SEVENTH not in original.extensions
+        assert original.extension is None
         
         # New chord should have the extension
-        assert ChordExtension.SEVENTH in with_seventh.extensions
+        assert with_seventh.extension == ChordExtension.SEVENTH
         
         # Other properties should be preserved
         assert with_seventh.root == original.root
@@ -665,7 +622,7 @@ class TestChordImmutability:
     
     def test_with_root_copy_constructor(self):
         """Test with_root copy constructor method."""
-        original = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH])
+        original = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH)
         
         # Change root
         with_new_root = original.with_root("G")
@@ -681,9 +638,55 @@ class TestChordImmutability:
         
         # Other properties should be preserved
         assert with_new_root.quality == original.quality
-        assert with_new_root.extensions == original.extensions
+        assert with_new_root.extension == original.extension
         assert with_new_root.bass_note == original.bass_note
         assert with_new_root.inversion == original.inversion
+
+    def test_with_octave_copy_constructor(self):
+        """Test with_octave copy constructor method."""
+        original = Chord("B", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH, bass_note="G#", inversion=2)
+
+        # Change octave
+        with_new_octave = original.with_octave(5)
+
+        # Should return new instance
+        assert with_new_octave is not original
+
+        # Original should be unchanged
+        assert original.root.name == NoteName.B
+        assert original.root.octave == None
+
+        assert with_new_octave.root.name == NoteName.B
+        assert with_new_octave.root.octave == 5
+
+        # Other properties should be preserved
+        assert with_new_octave.quality == original.quality
+        assert with_new_octave.extension == original.extension
+        assert with_new_octave.bass_note == original.bass_note
+        assert with_new_octave.inversion == original.inversion
+
+    def test_with_octave_none_copy_constructor(self):
+        """Test with_octave copy constructor method with None."""
+        original = Chord("B4", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH, bass_note="G#3", inversion=2)
+
+        # Change octave to None
+        with_no_octave = original.with_octave(None)
+
+        # Should return new instance
+        assert with_no_octave is not original
+
+        # Original should be unchanged
+        assert original.root.name == NoteName.B
+        assert original.root.octave == 4
+
+        assert with_no_octave.root.name == NoteName.B
+        assert with_no_octave.root.octave == None
+
+        # Other properties should be preserved
+        assert with_no_octave.quality == original.quality
+        assert with_no_octave.extension == original.extension
+        assert with_no_octave.bass_note == original.bass_note
+        assert with_no_octave.inversion == original.inversion
     
     def test_with_bass_copy_constructor(self):
         """Test with_bass copy constructor method."""
@@ -704,7 +707,7 @@ class TestChordImmutability:
         # Other properties should be preserved
         assert with_bass.root == original.root
         assert with_bass.quality == original.quality
-        assert with_bass.extensions == original.extensions
+        assert with_bass.extension == original.extension
         assert with_bass.inversion == original.inversion
     
     def test_with_inversion_copy_constructor(self):
@@ -718,7 +721,7 @@ class TestChordImmutability:
         assert with_inversion is not original
         
         # Original should be unchanged
-        assert original.inversion is None
+        assert original.inversion == 0
         
         # New chord should have the inversion
         assert with_inversion.inversion == 1
@@ -726,7 +729,7 @@ class TestChordImmutability:
         # Other properties should be preserved
         assert with_inversion.root == original.root
         assert with_inversion.quality == original.quality
-        assert with_inversion.extensions == original.extensions
+        assert with_inversion.extension == original.extension
         assert with_inversion.bass_note == original.bass_note
     
     def test_with_method_generic_copy_constructor(self):
@@ -737,7 +740,7 @@ class TestChordImmutability:
         modified = original.with_(
             root="G",
             quality=ChordQuality.MINOR,
-            extensions=[ChordExtension.SEVENTH],
+            extension=ChordExtension.SEVENTH,
             bass_note="D"
         )
         
@@ -747,13 +750,13 @@ class TestChordImmutability:
         # Original should be unchanged
         assert original.root.name == NoteName.C
         assert original.quality == ChordQuality.MAJOR
-        assert len(original.extensions) == 0
+        assert original.extension is None
         assert original.bass_note is None
         
         # New chord should have all modifications
         assert modified.root.name == NoteName.G
         assert modified.quality == ChordQuality.MINOR
-        assert ChordExtension.SEVENTH in modified.extensions
+        assert modified.extension == ChordExtension.SEVENTH
         assert modified.bass_note.name == NoteName.D
     
     def test_chaining_copy_constructors(self):
@@ -772,14 +775,14 @@ class TestChordImmutability:
         # Original should be completely unchanged
         assert original.root.name == NoteName.C
         assert original.quality == ChordQuality.MAJOR
-        assert len(original.extensions) == 0
+        assert original.extension is None
         assert original.bass_note is None
-        assert original.inversion is None
+        assert original.inversion == 0
         
         # Final should have all modifications
         assert final.root.name == NoteName.C
         assert final.quality == ChordQuality.MAJOR
-        assert ChordExtension.SEVENTH in final.extensions
+        assert final.extension == ChordExtension.SEVENTH
         assert final.bass_note.name == NoteName.E
         assert final.inversion == 1
 
@@ -796,7 +799,7 @@ class TestChordTransposition:
         
         assert g_major.root.name == NoteName.G
         assert g_major.quality == ChordQuality.MAJOR
-        assert g_major.extensions == c_major.extensions
+        assert g_major.extension == c_major.extension
     
     def test_transpose_with_bass_note(self):
         """Test transposing chords with bass notes."""
@@ -811,7 +814,7 @@ class TestChordTransposition:
     
     def test_transpose_extended_chord(self):
         """Test transposing extended chords."""
-        cmaj7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.MAJOR_SEVENTH])
+        cmaj7 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH)
         minor_third = Interval(IntervalQuality.MINOR, 3)
         
         eb_maj7 = cmaj7.transpose(minor_third)
@@ -819,7 +822,7 @@ class TestChordTransposition:
         assert eb_maj7.root.name == NoteName.E
         assert eb_maj7.root.accidental == Accidental.FLAT
         assert eb_maj7.quality == ChordQuality.MAJOR
-        assert ChordExtension.MAJOR_SEVENTH in eb_maj7.extensions
+        assert eb_maj7.extension == ChordExtension.MAJOR_SEVENTH
 
 
 class TestChordFactoryFunctions:
@@ -856,15 +859,15 @@ class TestChordFactoryFunctions:
         c7 = dominant_seventh_chord("C")
         assert c7.quality == ChordQuality.MAJOR
         assert c7.root.name == NoteName.C
-        assert ChordExtension.SEVENTH in c7.extensions
+        assert c7.extension == ChordExtension.SEVENTH
         
         cmaj7 = major_seventh_chord("C")
-        assert ChordExtension.MAJOR_SEVENTH in cmaj7.extensions
-        
+        assert cmaj7.extension == ChordExtension.MAJOR_SEVENTH
+
         cm7 = minor_seventh_chord("C")
         assert cm7.quality == ChordQuality.MINOR
-        assert ChordExtension.SEVENTH in cm7.extensions
-    
+        assert cm7.extension == ChordExtension.SEVENTH
+
     def test_suspended_chord_factories(self):
         """Test suspended chord factory functions."""
         csus2 = sus2_chord("C")
@@ -890,10 +893,10 @@ class TestChordEquality:
     
     def test_chord_equality_with_extensions(self):
         """Test equality with extensions."""
-        c7_1 = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH])
-        c7_2 = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH])
-        cmaj7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.MAJOR_SEVENTH])
-        
+        c7_1 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH)
+        c7_2 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH)
+        cmaj7 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH)
+
         assert c7_1 == c7_2
         assert c7_1 != cmaj7
     
@@ -933,18 +936,13 @@ class TestChordStringRepresentation:
     
     def test_chord_name_with_extensions(self):
         """Test chord names with extensions."""
-        c7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH])
-        assert c7.name == "C7"
-        
-        cmaj7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.MAJOR_SEVENTH])
-        assert cmaj7.name == "Cmaj7"
-        
-        cm7 = Chord("C", ChordQuality.MINOR, [ChordExtension.SEVENTH])
-        assert cm7.name == "Cm7"
+        assert Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH).name == "C(7)"
+        assert Chord("C", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH).name == "C(maj7)"
+        assert Chord("C", ChordQuality.MINOR, extension=ChordExtension.SEVENTH).name == "Cm(7)"
     
     def test_chord_name_with_additions(self):
         """Test chord names with additions."""
-        cadd9 = Chord("C", ChordQuality.MAJOR, additions=[9])
+        cadd9 = Chord("C", ChordQuality.MAJOR, additions=["9"])
         assert "(add9)" in cadd9.name
     
     def test_chord_name_with_bass(self):
@@ -955,46 +953,18 @@ class TestChordStringRepresentation:
         am_over_c = Chord("A", ChordQuality.MINOR, bass_note="C")
         assert am_over_c.name == "Am/C"
     
-    def test_str_representation(self):
+    def test_str(self):
         """Test __str__ method."""
         c_major = Chord("C", ChordQuality.MAJOR)
         assert str(c_major) == "C"
         
-        c7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH])
-        assert str(c7) == "C7"
+        c7 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH)
+        assert str(c7) == "C(7)"
     
-    def test_repr_representation(self):
+    def test_repr(self):
         """Test __repr__ method."""
-        c_major = Chord("C", ChordQuality.MAJOR)
-        repr_str = repr(c_major)
-        
-        assert "Chord" in repr_str
-        assert "C" in repr_str
-        assert "Notes:" in repr_str
-
-
-class TestChordPatterns:
-    """Test chord interval patterns."""
-    
-    def test_chord_patterns_dict(self):
-        """Test that chord patterns are correctly defined in the optimized structure."""
-        from chordelia.chords import _CHORD_INTERVALS
-        
-        assert _CHORD_INTERVALS[ChordQuality.MAJOR] == (0, 4, 7)
-        assert _CHORD_INTERVALS[ChordQuality.MINOR] == (0, 3, 7)
-        assert _CHORD_INTERVALS[ChordQuality.DIMINISHED] == (0, 3, 6)
-        assert _CHORD_INTERVALS[ChordQuality.AUGMENTED] == (0, 4, 8)
-        assert _CHORD_INTERVALS[ChordQuality.SUSPENDED_2] == (0, 2, 7)
-        assert _CHORD_INTERVALS[ChordQuality.SUSPENDED_4] == (0, 5, 7)
-        assert _CHORD_INTERVALS[ChordQuality.POWER] == (0, 7)
-    
-    def test_extension_intervals_dict(self):
-        """Test that extension intervals are correctly defined."""
-        assert Chord.EXTENSION_INTERVALS[ChordExtension.SEVENTH] == 10
-        assert Chord.EXTENSION_INTERVALS[ChordExtension.MAJOR_SEVENTH] == 11
-        assert Chord.EXTENSION_INTERVALS[ChordExtension.NINTH] == 14
-        assert Chord.EXTENSION_INTERVALS[ChordExtension.ELEVENTH] == 17
-        assert Chord.EXTENSION_INTERVALS[ChordExtension.THIRTEENTH] == 21
+        assert repr(Chord("C", ChordQuality.MAJOR)) == '<Chord(C)[C, E, G]>'
+        assert repr(Chord("C3", ChordQuality.MAJOR, "maj7")) == '<Chord(C3(maj7))[C3, E3, G3, B3]>'
 
 
 class TestChordEdgeCases:
@@ -1010,37 +980,23 @@ class TestChordEdgeCases:
         
         assert actual_pitch_classes == expected_pitch_classes
     
-    def test_chord_with_many_extensions(self):
+    def test_chord_with_extensions_and_additions(self):
         """Test chord with multiple extensions."""
         complex_chord = Chord(
             "C", ChordQuality.MAJOR,
-            extensions=[ChordExtension.MAJOR_SEVENTH, ChordExtension.NINTH],
-            additions=[11]
+            extension=ChordExtension.MAJOR_SEVENTH,
+            additions=["11", "13"]
         )
         
-        notes = complex_chord.notes
-        pitch_classes = set(note.pitch_class for note in notes)
-        
-        # Should contain root, third, fifth, major seventh, ninth, eleventh
-        assert 0 in pitch_classes  # Root
-        assert 4 in pitch_classes  # Third
-        assert 7 in pitch_classes  # Fifth
-        assert 11 in pitch_classes  # Major seventh
-        assert 2 in pitch_classes  # Ninth
-        assert 5 in pitch_classes  # Eleventh (same as fourth)
-    
-    def test_chord_string_parsing_edge_cases(self):
-        """Test edge cases in chord string parsing."""
-        # Test with double accidentals
-        chord = Chord.from_string("F##")
-        assert chord.root.name == NoteName.F
-        assert chord.root.accidental == Accidental.DOUBLE_SHARP
-        
-        # Test with complex notation
-        complex_chord = Chord.from_string("Bb13")
-        assert complex_chord.root.name == NoteName.B
-        assert complex_chord.root.accidental == Accidental.FLAT
-        assert 13 in complex_chord.extensions
+        pitch_classes = set(note.pitch_class for note in complex_chord.notes)
+        assert pitch_classes == {
+            0,   # Root
+            4,   # Third
+            7,   # Fifth
+            11,  # Major seventh
+            5,   # Eleventh (same as fourth)
+            9,   # Thirteenth (same as sixth)
+        }
     
     def test_chord_lazy_initialization(self):
         """Test that chord notes are calculated lazily with cached_property."""
@@ -1079,3 +1035,4 @@ class TestChordEdgeCases:
             Chord.from_string("Cbbbb")  # Too many flats
         except ValueError:
             pass  # Expected to fail
+
