@@ -424,6 +424,13 @@ class Chord:
         
         root_str = root_match.group(1)
         remaining = chord_string[len(root_str):]
+
+        # If bare digits immediately follow the root, interpret them as octave.
+        if remaining and remaining[0].isdigit():
+            octave_match = re.match(r'^(\d+)', remaining)
+            if octave_match:
+                octave = int(octave_match.group(1))
+                remaining = remaining[len(octave_match.group(1)):]
         
         # Initialize parsing variables
         quality = ChordQuality.MAJOR
@@ -471,18 +478,13 @@ class Chord:
         elif remaining and remaining[0] == '+':
             quality = ChordQuality.AUGMENTED
             remaining = remaining[1:]
-        elif remaining and remaining[0] == '5':
-            quality = ChordQuality.POWER
-            remaining = remaining[1:]
-
-        print(f"{quality=}, {remaining=}")
-
         # True until we've found the first modification.
         first_modification = True
 
         def _process_modifications(content: str):
             nonlocal first_modification
             nonlocal extension
+            nonlocal quality
             if content.startswith('no'):
                 omissions.append(Interval.from_string(content[2:]))
             elif content.startswith('add'):
@@ -490,18 +492,22 @@ class Chord:
             else:
                 # No prefix. Assume chord extension if it's the first modification, otherwise addition.
                 if first_modification:
-                    extension = ChordExtension.from_string(content)
+                    try:
+                        extension = ChordExtension.from_string(content)
+                    except ValueError:
+                        # Some numeric symbols (for example "5") are qualities.
+                        quality = ChordQuality.from_string(content)
                 else: 
                     additions.append(Interval.from_string(content))
             first_modification = False
 
         while match := _MODIFICATION_RE.match(remaining):
             mod_str = match.group(0)
-            print(f"Found modification: {mod_str}")
             _process_modifications(mod_str.strip("()"))
             remaining = remaining[len(mod_str):]
 
-        return cls(root_str, quality, extension=extension, additions=additions, omissions=omissions, bass_note=bass_note)
+        root = Note.from_string(root_str).with_octave(octave)
+        return cls(root, quality, extension=extension, additions=additions, omissions=omissions, bass_note=bass_note)
     
     @classmethod
     def from_notes(cls, notes: Iterable[Union[Note, str]], bass_note: Optional[Union[Note, str]] = None) -> 'Chord':
@@ -756,7 +762,11 @@ class Chord:
             ChordQuality.SUSPENDED_4: "sus4",
             ChordQuality.POWER: "5",
         }
-        name += quality_symbols[self.quality]
+        quality_symbol = quality_symbols[self.quality]
+        if quality_symbol and quality_symbol[0].isdigit():
+            name += f"({quality_symbol})"
+        else:
+            name += quality_symbol
         
         # Add extension
         if self._extension:
