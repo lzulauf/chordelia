@@ -202,6 +202,25 @@ class TestChordFromString:
         
         c_minus = Chord.from_string("C-")
         assert c_minus.quality == ChordQuality.MINOR
+
+    def test_c5_is_major_chord_rooted_at_octave_5(self):
+        """C5 should parse as a C major chord with root octave 5."""
+        chord = Chord.from_string("C5")
+        assert chord.root == Note("C5")
+        assert chord.quality == ChordQuality.MAJOR
+
+    def test_c7_is_major_chord_rooted_at_octave_7(self):
+        """C7 should parse as a C major chord with root octave 7."""
+        chord = Chord.from_string("C7")
+        assert chord.root == Note("C7")
+        assert chord.quality == ChordQuality.MAJOR
+        assert chord.extension is None
+
+    def test_parenthesized_5_is_power_chord(self):
+        """C(5) should parse as an explicit C power chord."""
+        chord = Chord.from_string("C(5)")
+        assert chord.root == Note("C")
+        assert chord.quality == ChordQuality.POWER
     
     def test_diminished_chords(self):
         """Test parsing diminished chords."""
@@ -244,7 +263,7 @@ class TestChordFromString:
         assert Chord.from_string(chord_str) == expected_chord
 
     @pytest.mark.parametrize("chord_str, root, quality, extension", [
-        ("C7", notes.C, ChordQuality.MAJOR, ChordExtension.SEVENTH),
+        ("C(7)", notes.C, ChordQuality.MAJOR, ChordExtension.SEVENTH),
         ("Cmaj7", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_SEVENTH),
         ("C(maj7)", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_SEVENTH),
         ("Cm7", notes.C, ChordQuality.MINOR, ChordExtension.SEVENTH),
@@ -252,13 +271,13 @@ class TestChordFromString:
         ("Cmin7", notes.C, ChordQuality.MINOR, ChordExtension.SEVENTH),
         ("Cmin(7)", notes.C, ChordQuality.MINOR, ChordExtension.SEVENTH),
         ("Cmin(maj7)", notes.C, ChordQuality.MINOR, ChordExtension.MAJOR_SEVENTH),
-        ("C6", notes.C, ChordQuality.MAJOR, ChordExtension.SIXTH),
-        ("C9", notes.C, ChordQuality.MAJOR, ChordExtension.NINTH),
+        ("C(6)", notes.C, ChordQuality.MAJOR, ChordExtension.SIXTH),
+        ("C(9)", notes.C, ChordQuality.MAJOR, ChordExtension.NINTH),
         ("Cmaj9", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_NINTH),
-        ("C11", notes.C, ChordQuality.MAJOR, ChordExtension.ELEVENTH),
+        ("C(11)", notes.C, ChordQuality.MAJOR, ChordExtension.ELEVENTH),
         ("Cmaj11", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_ELEVENTH),
         ("Cm(maj11)", notes.C, ChordQuality.MINOR, ChordExtension.MAJOR_ELEVENTH),
-        ("C13", notes.C, ChordQuality.MAJOR, ChordExtension.THIRTEENTH),
+        ("C(13)", notes.C, ChordQuality.MAJOR, ChordExtension.THIRTEENTH),
         ("Cmaj13", notes.C, ChordQuality.MAJOR, ChordExtension.MAJOR_THIRTEENTH),
     ])
     def test_extension_chord_parsing(self, chord_str, root, quality, extension):
@@ -297,12 +316,12 @@ class TestChordFromString:
         ("C(7)(add11)", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": ["P11"], "bass_note": None}),
         ("C(7)add11", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": ["P11"], "bass_note": None}),
         ("C(7)(11)(13)", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": ["P11", "13"], "bass_note": None}),
-        ("B7(9)", {"root": notes.B, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": [Interval(IntervalQuality.MAJOR, 9)]}),
+        ("B(7)(9)", {"root": notes.B, "quality": ChordQuality.MAJOR, "extension": ChordExtension.SEVENTH, "additions": [Interval(IntervalQuality.MAJOR, 9)]}),
         ("F#maj7(#11)", {"root": notes.F_SHARP, "quality": ChordQuality.MAJOR, "extension": ChordExtension.MAJOR_SEVENTH, "additions": [Interval(IntervalQuality.AUGMENTED, 11)]}),
         ("Cmaj7(add9)", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.MAJOR_SEVENTH, "additions": [Interval(IntervalQuality.MAJOR, 9)]}),
         ("Cmaj7add9/E", {"root": notes.C, "quality": ChordQuality.MAJOR, "extension": ChordExtension.MAJOR_SEVENTH, "additions": [Interval(IntervalQuality.MAJOR, 9)], "bass_note": notes.E}),
         ("F##", {"root": Note(NoteName.F, accidental=Accidental.DOUBLE_SHARP), "quality": ChordQuality.MAJOR}),
-        ("Bb13", {"root": Note(NoteName.B, accidental=Accidental.FLAT), "quality": ChordQuality.MAJOR, "extension": ChordExtension.THIRTEENTH}),
+        ("Bb(13)", {"root": Note(NoteName.B, accidental=Accidental.FLAT), "quality": ChordQuality.MAJOR, "extension": ChordExtension.THIRTEENTH}),
     ])
     def test_advanced_chord_parsing(self, chord_str, expected_chord_kwargs):
         assert Chord.from_string(chord_str) == Chord(**expected_chord_kwargs)
@@ -933,6 +952,9 @@ class TestChordStringRepresentation:
         
         csus4 = Chord("C", ChordQuality.SUSPENDED_4)
         assert csus4.name == "Csus4"
+
+        c_power = Chord("C", ChordQuality.POWER)
+        assert c_power.name == "C(5)"
     
     def test_chord_name_with_extensions(self):
         """Test chord names with extensions."""
@@ -965,6 +987,44 @@ class TestChordStringRepresentation:
         """Test __repr__ method."""
         assert repr(Chord("C", ChordQuality.MAJOR)) == '<Chord(C)[C, E, G]>'
         assert repr(Chord("C3", ChordQuality.MAJOR, "maj7")) == '<Chord(C3(maj7))[C3, E3, G3, B3]>'
+
+
+class TestChordRoundTrip:
+    """Test round-trip conversion between Chord objects and chord strings."""
+
+    @pytest.mark.parametrize("chord", [
+        Chord("C", ChordQuality.MAJOR),
+        Chord("C5", ChordQuality.MAJOR),
+        Chord("F#3", ChordQuality.MINOR),
+        Chord("Bb2", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH),
+        Chord("E4", ChordQuality.AUGMENTED),
+        Chord("D3", ChordQuality.DIMINISHED),
+        Chord("G4", ChordQuality.SUSPENDED_2),
+        Chord("A3", ChordQuality.SUSPENDED_4),
+        Chord("C", ChordQuality.POWER),
+        Chord("C4", ChordQuality.POWER),
+        Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH),
+        Chord("C", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH),
+        Chord("C", ChordQuality.MINOR, extension=ChordExtension.SEVENTH),
+        Chord("E", ChordQuality.MINOR, extension=ChordExtension.MAJOR_SEVENTH),
+        Chord("F#", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_NINTH),
+        Chord("Bb", ChordQuality.MAJOR, extension=ChordExtension.THIRTEENTH),
+        Chord("C", ChordQuality.MAJOR, additions=["9"]),
+        Chord("D", ChordQuality.MAJOR, additions=["#11"]),
+        Chord("A", ChordQuality.MINOR, additions=["11"]),
+        Chord("C", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH, additions=["9"]),
+        Chord("G", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH, additions=["9", "13"]),
+        Chord("C", ChordQuality.MAJOR, omissions=["3"]),
+        Chord("D", ChordQuality.MINOR, extension=ChordExtension.SEVENTH, omissions=["5"]),
+        Chord("C", ChordQuality.MAJOR, bass_note="E"),
+        Chord("A", ChordQuality.MINOR, bass_note="C"),
+        Chord("G", ChordQuality.MAJOR, bass_note="B"),
+        Chord("C4", ChordQuality.MAJOR, bass_note="E3"),
+        Chord("F#3", ChordQuality.MINOR, extension=ChordExtension.SEVENTH, bass_note="A2"),
+    ])
+    def test_from_string_of_str_round_trip(self, chord):
+        """Chord.from_string(str(x)) should recreate x for supported string forms."""
+        assert Chord.from_string(str(chord)) == chord
 
 
 class TestChordEdgeCases:
