@@ -12,6 +12,11 @@ dependencies = [
     # Core music theory - no external dependencies
 ]
 
+[project.urls]
+Homepage = "https://github.com/lzulauf/chordelia"
+Source = "https://github.com/lzulauf/chordelia"
+Issues = "https://github.com/lzulauf/chordelia/issues"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
