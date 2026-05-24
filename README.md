@@ -586,3 +586,56 @@ Contributions are welcome! Please ensure all tests pass and add tests for new fu
 ## License
 
 MIT License - see LICENSE file for details.
+
+## Versioning and Publishing
+
+### Bumping the Version
+
+This project uses [bump-my-version](https://github.com/callowayproject/bump-my-version) to manage version numbers.
+
+**Install bump-my-version:**
+
+```bash
+uv tool install bump-my-version
+```
+
+**Show possible version bumps:**
+
+```bash
+uv tool run bump-my-version show-bump
+```
+
+**Bump the version:**
+
+Replace `<part>` with `major`, `minor`, `patch`, or `pre_l` as needed:
+
+```bash
+uv tool run bump-my-version bump <part>
+```
+
+This will update the version in both `pyproject.toml` and `src/chordelia/__init__.py`.
+
+### Publishing to PyPI
+
+Publishing is handled by GitHub Actions when a GitHub Release is published. The workflow file is `.github/workflows/python-publish.yml`.
+
+**Steps:**
+
+1. Bump the version as described above.
+2. Commit and push the version bump:
+
+    ```bash
+    git add .
+    git commit -m "Bump version: <old_version> → <new_version>"
+    git push
+    ```
+3. Create and publish a GitHub Release for the new version.
+4. The `Upload Python Package` workflow runs on `release.published`, builds the package, and publishes it to PyPI.
+
+You can create the release in the GitHub UI, or with GitHub CLI:
+
+```bash
+gh release create v<new_version> --title v<new_version> --generate-notes
+```
+
+For more details, see the workflow file at `.github/workflows/python-publish.yml`.
