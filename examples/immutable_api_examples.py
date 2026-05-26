@@ -149,7 +149,7 @@ def scale_immutability_examples():
     print(f"Transposed notes: {[str(note) for note in g_major.notes]}")
     
     # Get mode returns new instance
-    d_dorian = c_major.get_mode(2)
+    d_dorian = c_major.mode_from_degree(2)
     print(f"Mode: {d_dorian.name}")
     print(f"Mode notes: {[str(note) for note in d_dorian.notes]}")
     

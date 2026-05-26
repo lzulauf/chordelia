@@ -43,7 +43,7 @@ from chordelia import Scale, ScaleType, Interval, IntervalQuality
 
 c_major = Scale("C", ScaleType.MAJOR)
 g_major = c_major.transpose(Interval(IntervalQuality.PERFECT, 5))
-d_dorian = c_major.get_mode(2)
+d_dorian = c_major.mode_from_degree(2)
 
 print([str(n) for n in c_major.notes])
 print([str(n) for n in g_major.notes])

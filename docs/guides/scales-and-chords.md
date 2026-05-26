@@ -19,7 +19,7 @@ print(c_major.degree(5))  # G
 
 # Methods return new immutable scales
 g_major = c_major.transpose(Interval(IntervalQuality.PERFECT, 5))
-d_dorian = c_major.get_mode(2)
+d_dorian = c_major.mode_from_degree(2)
 
 print(c_major.contains_note(Note("E")))   # True
 print(c_major.contains_note(Note("F#")))  # False

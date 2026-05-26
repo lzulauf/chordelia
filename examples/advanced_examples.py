@@ -19,7 +19,7 @@ def modal_harmony_example():
     
     print("All modes of C major:")
     for i in range(1, 8):
-        mode = c_major.get_mode(i)
+        mode = c_major.mode_from_degree(i)
         notes = [str(note) for note in mode.notes]
         print(f"  {mode_names[i-1]} ({mode.root}): {notes}")
     
@@ -27,17 +27,17 @@ def modal_harmony_example():
     print("\nCharacteristic chords for each mode:")
     
     # Dorian: minor tonic with natural 6th
-    d_dorian = c_major.get_mode(2)
+    d_dorian = c_major.mode_from_degree(2)
     dm_add6 = Chord(d_dorian.root, ChordQuality.MINOR, additions=[6])
     print(f"D Dorian characteristic: Dm(add6) = {[str(note) for note in dm_add6.notes]}")
     
     # Lydian: major tonic with #11
-    f_lydian = c_major.get_mode(4)
+    f_lydian = c_major.mode_from_degree(4)
     f_maj_sharp11 = Chord(f_lydian.root, ChordQuality.MAJOR, additions=[11])  # This would be #11
     print(f"F Lydian characteristic: Fmaj#11 (conceptually)")
     
     # Mixolydian: dominant 7th
-    g_mixolydian = c_major.get_mode(5)
+    g_mixolydian = c_major.mode_from_degree(5)
     g7 = Chord(g_mixolydian.root, ChordQuality.MAJOR, extensions=["7"])
     print(f"G Mixolydian characteristic: G7 = {[str(note) for note in g7.notes]}")
     
