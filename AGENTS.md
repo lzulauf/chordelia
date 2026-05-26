@@ -17,6 +17,15 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 	- Expanding edge-case/validation matrices with parametrization
 	- Testing optional dependency paths with deterministic mocks
 
+### test-running
+
+- Path: skills/test-running.md
+- Use when:
+	- Running full or focused pytest commands
+	- Reproducing and triaging test failures
+	- Running slow tests with --runslow intentionally
+	- Checking coverage with pytest --cov=src
+
 ### plan-use
 
 - Path: skills/plan-use.md
@@ -44,6 +53,15 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 	- Reviewing skills to remove redundant instructions
 	- Updating AGENTS.md routing for new or changed skills
 
+### decision-writing
+
+- Path: skills/decision-writing.md
+- Use when:
+	- Creating architecture or approach decision documents
+	- Comparing alternative technical strategies and tradeoffs
+	- Recommending a specific approach/technology
+	- Linking decisions to implementation plans when execution should proceed
+
 ### function-naming
 
 - Path: skills/function-naming.md
@@ -66,7 +84,9 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 ### Skill Selection Rule
 
 - If a task is primarily about test coverage or test refactoring, load test-writing.
+- If a task is primarily about running tests, triaging failures, or checking coverage, load test-running.
 - If a task is primarily about creating, updating, or restructuring execution plans, load plan-use.
+- If a task is primarily about choosing between implementation approaches, load decision-writing.
 - If a task is primarily about README/docs structure or documentation ownership boundaries, load readme-writing.
 - If a task is primarily about creating or reviewing skill files, load skill-writing.
 - If a task is primarily about naming strategy, load function-naming.
@@ -75,14 +95,18 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 - If plan work includes naming or immutable model constraints, load plan-use with the relevant companion skill(s).
 - If plan work includes documentation restructuring, load plan-use with readme-writing.
 - If plan work includes skill creation or skill refactoring, load plan-use with skill-writing.
+- If plan work includes unresolved approach choices, load plan-use with decision-writing and create a decision doc in decisions/.
 - If test work includes naming or immutable constraints, load test-writing with function-naming and/or immutable-types as needed.
+- If test work includes both authoring and execution, load test-writing with test-running.
 
 ## Maintenance Rule
 
 - Keep test authoring and coverage conventions in skills/test-writing.md.
+- Keep test execution and coverage command conventions in skills/test-running.md.
 - Keep plan authoring and execution standards in skills/plan-use.md.
 - Keep README/docs structuring conventions in skills/readme-writing.md.
 - Keep skill authoring/review conventions in skills/skill-writing.md.
+- Keep decision-document conventions in skills/decision-writing.md.
 - Keep global naming conventions in skills/function-naming.md.
 - Keep immutable-specific modeling constraints in skills/immutable-types.md.
 - Keep AGENTS.md focused on skill discovery and when to load each skill.

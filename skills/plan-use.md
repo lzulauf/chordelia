@@ -9,7 +9,7 @@ user-invocable: true
 
 Use this skill to draft clear, execution-ready planning documents and keep them actively updated during implementation.
 
-Companion skills: function-naming for naming standards and immutable-types for immutable-model constraints.
+Companion skills: function-naming for naming standards, immutable-types for immutable-model constraints, and decision-writing for approach-selection docs.
 
 ## When To Use
 
@@ -91,6 +91,7 @@ Checklist style example:
 - If a conventions or migration prerequisite exists, state it near the top as Prerequisite.
 - Link dependent plans directly.
 - Do not start downstream feature phases until prerequisite checklist gates are met.
+- If a plan depends on unresolved approach choices, create a decision document in decisions/ as a Markdown file and link it from the plan.
 
 ## Plan Review Checklist
 
