@@ -6,10 +6,14 @@ with proper enharmonic spelling based on music theory principles.
 """
 
 from enum import Enum
-from typing import List, Optional, Union, Tuple, Iterable
+from typing import List, Optional, Union, Tuple, Iterable, TYPE_CHECKING
 from functools import lru_cache, cached_property
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.intervals import Interval, IntervalQuality
+from chordelia.degrees import Degree, DegreeLike
+
+if TYPE_CHECKING:
+    from chordelia.chords import Chord, ChordQuality
 
 
 class ScaleType(Enum):
@@ -260,7 +264,82 @@ class Scale:
         else:
             return True  # Default to sharps
     
-    def degree(self, degree_number: int) -> Note:
+    def _coerce_scale_degree(
+        self,
+        degree_value: DegreeLike,
+        *,
+        method_name: str,
+        allow_altered: bool = False,
+    ) -> Degree:
+        """Coerce and validate a degree input at API boundaries."""
+        degree = Degree.coerce(degree_value)
+        degree_number = degree.to_int()
+
+        if not 1 <= degree_number <= len(self.notes):
+            raise ValueError(
+                f"{method_name} requires a degree in range 1-{len(self.notes)}, "
+                f"got {degree_number}"
+            )
+
+        if not allow_altered and degree.has_alteration:
+            raise ValueError(
+                f"{method_name} currently supports only unaltered degrees. "
+                "Examples: 1, 2, 3, I, ii, V."
+            )
+
+        return degree
+
+    @staticmethod
+    def _triad_quality(
+        root: Note,
+        third: Note,
+        fifth: Note,
+    ) -> Optional['ChordQuality']:
+        """Infer triad quality from scale-derived tones."""
+        from chordelia.chords import ChordQuality
+
+        third_interval = (third.pitch_class - root.pitch_class) % 12
+        fifth_interval = (fifth.pitch_class - root.pitch_class) % 12
+
+        quality_map = {
+            (4, 7): ChordQuality.MAJOR,
+            (3, 7): ChordQuality.MINOR,
+            (3, 6): ChordQuality.DIMINISHED,
+            (4, 8): ChordQuality.AUGMENTED,
+        }
+        return quality_map.get((third_interval, fifth_interval))
+
+    @staticmethod
+    def _validate_functional_hint(degree: Degree, quality: 'ChordQuality') -> None:
+        """Validate Roman-case functional intent against derived harmony."""
+        from chordelia.chords import ChordQuality
+
+        hint = degree.functional_hint
+        if hint is None:
+            return
+
+        if hint == "major" and quality != ChordQuality.MAJOR:
+            raise ValueError(
+                f"Degree {degree} requests an uppercase major function, "
+                f"but the scale-derived triad is {quality}."
+            )
+
+        if hint == "minor_or_diminished" and quality not in {
+            ChordQuality.MINOR,
+            ChordQuality.DIMINISHED,
+        }:
+            raise ValueError(
+                f"Degree {degree} requests a lowercase minor/diminished function, "
+                f"but the scale-derived triad is {quality}."
+            )
+
+        if hint == "diminished" and quality != ChordQuality.DIMINISHED:
+            raise ValueError(
+                f"Degree {degree} requests a diminished function, "
+                f"but the scale-derived triad is {quality}."
+            )
+
+    def degree(self, degree_number: DegreeLike) -> Note:
         """
         Get a specific scale degree.
         
@@ -270,12 +349,14 @@ class Scale:
         Returns:
             The note representing that scale degree
         """
-        if not 1 <= degree_number <= len(self.notes):
-            raise ValueError(f"Scale degree must be 1-{len(self.notes)}, got {degree_number}")
-        
-        return self.notes[degree_number - 1]
+        degree = self._coerce_scale_degree(
+            degree_number,
+            method_name="Scale.degree",
+            allow_altered=False,
+        )
+        return self.notes[degree.to_int() - 1]
     
-    def mode_from_degree(self, degree: int) -> 'Scale':
+    def mode_from_degree(self, degree: DegreeLike) -> 'Scale':
         """
         Get a mode of this scale starting from the specified degree.
         
@@ -285,15 +366,19 @@ class Scale:
         Returns:
             A new Scale object representing the mode
         """
-        if not 1 <= degree <= len(self.notes):
-            raise ValueError(f"Degree must be 1-{len(self.notes)}, got {degree}")
+        coerced_degree = self._coerce_scale_degree(
+            degree,
+            method_name="Scale.mode_from_degree",
+            allow_altered=False,
+        )
+        degree_number = coerced_degree.to_int()
         
         # Get the new root note
-        new_root = self.degree(degree)
+        new_root = self.degree(degree_number)
         
         # Calculate the new pattern by rotating the original pattern
         original_pattern = self.pattern
-        degree_index = degree - 1
+        degree_index = degree_number - 1
         
         # Rotate pattern and normalize to start from 0
         rotated_pattern = original_pattern[degree_index:] + original_pattern[:degree_index]
@@ -336,7 +421,54 @@ class Scale:
         scale_pitch_classes = {n.pitch_class for n in self.notes}
         return note.pitch_class in scale_pitch_classes
     
-    def degree_for_chord_root(self, chord_root: Note) -> Optional[int]:
+    def chord_for_degree(self, degree: DegreeLike) -> 'Chord':
+        """
+        Build the default diatonic triad for a scale degree.
+
+        Roman input preserves functional hints. For example, uppercase Roman
+        numerals request major function while lowercase requests
+        minor/diminished function.
+        """
+        from chordelia.chords import Chord
+
+        if len(self.notes) != 7:
+            raise ValueError(
+                "Scale.chord_for_degree requires a heptatonic scale (7 notes)."
+            )
+
+        degree_obj = self._coerce_scale_degree(
+            degree,
+            method_name="Scale.chord_for_degree",
+            allow_altered=False,
+        )
+
+        root_index = degree_obj.to_int() - 1
+        root = self.notes[root_index]
+        third = self.notes[(root_index + 2) % 7]
+        fifth = self.notes[(root_index + 4) % 7]
+
+        quality = self._triad_quality(root, third, fifth)
+        if quality is None:
+            raise ValueError(
+                f"Unsupported diatonic triad quality at degree {degree_obj} "
+                f"for scale {self.name}."
+            )
+
+        self._validate_functional_hint(degree_obj, quality)
+        return Chord(root, quality)
+
+    def chords_for_degrees(self, *degrees: DegreeLike) -> Tuple['Chord', ...]:
+        """Build default diatonic triads for all provided degrees in input order."""
+        if len(degrees) == 1 and isinstance(degrees[0], (list, tuple)):
+            raise ValueError(
+                "Pass degrees as separate arguments, for example "
+                "scale.chords_for_degrees(1, 4, 5)."
+            )
+
+        coerced_degrees = tuple(Degree.coerce(degree) for degree in degrees)
+        return tuple(self.chord_for_degree(degree) for degree in coerced_degrees)
+
+    def degree_for_chord_root(self, chord_root: Note) -> Optional[Degree]:
         """
         Get the scale degree for a given note.
         
@@ -348,7 +480,7 @@ class Scale:
         """
         for i, scale_note in enumerate(self.notes):
             if scale_note.pitch_class == chord_root.pitch_class:
-                return i + 1
+                return Degree(i + 1)
         return None
     
     @property

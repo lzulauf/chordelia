@@ -23,6 +23,11 @@ from chordelia import Scale, ScaleType
 c_major = Scale("C", ScaleType.MAJOR)
 print([str(note) for note in c_major.notes])
 # ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+
+ii = c_major.chord_for_degree("ii")
+v = c_major.chord_for_degree("V")
+i = c_major.chord_for_degree("I")
+print([ii.name, v.name, i.name])  # ['Dm', 'G', 'C']
 ```
 
 ## Chords
@@ -37,6 +42,9 @@ first_inversion = c_maj7.with_inversion(1)
 print(c_major.name)       # C
 print(c_maj7.name)        # Cmaj7
 print(first_inversion.name)
+
+print(c_maj7.tone_at("III"))          # G
+print(c_maj7.degree_for_tone(c_maj7.tone_at(2)))  # 2
 ```
 
 ## Rhythm and Timing

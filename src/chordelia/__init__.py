@@ -13,6 +13,7 @@ and clarity, making it suitable for low-end hardware.
 """
 
 from chordelia.intervals import Interval, IntervalQuality
+from chordelia.degrees import Degree, DegreeLike, RomanCase
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.scales import Scale, ScaleType
 from chordelia.chords import Chord, ChordQuality, ChordExtension
@@ -42,6 +43,9 @@ __version__ = "0.3.1"
 __all__ = [
     "Interval",
     "IntervalQuality", 
+    "Degree",
+    "DegreeLike",
+    "RomanCase",
     "Note",
     "NoteName",
     "Accidental",

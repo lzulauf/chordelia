@@ -6,6 +6,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 
 - `Note`: Musical note with optional octave support.
 - `Interval`: Interval quality and number with semitone math.
+- `Degree`: Degree value object with numeric and Roman coercion helpers.
 - `Scale`: Scale generation with theory-aware note spelling.
 - `Chord`: Chord quality, extensions, inversions, and slash chords.
 - `Duration`: Fractional note duration utilities.
@@ -27,6 +28,15 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - Duration creation: `whole_note()`, `half_note()`, `quarter_note()`, `eighth_note()`, `sixteenth_note()`
 - Duration modification: `dotted(duration)`, `triplet(duration)`
 - Common time signatures: `COMMON_TIME`, `WALTZ_TIME`, `COMPOUND_DUPLE`
+
+## Degree-Aware APIs
+
+- `Degree.coerce(...)`, `Degree.from_string(...)`, `Degree.to_int()`, `Degree.to_roman(...)`
+- `Scale.degree(...)`, `Scale.mode_from_degree(...)`
+- `Scale.chord_for_degree(...)`, `Scale.chords_for_degrees(...)`
+- `Scale.degree_for_chord_root(...) -> Degree | None`
+- `Chord.tone_at(...)`, `Chord.degree_for_tone(...) -> Degree | None`
+- `Interval.degree`, `Interval.simple_degree`
 
 ## Real-World Applications
 

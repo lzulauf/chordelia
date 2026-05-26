@@ -7,11 +7,13 @@ enharmonic spelling, modes, and transposition.
 
 import pytest
 from chordelia.scales import Scale, ScaleType, CustomScale
+from chordelia.degrees import Degree
 from chordelia.scales import (
     major_scale, minor_scale, harmonic_minor_scale, melodic_minor_scale,
     dorian_scale, mixolydian_scale, pentatonic_major_scale, 
     pentatonic_minor_scale, blues_scale
 )
+from chordelia.chords import Chord, ChordQuality
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.intervals import Interval, IntervalQuality
 
@@ -267,6 +269,14 @@ class TestScaleDegrees:
         assert str(c_major.degree(5)) == "G"  # Fifth
         assert str(c_major.degree(6)) == "A"  # Sixth
         assert str(c_major.degree(7)) == "B"  # Seventh
+
+    def test_scale_degree_access_with_degree_like_inputs(self):
+        """Degree APIs should accept ints, Degree objects, and Roman strings."""
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        assert str(c_major.degree(Degree(4))) == "F"
+        assert str(c_major.degree("V")) == "G"
+        assert str(c_major.degree("ii")) == "D"
     
     def test_invalid_scale_degree(self):
         """Test that invalid scale degrees raise errors."""
@@ -310,6 +320,13 @@ class TestScaleModes:
         # Sixth mode (Aeolian/Natural Minor) starting from A
         a_aeolian = c_major.mode_from_degree(6)
         assert str(a_aeolian.root) == "A"
+
+    def test_mode_from_degree_accepts_degree_like(self):
+        """Mode selection should accept DegreeLike values."""
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        assert str(c_major.mode_from_degree(Degree(2)).root) == "D"
+        assert str(c_major.mode_from_degree("iii").root) == "E"
     
     def test_mode_patterns(self):
         """Test that modes have correct interval patterns."""
@@ -468,12 +485,90 @@ class TestScaleNoteContainment:
         """Test finding scale degrees for notes."""
         c_major = Scale("C", ScaleType.MAJOR)
         
-        assert c_major.degree_for_chord_root(Note("C")) == 1
-        assert c_major.degree_for_chord_root(Note("E")) == 3
-        assert c_major.degree_for_chord_root(Note("G")) == 5
+        assert c_major.degree_for_chord_root(Note("C")) == Degree(1)
+        assert c_major.degree_for_chord_root(Note("E")) == Degree(3)
+        assert c_major.degree_for_chord_root(Note("G")) == Degree(5)
         
         # Note not in scale should return None
         assert c_major.degree_for_chord_root(Note("F#")) is None
+
+
+class TestScaleDegreeHarmonization:
+    """Test scale harmonization helpers that use degree inputs."""
+
+    @pytest.mark.parametrize(
+        "degree, expected_root, expected_quality",
+        [
+            pytest.param(1, "C", ChordQuality.MAJOR, id="major-I"),
+            pytest.param("ii", "D", ChordQuality.MINOR, id="major-ii"),
+            pytest.param("vii°", "B", ChordQuality.DIMINISHED, id="major-vii-dim"),
+            pytest.param(Degree(5), "G", ChordQuality.MAJOR, id="major-V"),
+        ],
+    )
+    def test_chord_for_degree_major(self, degree, expected_root, expected_quality):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        chord = c_major.chord_for_degree(degree)
+        assert isinstance(chord, Chord)
+        assert str(chord.root) == expected_root
+        assert chord.quality == expected_quality
+
+    @pytest.mark.parametrize(
+        "degree, expected_root, expected_quality",
+        [
+            pytest.param(1, "A", ChordQuality.MINOR, id="minor-i"),
+            pytest.param(2, "B", ChordQuality.DIMINISHED, id="minor-ii-dim"),
+            pytest.param(3, "C", ChordQuality.MAJOR, id="minor-III"),
+            pytest.param(7, "G", ChordQuality.MAJOR, id="minor-VII"),
+        ],
+    )
+    def test_chord_for_degree_natural_minor(self, degree, expected_root, expected_quality):
+        a_minor = Scale("A", ScaleType.NATURAL_MINOR)
+
+        chord = a_minor.chord_for_degree(degree)
+        assert str(chord.root) == expected_root
+        assert chord.quality == expected_quality
+
+    def test_chords_for_degrees_preserves_input_order(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        progression = c_major.chords_for_degrees("ii", "V", "I")
+        assert isinstance(progression, tuple)
+        assert [str(chord.root) for chord in progression] == ["D", "G", "C"]
+        assert [chord.quality for chord in progression] == [
+            ChordQuality.MINOR,
+            ChordQuality.MAJOR,
+            ChordQuality.MAJOR,
+        ]
+
+    def test_chords_for_degrees_rejects_ambiguous_single_tuple_call(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        with pytest.raises(ValueError):
+            c_major.chords_for_degrees((1, 4, 5))
+
+    def test_chord_generation_limited_to_heptatonic_scales(self):
+        c_pent = Scale("C", ScaleType.PENTATONIC_MAJOR)
+
+        with pytest.raises(ValueError):
+            c_pent.chord_for_degree(1)
+
+        with pytest.raises(ValueError):
+            c_pent.chords_for_degrees(1, 4, 5)
+
+    @pytest.mark.parametrize("degree", ["I", "V"])
+    def test_uppercase_roman_function_conflict_raises(self, degree):
+        a_minor = Scale("A", ScaleType.NATURAL_MINOR)
+
+        with pytest.raises(ValueError):
+            a_minor.chord_for_degree(degree)
+
+    def test_post_construction_refinement_with_extension(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        dominant_seventh = c_major.chord_for_degree("V").with_extension("7")
+        assert str(dominant_seventh.root) == "G"
+        assert str(dominant_seventh.extension) == "7"
 
 
 class TestCustomScale:
