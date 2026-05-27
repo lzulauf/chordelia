@@ -18,7 +18,7 @@ Back links: [Project README](../README.md)
 
 ## Reference
 
-- [API Overview](api-overview.md): class, enum, and convenience function map.
+- [API Overview](api-overview.md): class, value object, enum, and convenience function map.
 
 ## Development
 

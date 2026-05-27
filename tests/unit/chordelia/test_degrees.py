@@ -3,6 +3,7 @@
 import pytest
 
 from chordelia.degrees import Degree
+from chordelia.accidentals import Accidental
 
 
 class TestDegreeCreation:
@@ -40,7 +41,7 @@ class TestDegreeStringParsing:
     """Test Degree string grammar and Roman semantics."""
 
     @pytest.mark.parametrize(
-        "text, number, accidental, roman_case, is_roman, diminished",
+        "text, number, accidental_offset, roman_case, is_roman, diminished",
         [
             pytest.param("1", 1, 0, "none", False, False, id="numeric"),
             pytest.param("bb7", 7, -2, "none", False, False, id="numeric-double-flat"),
@@ -52,11 +53,20 @@ class TestDegreeStringParsing:
             pytest.param("V7", 5, 0, "upper", True, False, id="roman-with-suffix"),
         ],
     )
-    def test_from_string_fields(self, text, number, accidental, roman_case, is_roman, diminished):
+    def test_from_string_fields(
+        self,
+        text,
+        number,
+        accidental_offset,
+        roman_case,
+        is_roman,
+        diminished,
+    ):
         degree = Degree.from_string(text)
 
         assert degree.number == number
-        assert degree.accidental == accidental
+        assert degree.accidental == Accidental.from_offset(accidental_offset)
+        assert degree.accidental_offset == accidental_offset
         assert degree.roman_case == roman_case
         assert degree.is_roman is is_roman
         assert degree.had_diminished_symbol is diminished

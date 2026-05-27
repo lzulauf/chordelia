@@ -14,10 +14,10 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `Tempo`: BPM and traditional marking helpers.
 - `Beat`: Position tracking within and across measures.
 
-## Enumerations
+## Enumerations and Value Objects
 
 - `NoteName`: C, D, E, F, G, A, B
-- `Accidental`: DOUBLE_FLAT, FLAT, NATURAL, SHARP, DOUBLE_SHARP
+- `Accidental`: enum with canonical constants (`DOUBLE_FLAT`, `FLAT`, `NATURAL`, `SHARP`, `DOUBLE_SHARP`) and conversion helpers (`coerce`, `from_offset`, `from_string`, `to_offset`, `to_symbol`)
 - `IntervalQuality`: PERFECT, MAJOR, MINOR, AUGMENTED, DIMINISHED, and more
 - `ScaleType`: MAJOR, MINOR, DORIAN, MIXOLYDIAN, PENTATONIC_MAJOR, and more
 - `ChordQuality`: MAJOR, MINOR, DIMINISHED, AUGMENTED, SUSPENDED_2, and more
@@ -32,6 +32,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 ## Degree-Aware APIs
 
 - `Degree.coerce(...)`, `Degree.from_string(...)`, `Degree.to_int()`, `Degree.to_roman(...)`
+- `Degree.accidental`, `Degree.accidental_offset`
 - `Scale.degree(...)`, `Scale.mode_from_degree(...)`
 - `Scale.chord_for_degree(...)`, `Scale.chords_for_degrees(...)`
 - `Scale.degree_for_chord_root(...) -> Degree | None`

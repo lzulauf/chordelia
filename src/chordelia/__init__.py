@@ -14,7 +14,8 @@ and clarity, making it suitable for low-end hardware.
 
 from chordelia.intervals import Interval, IntervalQuality
 from chordelia.degrees import Degree, DegreeLike, RomanCase
-from chordelia.notes import Note, NoteName, Accidental
+from chordelia.accidentals import Accidental
+from chordelia.notes import Note, NoteName
 from chordelia.scales import Scale, ScaleType
 from chordelia.chords import Chord, ChordQuality, ChordExtension
 from chordelia.rhythm import (

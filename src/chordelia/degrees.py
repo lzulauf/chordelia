@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from typing import Literal, TypeAlias
+from chordelia.accidentals import Accidental
 
 RomanCase: TypeAlias = Literal["upper", "lower", "preserve", "auto"]
 
@@ -48,7 +49,7 @@ class Degree:
     def __init__(
         self,
         number: int,
-        accidental: int = 0,
+        accidental: Accidental | int | str = 0,
         *,
         parsed_case: Literal["upper", "lower", "mixed", "none"] = "none",
         is_roman: bool = False,
@@ -57,10 +58,7 @@ class Degree:
     ):
         if number < 1:
             raise ValueError(f"Degree number must be >= 1, got {number}")
-        if accidental < -2 or accidental > 2:
-            raise ValueError(
-                f"Degree accidental offset must be between -2 and 2, got {accidental}"
-            )
+        accidental = Accidental.coerce(accidental)
         if parsed_case not in {"upper", "lower", "mixed", "none"}:
             raise ValueError(
                 "parsed_case must be one of: 'upper', 'lower', 'mixed', 'none'"
@@ -101,12 +99,12 @@ class Degree:
             )
 
         if match := _DEGREE_NUMERIC_RE.match(normalized):
-            accidental = _accidental_to_offset(match.group("acc"))
+            accidental = Accidental.from_string(match.group("acc"))
             number = int(match.group("number"))
             return cls(number, accidental)
 
         if match := _DEGREE_ROMAN_RE.match(normalized):
-            accidental = _accidental_to_offset(match.group("acc"))
+            accidental = Accidental.from_string(match.group("acc"))
             roman = match.group("roman")
             diminished_symbol = match.group("dim")
 
@@ -138,9 +136,14 @@ class Degree:
         return self._number
 
     @property
-    def accidental(self) -> int:
-        """Accidental offset in semitones (-2..2)."""
+    def accidental(self) -> Accidental:
+        """Canonical accidental enum member."""
         return self._accidental
+
+    @property
+    def accidental_offset(self) -> int:
+        """Accidental semitone offset for arithmetic workflows."""
+        return self._accidental.to_offset()
 
     @property
     def is_roman(self) -> bool:
@@ -160,7 +163,7 @@ class Degree:
     @property
     def has_alteration(self) -> bool:
         """Whether this degree has an accidental prefix."""
-        return self._accidental != 0
+        return self.accidental_offset != 0
 
     @property
     def functional_hint(self) -> Literal["major", "minor_or_diminished", "diminished"] | None:
@@ -205,7 +208,7 @@ class Degree:
             roman = roman_upper
 
         dim_suffix = "°" if self._had_diminished_symbol else ""
-        return f"{_offset_to_accidental(self._accidental)}{roman}{dim_suffix}"
+        return f"{self._accidental.to_symbol()}{roman}{dim_suffix}"
 
     def __int__(self) -> int:
         return self.to_int()
@@ -213,11 +216,11 @@ class Degree:
     def __str__(self) -> str:
         if self._is_roman:
             return self.to_roman(case="preserve")
-        return f"{_offset_to_accidental(self._accidental)}{self._number}"
+        return f"{self._accidental.to_symbol()}{self._number}"
 
     def __repr__(self) -> str:
         return (
-            f"Degree(number={self._number}, accidental={self._accidental}, "
+            f"Degree(number={self._number}, accidental={self.accidental_offset}, "
             f"roman_case={self._parsed_case!r}, is_roman={self._is_roman})"
         )
 
@@ -226,35 +229,14 @@ class Degree:
             return False
         return (
             self._number == other._number
-            and self._accidental == other._accidental
+            and self.accidental_offset == other.accidental_offset
         )
 
     def __hash__(self) -> int:
-        return hash((self._number, self._accidental))
+        return hash((self._number, self.accidental_offset))
 
 
 DegreeLike: TypeAlias = Degree | int | str
-
-
-def _accidental_to_offset(accidental: str) -> int:
-    if not accidental:
-        return 0
-    if set(accidental) == {"#"}:
-        return len(accidental)
-    if set(accidental) == {"b"}:
-        return -len(accidental)
-    raise ValueError(
-        f"Invalid accidental prefix: {accidental!r}. Use only leading # or b."
-    )
-
-
-def _offset_to_accidental(offset: int) -> str:
-    if offset > 0:
-        return "#" * offset
-    if offset < 0:
-        return "b" * (-offset)
-    return ""
-
 
 def _roman_to_int(text: str) -> int:
     total = 0

@@ -29,7 +29,7 @@ class TestNoteName:
 
 
 class TestAccidental:
-    """Test Accidental enum."""
+    """Test accidental enum behavior exposed in notes."""
     
     def test_accidental_values(self):
         """Test that accidentals have correct semitone values."""
@@ -50,6 +50,21 @@ class TestAccidental:
 
 class TestNoteCreation:
     """Test note creation and initialization."""
+
+    @pytest.mark.parametrize(
+        "alias",
+        [
+            pytest.param("", id="empty"),
+            pytest.param("n", id="n"),
+            pytest.param("N", id="upper-n"),
+            pytest.param("natural", id="natural-lower"),
+            pytest.param("NATURAL", id="natural-upper"),
+        ],
+    )
+    def test_create_with_natural_alias_strings(self, alias):
+        """Test constructor coercion for natural accidental aliases."""
+        note = Note(NoteName.C, alias)
+        assert note.accidental is Accidental.NATURAL
     
     def test_create_natural_notes(self):
         """Test creation of natural notes."""
@@ -111,6 +126,12 @@ class TestNoteCreation:
         
         e_flat = Note(NoteName.E, -1)
         assert e_flat.accidental == Accidental.FLAT
+
+    @pytest.mark.parametrize("accidental", ["x", "#b", "bbb", "###", object()])
+    def test_create_with_invalid_accidental_raises(self, accidental):
+        """Test invalid accidental values are rejected through canonical coercion."""
+        with pytest.raises(ValueError):
+            Note(NoteName.C, accidental)
 
 
 class TestNoteFromString:

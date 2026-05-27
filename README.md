@@ -5,6 +5,7 @@ Chordelia is a Python library for music theory and timing workflows. It emphasiz
 ## Features
 
 - Intervals with quality/number math and naming
+- Degrees with int/Roman coercion and context-aware Roman case semantics
 - Notes with accidentals, enharmonics, octave, MIDI, and frequency support
 - Scales with theory-correct enharmonic spelling
 - Chords with parsing, extensions, inversions, and slash-chord handling
@@ -35,6 +36,9 @@ from chordelia import Note, Scale, ScaleType, Chord
 
 c_major = Scale("C", ScaleType.MAJOR)
 print([str(n) for n in c_major.notes])
+
+ii_v_i = c_major.chords_for_degrees("ii", "V", "I")
+print([chord.name for chord in ii_v_i])
 
 c_chord = Chord("C").with_extension("maj7").with_inversion(1)
 print(c_chord.name)
