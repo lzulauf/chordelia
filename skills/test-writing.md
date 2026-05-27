@@ -9,7 +9,7 @@ user-invocable: true
 
 Use this skill to write or update tests that match chordelia conventions.
 
-Companion skills: function-naming for canonical API naming and immutable-types for immutable behavior checks.
+Companion skills: function-naming for canonical API naming, immutable-types for immutable behavior checks, and readme-writing for documentation updates tied to behavior/API changes.
 
 ## Core Conventions
 
@@ -72,6 +72,15 @@ Companion skills: function-naming for canonical API naming and immutable-types f
 7. Match local style in existing files
 - If a file uses unittest style for a specific area (for example heavy playback mocking), follow local style unless intentionally migrating.
 
+8. Require test deltas for behavior/API changes
+- If a change modifies behavior, parsing, validation, public APIs, or canonical model semantics, add or update tests in the same change.
+- If no tests are added or updated, include a short "No test delta rationale" note in the task summary or plan update.
+- Valid rationale examples: docs-only edits, comment-only edits, pure refactor with proven behavioral equivalence and no contract changes.
+
+9. Coordinate docs deltas for user-visible changes
+- If a test delta confirms user-visible behavior/API changes, ensure matching README/docs updates are included or document a "No docs delta rationale".
+- Load readme-writing when behavior/API changes alter examples, contracts, or usage guidance.
+
 ## Checklist for New Test Work
 
 - [ ] Canonical API names used in new tests
@@ -84,6 +93,9 @@ Companion skills: function-naming for canonical API naming and immutable-types f
 - [ ] Fixture scope is appropriate (local file vs conftest.py)
 - [ ] Immutability checks included where relevant
 - [ ] Slow markers used only when needed
+- [ ] Behavior/API changes include test additions or updates in the same change
+- [ ] If no tests changed, "No test delta rationale" is explicitly documented
+- [ ] User-visible behavior/API changes include matching docs updates or a "No docs delta rationale"
 
 ## Running Tests
 

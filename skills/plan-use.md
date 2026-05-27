@@ -9,7 +9,7 @@ user-invocable: true
 
 Use this skill to draft clear, execution-ready planning documents and keep them actively updated during implementation.
 
-Companion skills: function-naming for naming standards, immutable-types for immutable-model constraints, and decision-writing for approach-selection docs.
+Companion skills: function-naming for naming standards, immutable-types for immutable-model constraints, decision-writing for approach-selection docs, and readme-writing for README/docs ownership and update flow.
 
 ## When To Use
 
@@ -20,6 +20,7 @@ Companion skills: function-naming for naming standards, immutable-types for immu
 - Defining success criteria before coding
 - Updating plan checklist status as implementation progresses
 - Re-scoping phases when requirements change
+- Planning public API or behavior changes that require documentation updates
 
 ## Plan Location and Naming
 
@@ -32,7 +33,7 @@ Companion skills: function-naming for naming standards, immutable-types for immu
 
 Examples:
 - .plans/conventions_alignment_plan.md
-- .plans/degree_support.md
+- .plans/archive/degree_support.md
 
 ## Required Plan Sections
 
@@ -42,12 +43,27 @@ Include these sections in order unless there is a strong reason not to:
 2. Why this comes first (optional but recommended)
 3. Scope
 4. Out of scope
-5. Testing approach
-6. Progress checklist
-7. Phases (numbered, with concrete deliverables)
-8. Execution order recommendation
-9. Risks and mitigations (optional)
-10. Acceptance criteria
+5. Technical design details
+6. Testing approach
+7. Documentation approach
+8. Progress checklist
+9. Phases (numbered, with concrete deliverables)
+10. Execution order recommendation
+11. Risks and mitigations (optional)
+12. Acceptance criteria
+
+## Technical Design Details Rules
+
+- Include an explicit section named "Technical design details" for any plan that changes code.
+- This section should be specific enough that implementation can begin without rediscovering major design choices.
+- Cover at least:
+	- Canonical types/data models and invariants.
+	- API signatures for new or changed public methods.
+	- Module/file touchpoints (where each change will occur).
+	- Error and validation semantics (what raises, accepted forms).
+	- Compatibility and migration notes (what breaks, what is removed, and when).
+- Prefer explicit examples for ambiguous contracts (for example input and output forms).
+- If design uncertainty remains after this section, create/link a decision doc before coding.
 
 ## Testing Approach Section Rules
 
@@ -56,7 +72,16 @@ Include these sections in order unless there is a strong reason not to:
 - Identify key test targets and critical edge cases.
 - Describe mocking/fixture strategy and whether shared fixtures are needed.
 - Include how tests will be run and what constitutes passing validation.
-- If no test changes are expected, state that explicitly with rationale.
+- Include expected test delta classification: new tests, updated tests, both, or no test delta.
+- If no test changes are expected, state that explicitly with rationale under a "No test delta rationale" note.
+
+## Documentation Approach Section Rules
+
+- Include an explicit section named "Documentation approach" for plans that change public APIs, parsing behavior, validation behavior, examples, or user-facing workflows.
+- Identify documentation touchpoints directly (for example README.md, docs/README.md, docs/api-overview.md, and affected guides).
+- Include expected docs delta classification: README updates, docs updates, both, or no docs delta.
+- If no documentation changes are expected, state that explicitly with rationale under a "No docs delta rationale" note.
+- Include how documentation changes will be validated (for example example snippets updated, link paths checked, terminology consistency verified).
 
 ## Progress Checklist Rules
 
@@ -78,6 +103,8 @@ Checklist style example:
 - Prefer small, testable phase boundaries.
 - Put compatibility and migration phases before cleanup/removal phases.
 - Explicitly call out docs and tests phases.
+- Include technical deliverables in each phase (for example signature updates, type migrations, parser behavior).
+- For model/API phases, list target files/modules directly.
 
 ## Naming and API Planning Rules
 
@@ -97,12 +124,20 @@ Checklist style example:
 
 - Sections are complete and in logical order.
 - Scope and out-of-scope are explicit.
+- Technical design details are explicit, concrete, and implementation-ready.
 - Testing approach section is explicit and actionable.
+- Testing approach explicitly states expected test delta classification.
+- Any "no test delta" claim includes rationale and is consistent with the planned code changes.
+- Documentation approach section is explicit and actionable when user-facing behavior or APIs change.
+- Documentation approach explicitly states expected docs delta classification.
+- Any "no docs delta" claim includes rationale and is consistent with the planned code changes.
 - Checklist is actionable and measurable.
 - Checklist status is current and reflects real execution progress.
 - Phases map to concrete files/modules.
 - Test and documentation work are included.
 - Acceptance criteria are unambiguous.
+- Acceptance criteria include test validation evidence expectations (focused and full test runs, or justified exception).
+- Acceptance criteria include documentation validation expectations (updated references/examples or justified exception).
 - Dependencies and prerequisites are linked.
 - Finished plans are moved to .plans/archive/.
 
@@ -111,7 +146,7 @@ Checklist style example:
 1. Preserve plan intent and existing completed checklist items.
 2. Apply minimal edits for consistency with current conventions.
 3. Update all internal references after renames.
-4. Update testing approach if scope, risk, or validation strategy has changed.
+4. Update testing and documentation approach if scope, risk, or validation strategy has changed.
 5. Update checklist states to reflect the current project state.
 6. Re-read full plan to ensure no stale names remain.
 7. Note major deltas in commit/PR summary.
