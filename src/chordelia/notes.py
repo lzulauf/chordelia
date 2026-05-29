@@ -7,11 +7,14 @@ All calculations are done algorithmically for efficiency.
 """
 
 from enum import Enum
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 import re
 from functools import lru_cache
 from chordelia.accidentals import Accidental
 from chordelia.intervals import Interval, IntervalQuality
+
+if TYPE_CHECKING:
+    from chordelia.score import ScoreEvent, ScoreEventContext
 
 # Pre-compiled regex for faster note parsing
 _NOTE_PATTERN = re.compile(r'^([A-G])(#{1,2}|b{1,2})?(\d+)?$')
@@ -353,6 +356,28 @@ class Note:
         
         # Adjust enharmonic spelling based on the interval
         return self._get_enharmonic_for_interval(base_note, interval)
+
+    def score_events_for_context(self, context: 'ScoreEventContext') -> tuple['ScoreEvent', ...]:
+        """Emit a single score event for this note under the provided context."""
+        midi_number = self.midi_number
+        if midi_number is None:
+            raise ValueError(
+                "Note.score_events_for_context requires octave information to emit MIDI pitch values."
+            )
+
+        from chordelia.score import ScoreEvent
+
+        return (
+            ScoreEvent(
+                beat=context.start_offset,
+                duration=context.default_duration,
+                pitches=(midi_number,),
+                velocity=context.velocity,
+                channel=context.channel,
+                voice=context.voice,
+                spelling=(str(self),),
+            ),
+        )
     
     def _get_enharmonic_for_interval(self, target_note: 'Note', interval: Interval) -> 'Note':
         """

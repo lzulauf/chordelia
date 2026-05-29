@@ -9,6 +9,8 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `Degree`: Degree value object with numeric and Roman coercion helpers.
 - `Scale`: Scale generation with theory-aware note spelling.
 - `Chord`: Chord quality, extensions, inversions, and slash chords.
+- `Sequenceable`: Protocol for objects that can emit normalized score events.
+- `Score`: Canonical wrapper around a source and ordered normalized events.
 - `Duration`: Fractional note duration utilities.
 - `TimeSignature`: Meter representation such as 4/4, 3/4, 6/8.
 - `Tempo`: BPM and traditional marking helpers.
@@ -22,12 +24,37 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `ScaleType`: MAJOR, MINOR, DORIAN, MIXOLYDIAN, PENTATONIC_MAJOR, and more
 - `ChordQuality`: MAJOR, MINOR, DIMINISHED, AUGMENTED, SUSPENDED_2, and more
 - `NoteValue`: WHOLE, HALF, QUARTER, EIGHTH, SIXTEENTH, and more
+- `ScoreEvent`: Timed event with beat, duration, pitches, and playback metadata
+- `ScoreEventContext`: Context used to convert sequenceable values into score events
+- `ScoreMetadata`: Score-level metadata such as tempo, time signature, key, and ppq
 
 ## Convenience Functions
 
 - Duration creation: `whole_note()`, `half_note()`, `quarter_note()`, `eighth_note()`, `sixteenth_note()`
 - Duration modification: `dotted(duration)`, `triplet(duration)`
 - Common time signatures: `COMMON_TIME`, `WALTZ_TIME`, `COMPOUND_DUPLE`
+- Score conversion: `score_from_sequenceable(...)`
+
+## Score Conversion Workflow
+
+- Use `Score.from_sequenceable(...)` or `score_from_sequenceable(...)` for canonical normalization.
+- `Note` and `Chord` implement `Sequenceable` and provide `score_events_for_context(...)`.
+- `Score.events` are sorted deterministically for downstream consistency.
+
+Example:
+
+```python
+from chordelia import Chord, Score
+
+score = Score.from_sequenceable(
+	Chord("C4"),
+	tempo=96,
+	time_signature=(3, 4),
+)
+
+first_event = score.events[0]
+print(first_event.beat, first_event.duration, first_event.pitches)
+```
 
 ## Degree-Aware APIs
 

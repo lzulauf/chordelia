@@ -14,6 +14,12 @@ pytest tests/
 
 Contributions are welcome. Please include tests for behavior changes and keep docs aligned with the final API.
 
+## Public vs Internal APIs
+
+- Public APIs are exported from `chordelia` and documented in the API docs.
+- Names prefixed with `_` are internal implementation details and may change without compatibility guarantees.
+- In particular, adapter-registry helpers in `chordelia.sequenceable` are internal; prefer public score conversion entry points such as `Score.from_sequenceable(...)` and `score_from_sequenceable(...)`.
+
 ## Versioning
 
 This project uses bump-my-version.

@@ -58,6 +58,20 @@ quarter_ms = quarter_note().to_milliseconds(tempo.bpm, time_sig)
 print(f"Quarter note length: {quarter_ms:.0f}ms")
 ```
 
+## Score Conversion
+
+```python
+from chordelia import Chord, Note, Score, score_from_sequenceable
+
+# Classmethod conversion
+chord_score = Score.from_sequenceable(Chord("C4"), tempo=100)
+print(chord_score.events[0].pitches)  # (60, 64, 67)
+
+# Helper conversion
+note_score = score_from_sequenceable(Note("F#4"), time_signature=(3, 4))
+print(note_score.events[0].beat, note_score.events[0].duration)
+```
+
 ## Where to Go Next
 
 - [Notes and Intervals](guides/notes-and-intervals.md)

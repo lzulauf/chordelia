@@ -6,12 +6,14 @@ transposition, MIDI conversion, and interval calculations.
 """
 
 import pytest
+from fractions import Fraction
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.notes import (
     C, C_SHARP, D_FLAT, D, D_SHARP, E_FLAT, E, F, F_SHARP, G_FLAT,
     G, G_SHARP, A_FLAT, A, A_SHARP, B_FLAT, B
 )
 from chordelia.intervals import Interval, IntervalQuality
+from chordelia.score import ScoreEventContext
 
 
 class TestNoteName:
@@ -334,6 +336,55 @@ class TestNoteMIDI:
         
         high_note = Note.from_midi_number(127)
         assert high_note.octave == 9
+
+
+class TestNoteScoreEvents:
+    """Test score event conversion behavior for Note."""
+
+    def test_note_emits_single_score_event(self):
+        """Notes emit one event using timing and playback values from context."""
+        context = ScoreEventContext(
+            start_offset=Fraction(3, 2),
+            default_duration=Fraction(1, 2),
+            velocity=90,
+            channel=2,
+            voice=1,
+        )
+
+        events = Note("C4").score_events_for_context(context)
+
+        assert len(events) == 1
+        event = events[0]
+        assert event.beat == Fraction(3, 2)
+        assert event.duration == Fraction(1, 2)
+        assert event.pitches == (60,)
+        assert event.velocity == 90
+        assert event.channel == 2
+        assert event.voice == 1
+        assert event.spelling == ("C4",)
+
+    def test_note_without_octave_raises_value_error(self):
+        """Notes without octave cannot emit MIDI pitch values."""
+        with pytest.raises(ValueError, match="requires octave information"):
+            Note("C").score_events_for_context(ScoreEventContext())
+
+    def test_note_emits_accidental_midi_pitch_and_spelling(self):
+        """Accidental notes should emit the matching MIDI pitch and spelling."""
+        context = ScoreEventContext(
+            start_offset=Fraction(1, 4),
+            default_duration=Fraction(3, 8),
+            channel=3,
+            voice=2,
+        )
+
+        event = Note("F#4").score_events_for_context(context)[0]
+
+        assert event.beat == Fraction(1, 4)
+        assert event.duration == Fraction(3, 8)
+        assert event.pitches == (66,)
+        assert event.channel == 3
+        assert event.voice == 2
+        assert event.spelling == ("F#4",)
 
 
 class TestNoteTransposition:
