@@ -90,7 +90,7 @@ class Scale:
         ScaleType.BLUES: [0, 3, 5, 6, 7, 10],
     }
     
-    def __init__(self, root: Union[Note, str], scale_type: Union[ScaleType, str]):
+    def __init__(self, root: Union[Note, str], scale_type: Union[ScaleType, str, None]):
         """
         Initialize an immutable scale.
         
@@ -101,13 +101,29 @@ class Scale:
         if isinstance(root, str):
             root = Note.from_string(root)
         
-        if isinstance(scale_type, str):
+        if scale_type is None:
+            # CustomScale uses None as an internal sentinel for custom patterns.
+            if type(self) is Scale:
+                raise TypeError(
+                    "scale_type must be a ScaleType or string. "
+                    "For custom patterns use CustomScale(...)."
+                )
+        elif isinstance(scale_type, str):
             # Try to match string to ScaleType enum
             scale_type_map = {st.value: st for st in ScaleType}
             if scale_type.lower() in scale_type_map:
                 scale_type = scale_type_map[scale_type.lower()]
             else:
                 raise ValueError(f"Unknown scale type: {scale_type}")
+        elif not isinstance(scale_type, ScaleType):
+            if callable(scale_type):
+                raise TypeError(
+                    "scale_type must be a ScaleType or string, not a factory function. "
+                    "Use minor_scale(root) or Scale(root, 'natural_minor')."
+                )
+            raise TypeError(
+                f"scale_type must be a ScaleType or string, got {type(scale_type).__name__}."
+            )
         
         # Set attributes directly - rely on Python conventions for immutability
         self._root = root
@@ -517,7 +533,10 @@ class Scale:
     def __repr__(self) -> str:
         """Detailed string representation."""
         notes_str = ", ".join(str(note) for note in self.notes)
-        return f"Scale({self.root}, {self.scale_type.value}) - Notes: [{notes_str}]"
+        scale_type_name = (
+            self.scale_type.value if isinstance(self.scale_type, ScaleType) else "custom"
+        )
+        return f"Scale({self.root}, {scale_type_name}) - Notes: [{notes_str}]"
     
     def __eq__(self, other) -> bool:
         """Check equality with another scale."""
@@ -575,6 +594,11 @@ class CustomScale(Scale):
     def __hash__(self) -> int:
         """Hash function for use in sets and dictionaries."""
         return hash((self.root, self._custom_pattern))
+
+    def __repr__(self) -> str:
+        """Detailed string representation for custom scales."""
+        notes_str = ", ".join(str(note) for note in self.notes)
+        return f"CustomScale({self.root}, pattern={self._custom_pattern}) - Notes: [{notes_str}]"
 
 
 # Common scale factory functions for convenience
