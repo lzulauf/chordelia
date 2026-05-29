@@ -9,10 +9,11 @@ from chordelia.sequences import Rest, Sequence, SequenceEntry
 from chordelia.score import Score, ScoreEvent, ScoreEventContext
 from chordelia.sequenceable import (
     NotesLike,
+    SequenceRender,
     Sequenceable,
     _clear_sequenceable_adapters,
     _register_sequenceable_adapter,
-    _score_events_for,
+    _sequence_render_for,
 )
 
 
@@ -28,15 +29,15 @@ class TestSequenceableProtocol:
     """Runtime protocol checks for canonical sequenceable implementers."""
 
     def test_note_is_runtime_sequenceable(self):
-        """Note exposes the required score_events_for_context protocol surface."""
+        """Note exposes the required render_for_context protocol surface."""
         assert isinstance(Note("C4"), Sequenceable)
 
     def test_chord_is_runtime_sequenceable(self):
-        """Chord exposes the required score_events_for_context protocol surface."""
+        """Chord exposes the required render_for_context protocol surface."""
         assert isinstance(Chord.from_string("C4"), Sequenceable)
 
     def test_sequence_is_runtime_sequenceable(self):
-        """Sequence exposes the required score_events_for_context protocol surface."""
+        """Sequence exposes the required render_for_context protocol surface."""
         seq = Sequence((SequenceEntry(payload=Note("C4"), duration=1),))
         assert isinstance(seq, Sequenceable)
 
@@ -66,48 +67,56 @@ class TestAdapterRegistry:
     class ExternalToneVariant(ExternalTone):
         """Subclass used to verify MRO-based adapter lookup."""
 
-    def test_score_events_for_uses_registered_adapter(self):
-        """_score_events_for should route unknown values through registered adapters."""
+    def test_sequence_render_for_uses_registered_adapter(self):
+        """_sequence_render_for should route unknown values through registered adapters."""
 
         def tone_adapter(value, context):
-            return (
-                ScoreEvent(
-                    beat=context.start_offset,
-                    duration=context.default_duration,
-                    pitches=(value.midi_number,),
-                    velocity=context.velocity,
-                    channel=context.channel,
-                    voice=context.voice,
+            return SequenceRender(
+                events=(
+                    ScoreEvent(
+                        beat=context.start_offset,
+                        duration=context.default_duration,
+                        pitches=(value.midi_number,),
+                        velocity=context.velocity,
+                        channel=context.channel,
+                        voice=context.voice,
+                    ),
                 ),
+                consumed_duration=context.default_duration,
             )
 
         _register_sequenceable_adapter(self.ExternalTone, tone_adapter)
 
         context = ScoreEventContext(start_offset=1, default_duration=2, velocity=88)
-        events = _score_events_for(self.ExternalTone(72), context)
+        render = _sequence_render_for(self.ExternalTone(72), context)
+        events = render.events
 
         assert len(events) == 1
         assert events[0].beat == Duration.from_beats(1)
         assert events[0].duration == Duration.from_beats(2)
         assert events[0].pitches == (72,)
         assert events[0].velocity == 88
+        assert render.consumed_duration == Duration.from_beats(2)
 
     def test_adapter_lookup_uses_base_class_registration(self):
         """Adapter lookup should resolve through MRO for subclass values."""
 
         def tone_adapter(value, _context):
-            return (ScoreEvent(beat=0, duration=1, pitches=(value.midi_number,)),)
+            return SequenceRender(
+                events=(ScoreEvent(beat=0, duration=1, pitches=(value.midi_number,)),),
+                consumed_duration=Duration.from_beats(1),
+            )
 
         _register_sequenceable_adapter(self.ExternalTone, tone_adapter)
 
-        events = _score_events_for(self.ExternalToneVariant(69), ScoreEventContext())
+        events = _sequence_render_for(self.ExternalToneVariant(69), ScoreEventContext()).events
 
         assert events[0].pitches == (69,)
 
-    def test_score_events_for_raises_for_unsupported_values(self):
+    def test_sequence_render_for_raises_for_unsupported_values(self):
         """Unsupported values should fail with actionable guidance."""
         with pytest.raises(TypeError, match="_register_sequenceable_adapter"):
-            _score_events_for(object(), ScoreEventContext())
+            _sequence_render_for(object(), ScoreEventContext())
 
 
 class TestScoreFromSequenceable:
@@ -135,10 +144,13 @@ class TestScoreFromSequenceable:
         """Score should normalize event ordering regardless of adapter output order."""
 
         def pattern_adapter(_value, _context):
-            return (
-                ScoreEvent(beat=2, duration=1, pitches=(64,), channel=1),
-                ScoreEvent(beat=1, duration=1, pitches=(60,), channel=1),
-                ScoreEvent(beat=1, duration=1, pitches=(67,), channel=0),
+            return SequenceRender(
+                events=(
+                    ScoreEvent(beat=2, duration=1, pitches=(64,), channel=1),
+                    ScoreEvent(beat=1, duration=1, pitches=(60,), channel=1),
+                    ScoreEvent(beat=1, duration=1, pitches=(67,), channel=0),
+                ),
+                consumed_duration=Duration.from_beats(3),
             )
 
         _register_sequenceable_adapter(self.ExternalPattern, pattern_adapter)
@@ -151,6 +163,7 @@ class TestScoreFromSequenceable:
             Duration.from_beats(1),
             Duration.from_beats(2),
         ]
+        assert score.duration == Duration.from_beats(3)
 
 
 class TestSequenceScheduling:
@@ -181,7 +194,7 @@ class TestSequenceScheduling:
             )
         )
 
-        events = seq.score_events_for_context(ScoreEventContext())
+        events = seq.render_for_context(ScoreEventContext()).events
 
         assert len(events) == 1
         assert events[0].pitches == (60, 64, 67)
@@ -199,7 +212,7 @@ class TestSequenceScheduling:
             )
         )
 
-        events = seq.score_events_for_context(ScoreEventContext())
+        events = seq.render_for_context(ScoreEventContext()).events
 
         assert len(events) == 2
         assert events[0].beat == Duration.from_beats(0)
@@ -221,7 +234,7 @@ class TestSequenceScheduling:
             )
         )
 
-        events = seq.score_events_for_context(ScoreEventContext())
+        events = seq.render_for_context(ScoreEventContext()).events
 
         assert len(events) == 2
         assert events[0].pitches == (60,)
@@ -240,7 +253,7 @@ class TestSequenceScheduling:
             )
         )
 
-        events = seq.score_events_for_context(ScoreEventContext())
+        events = seq.render_for_context(ScoreEventContext()).events
 
         assert len(events) == 2
         assert [event.beat for event in events] == [Duration.from_beats(0), Duration.from_beats(0)]
@@ -260,7 +273,7 @@ class TestSequenceScheduling:
             )
         )
 
-        events = seq.score_events_for_context(ScoreEventContext())
+        events = seq.render_for_context(ScoreEventContext()).events
 
         assert len(events) == 2
         assert [event.beat for event in events] == [Duration.from_beats(0), Duration.from_beats(0)]
@@ -274,7 +287,7 @@ class TestSequenceScheduling:
             )
         )
 
-        events = seq.score_events_for_context(ScoreEventContext())
+        events = seq.render_for_context(ScoreEventContext()).events
 
         assert len(events) == 2
         assert events[0].beat == Duration.from_beats(0)
@@ -292,7 +305,7 @@ class TestSequenceScheduling:
             )
         )
 
-        events = seq.score_events_for_context(ScoreEventContext(start_offset=Duration.from_beats(3)))
+        events = seq.render_for_context(ScoreEventContext(start_offset=Duration.from_beats(3))).events
 
         assert [event.beat for event in events] == [
             Duration.from_beats(5),
@@ -308,7 +321,7 @@ class TestSequenceScheduling:
             )
         )
 
-        events = seq.score_events_for_context(ScoreEventContext())
+        events = seq.render_for_context(ScoreEventContext()).events
 
         assert len(events) == 2
         assert events[0].beat == Duration.from_beats(0)
@@ -323,7 +336,7 @@ class TestSequenceScheduling:
             )
         )
 
-        events = outer.score_events_for_context(ScoreEventContext())
+        events = outer.render_for_context(ScoreEventContext()).events
 
         assert [event.pitches for event in events] == [(60,), (64,)]
         assert [event.beat for event in events] == [
@@ -331,7 +344,7 @@ class TestSequenceScheduling:
             Duration.from_beats(1),
         ]
 
-    def test_sequence_constructor_flattens_child_sequences(self):
+    def test_sequence_constructor_supports_child_sequences_with_span_consumption(self):
         motif = Sequence(
             (
                 (Note("C4"), 1),
@@ -340,7 +353,8 @@ class TestSequenceScheduling:
         )
         combined = Sequence((motif, motif))
 
-        events = combined.score_events_for_context(ScoreEventContext())
+        render = combined.render_for_context(ScoreEventContext())
+        events = render.events
 
         assert [event.pitches for event in events] == [(60,), (62,), (60,), (62,)]
         assert [event.beat for event in events] == [
@@ -349,8 +363,67 @@ class TestSequenceScheduling:
             Duration.from_beats(2),
             Duration.from_beats(3),
         ]
+        assert render.consumed_duration == Duration.from_beats(4)
 
-    def test_sequence_constructor_flattens_list_multiplied_child_sequences(self):
+    def test_sequence_consumed_duration_for_child_note_and_chord_sequences(self):
+        child_notes = Sequence(
+            (
+                (Note("C4"), 2),
+                (Note("D4"), 1),
+            )
+        )
+        child_chords = Sequence(
+            (
+                (Chord.from_notes(["E4", "G4"]), 3),
+                (Chord.from_notes(["F4", "A4"]), 1),
+            )
+        )
+        parent = Sequence((child_notes, child_chords))
+
+        render = parent.render_for_context(ScoreEventContext())
+        events = render.events
+
+        assert [event.beat for event in events] == [
+            Duration.from_beats(0),
+            Duration.from_beats(2),
+            Duration.from_beats(3),
+            Duration.from_beats(6),
+        ]
+        assert [event.duration for event in events] == [
+            Duration.from_beats(2),
+            Duration.from_beats(1),
+            Duration.from_beats(3),
+            Duration.from_beats(1),
+        ]
+        assert render.consumed_duration == Duration.from_beats(7)
+
+    def test_sequence_consumed_duration_for_repeated_child_sequences(self):
+        child_notes = Sequence(
+            (
+                (Note("A3"), 1),
+                (Note("B3"), 2),
+            )
+        )
+        child_chords = Sequence(
+            (
+                (Chord.from_notes(["C4", "E4", "G4"]), 2),
+            )
+        )
+        parent = Sequence([child_notes, child_chords, child_notes])
+
+        render = parent.render_for_context(ScoreEventContext())
+
+        # child_notes span=3, child_chords span=2, child_notes span=3
+        assert render.consumed_duration == Duration.from_beats(8)
+        assert [event.beat for event in render.events] == [
+            Duration.from_beats(0),
+            Duration.from_beats(1),
+            Duration.from_beats(3),
+            Duration.from_beats(5),
+            Duration.from_beats(6),
+        ]
+
+    def test_sequence_constructor_supports_list_multiplied_child_sequences(self):
         motif = Sequence(
             (
                 (Chord.from_notes(["A3", "C4", "E4"]), 1),
@@ -359,7 +432,8 @@ class TestSequenceScheduling:
         )
         repeated = Sequence([motif] * 3)
 
-        events = repeated.score_events_for_context(ScoreEventContext())
+        render = repeated.render_for_context(ScoreEventContext())
+        events = render.events
 
         assert len(events) == 6
         assert [event.beat for event in events] == [
@@ -370,6 +444,7 @@ class TestSequenceScheduling:
             Duration.from_beats(4),
             Duration.from_beats(5),
         ]
+        assert render.consumed_duration == Duration.from_beats(6)
 
     def test_sequence_constructor_accepts_bare_sequenceable_values(self):
         seq = Sequence(
@@ -379,14 +454,16 @@ class TestSequenceScheduling:
             )
         )
 
-        events = seq.score_events_for_context(ScoreEventContext())
+        render = seq.render_for_context(ScoreEventContext())
+        events = render.events
 
         assert len(events) == 2
         assert [event.pitches for event in events] == [(60,), (64, 67)]
         assert [event.beat for event in events] == [Duration.from_beats(0), Duration.from_beats(1)]
         assert [event.duration for event in events] == [Duration.from_beats(1), Duration.from_beats(1)]
+        assert render.consumed_duration == Duration.from_beats(2)
 
-    def test_sequence_constructor_flattens_sequence_before_sequenceable_coercion(self):
+    def test_sequence_constructor_treats_child_sequence_like_other_sequenceables(self):
         motif = Sequence(
             (
                 (Note("C4"), 2),
@@ -395,10 +472,15 @@ class TestSequenceScheduling:
         )
         seq = Sequence((motif,))
 
-        assert len(seq.entries) == 2
-        assert [entry.duration for entry in seq.entries] == [Duration.from_beats(2), Duration.from_beats(3)]
+        assert len(seq.entries) == 1
+        assert seq.entries[0].duration == Duration.from_beats(1)
+
+        render = seq.render_for_context(ScoreEventContext())
+        assert render.consumed_duration == Duration.from_beats(5)
+        assert [event.beat for event in render.events] == [Duration.from_beats(0), Duration.from_beats(2)]
 
     def test_rest_emits_no_events_via_sequenceable_boundary(self):
-        """Rest conversion should succeed through _score_events_for and return no events."""
-        events = _score_events_for(Rest(), ScoreEventContext())
-        assert events == ()
+        """Rest conversion should succeed through _sequence_render_for and return no events."""
+        render = _sequence_render_for(Rest(), ScoreEventContext())
+        assert render.events == ()
+        assert render.consumed_duration == Duration.from_beats(1)

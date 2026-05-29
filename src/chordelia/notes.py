@@ -14,7 +14,8 @@ from chordelia.accidentals import Accidental
 from chordelia.intervals import Interval, IntervalLike, IntervalQuality
 
 if TYPE_CHECKING:
-    from chordelia.score import ScoreEvent, ScoreEventContext
+    from chordelia.score import ScoreEventContext
+    from chordelia.sequenceable import SequenceRender
 
 # Pre-compiled regex for faster note parsing
 _NOTE_PATTERN = re.compile(r'^([A-G])(#{1,2}|b{1,2})?(\d+)?$')
@@ -359,26 +360,30 @@ class Note:
         # Adjust enharmonic spelling based on the interval
         return self._get_enharmonic_for_interval(base_note, interval)
 
-    def score_events_for_context(self, context: 'ScoreEventContext') -> tuple['ScoreEvent', ...]:
-        """Emit a single score event for this note under the provided context."""
+    def render_for_context(self, context: 'ScoreEventContext') -> 'SequenceRender':
+        """Render a single score event and consumed span for this note."""
         midi_number = self.midi_number
         if midi_number is None:
             raise ValueError(
-                "Note.score_events_for_context requires octave information to emit MIDI pitch values."
+                "Note.render_for_context requires octave information to emit MIDI pitch values."
             )
 
         from chordelia.score import ScoreEvent
+        from chordelia.sequenceable import SequenceRender
 
-        return (
-            ScoreEvent(
-                beat=context.start_offset,
-                duration=context.default_duration,
-                pitches=(midi_number,),
-                velocity=context.velocity,
-                channel=context.channel,
-                voice=context.voice,
-                spelling=(str(self),),
+        return SequenceRender(
+            events=(
+                ScoreEvent(
+                    beat=context.start_offset,
+                    duration=context.default_duration,
+                    pitches=(midi_number,),
+                    velocity=context.velocity,
+                    channel=context.channel,
+                    voice=context.voice,
+                    spelling=(str(self),),
+                ),
             ),
+            consumed_duration=context.default_duration,
         )
 
     def to_notes(self) -> tuple['Note', ...]:

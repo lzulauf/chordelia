@@ -19,7 +19,8 @@ from chordelia.notes import Note, NoteName, Accidental
 from chordelia.scales import Scale, ScaleType
 
 if TYPE_CHECKING:
-    from chordelia.score import ScoreEvent, ScoreEventContext
+    from chordelia.score import ScoreEventContext
+    from chordelia.sequenceable import SequenceRender
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
@@ -723,8 +724,8 @@ class Chord:
         
         return self.with_(root=new_root, bass_note=new_bass)
 
-    def score_events_for_context(self, context: 'ScoreEventContext') -> tuple['ScoreEvent', ...]:
-        """Emit a single score event containing all chord tones."""
+    def render_for_context(self, context: 'ScoreEventContext') -> 'SequenceRender':
+        """Render one score event containing all chord tones and consumed span."""
         midi_pitches: list[int] = []
         spelling: list[str] = []
 
@@ -732,23 +733,27 @@ class Chord:
             midi_number = note.midi_number
             if midi_number is None:
                 raise ValueError(
-                    "Chord.score_events_for_context requires octave information on all chord tones."
+                    "Chord.render_for_context requires octave information on all chord tones."
                 )
             midi_pitches.append(midi_number)
             spelling.append(str(note))
 
         from chordelia.score import ScoreEvent
+        from chordelia.sequenceable import SequenceRender
 
-        return (
-            ScoreEvent(
-                beat=context.start_offset,
-                duration=context.default_duration,
-                pitches=tuple(midi_pitches),
-                velocity=context.velocity,
-                channel=context.channel,
-                voice=context.voice,
-                spelling=tuple(spelling),
+        return SequenceRender(
+            events=(
+                ScoreEvent(
+                    beat=context.start_offset,
+                    duration=context.default_duration,
+                    pitches=tuple(midi_pitches),
+                    velocity=context.velocity,
+                    channel=context.channel,
+                    voice=context.voice,
+                    spelling=tuple(spelling),
+                ),
             ),
+            consumed_duration=context.default_duration,
         )
 
     def to_notes(self) -> tuple[Note, ...]:

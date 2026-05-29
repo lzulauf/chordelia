@@ -5,7 +5,11 @@ import pytest
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
-from chordelia.sequenceable import _clear_sequenceable_adapters, _register_sequenceable_adapter
+from chordelia.sequenceable import (
+    SequenceRender,
+    _clear_sequenceable_adapters,
+    _register_sequenceable_adapter,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -156,21 +160,57 @@ class TestScore:
         assert len(score) == 2
         assert [event.pitches for event in score] == [(60,), (64,)]
 
+    def test_score_duration_returns_timeline_end_for_beats(self):
+        events = (
+            ScoreEvent(beat=1, duration=2, pitches=(60,)),
+            ScoreEvent(beat=4, duration=1, pitches=(64,)),
+        )
+
+        score = Score(source="x", metadata=ScoreMetadata(), events=events)
+
+        assert score.duration == Duration.from_beats(5)
+
+    def test_score_duration_returns_timeline_end_for_seconds(self):
+        events = (
+            ScoreEvent(
+                beat=Duration.from_seconds("1.5"),
+                duration=Duration.from_seconds("0.5"),
+                pitches=(60,),
+            ),
+            ScoreEvent(
+                beat=Duration.from_seconds("0.25"),
+                duration=Duration.from_seconds("0.75"),
+                pitches=(64,),
+            ),
+        )
+
+        score = Score(source="x", metadata=ScoreMetadata(), events=events)
+
+        assert score.duration == Duration.from_seconds("2.0")
+
+    def test_score_duration_for_empty_score_is_zero_beats(self):
+        score = Score(source="x", metadata=ScoreMetadata(), events=())
+
+        assert score.duration == Duration.from_beats(0)
+
     def test_from_sequenceable_passes_context_and_builds_metadata(self):
         """Score.from_sequenceable should propagate conversion context and metadata values."""
         captured = {}
 
         def external_adapter(_value, context):
             captured["context"] = context
-            return (
-                ScoreEvent(
-                    beat=context.start_offset,
-                    duration=context.default_duration,
-                    pitches=(72,),
-                    velocity=context.velocity,
-                    channel=context.channel,
-                    voice=context.voice,
+            return SequenceRender(
+                events=(
+                    ScoreEvent(
+                        beat=context.start_offset,
+                        duration=context.default_duration,
+                        pitches=(72,),
+                        velocity=context.velocity,
+                        channel=context.channel,
+                        voice=context.voice,
+                    ),
                 ),
+                consumed_duration=context.default_duration,
             )
 
         _register_sequenceable_adapter(self.External, external_adapter)

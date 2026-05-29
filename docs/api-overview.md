@@ -9,12 +9,12 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `Degree`: Degree value object with numeric and Roman coercion helpers.
 - `Scale`: Scale generation with theory-aware note spelling.
 - `Chord`: Chord quality, extensions, inversions, and slash chords.
-- `Sequenceable`: Protocol for objects that can emit normalized score events.
+- `Sequenceable`: Protocol for objects that render normalized score events and consumed span.
 - `NotesLike`: Protocol for values that can represent zero or more notes.
 - `Sequence`: Immutable ordered timeline of sequence entries.
 - `SequenceEntry`: One payload plus duration/offset timing metadata.
 - `Rest`: Explicit silent payload marker for sequence timelines.
-- `Score`: Canonical wrapper around a source and ordered normalized events.
+- `Score`: Canonical wrapper around a source and ordered normalized events; includes `score.duration` for normalized timeline span.
 - `MidiPlayback`: Live MIDI output transport for chord, note, and score playback.
 - `MidiFile`: MIDI wrapper for score conversion, file IO, and interface playback.
 - `Duration`: Fractional note duration utilities.
@@ -45,7 +45,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 ## Score Conversion Workflow
 
 - Use `Score.from_sequenceable(...)` or `score_from_sequenceable(...)` for canonical normalization.
-- `Note` and `Chord` implement `Sequenceable` and provide `score_events_for_context(...)`.
+- `Note` and `Chord` implement `Sequenceable` and provide `render_for_context(...)`.
 - `Sequence` and `Rest` implement `Sequenceable` and can be converted the same way.
 - Timing fields in score APIs use `Duration` objects, typically with `Duration.from_beats(...)`.
 - Use `Duration.from_seconds(...)` only for fixed wall-clock offsets that should not adapt to tempo changes.
@@ -58,7 +58,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - Iterable note strings or `Note` values are kept as one convenience chord layer.
 - Iterable values containing chord-like boundaries (for example `Chord`, `Rest`, or mixed `Note` and `Chord`) preserve each item as its own simultaneous layer.
 - Constructor input can include bare `Sequenceable` values, which coerce to default 1-beat entries.
-- Constructor input can include child `Sequence` values; their entries are flattened in order.
+- Constructor input can include child `Sequence` values, which are treated as sequenceable payloads and consume their rendered span.
 - Empty iterables coerce to `Rest`.
 
 Example:

@@ -9,7 +9,7 @@ from chordelia.chords import Chord
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
 from chordelia.score import ScoreEvent, ScoreEventContext
-from chordelia.sequenceable import NotesLike, Sequenceable, _score_events_for
+from chordelia.sequenceable import NotesLike, SequenceRender, Sequenceable, _sequence_render_for
 
 
 DurationLike = Duration | int | float
@@ -92,11 +92,11 @@ class _SimultaneousPayload:
 
     layers: tuple[Sequenceable, ...]
 
-    def score_events_for_context(self, context: ScoreEventContext) -> tuple[ScoreEvent, ...]:
+    def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
         events: list[ScoreEvent] = []
         for layer in self.layers:
-            events.extend(_score_events_for(layer, context))
-        return tuple(events)
+            events.extend(_sequence_render_for(layer, context).events)
+        return SequenceRender(events=tuple(events), consumed_duration=context.default_duration)
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,9 +107,9 @@ class Rest:
         """Represent this rest as an empty note collection."""
         return ()
 
-    def score_events_for_context(self, _context: ScoreEventContext) -> tuple[ScoreEvent, ...]:
-        """Rests are sequenceable and emit no score events."""
-        return ()
+    def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
+        """Rests are sequenceable and emit no score events while consuming span."""
+        return SequenceRender(events=(), consumed_duration=context.default_duration)
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,9 +174,6 @@ class Sequence:
     def __init__(self, entries: Iterable['SequenceInputLike'] = ()):
         normalized_entries: list[SequenceEntry] = []
         for entry_value in entries:
-            if isinstance(entry_value, Sequence):
-                normalized_entries.extend(entry_value.entries)
-                continue
             if isinstance(entry_value, Sequenceable):
                 normalized_entries.append(SequenceEntry(payload=entry_value))
                 continue
@@ -187,8 +184,8 @@ class Sequence:
         """Return a new sequence with entries appended in order."""
         return Sequence((*self.entries, *entries))
 
-    def score_events_for_context(self, context: ScoreEventContext) -> tuple[ScoreEvent, ...]:
-        """Flatten sequence entries into score events using deterministic scheduling."""
+    def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
+        """Render sequence entries into score events using deterministic span scheduling."""
         events: list[ScoreEvent] = []
         cursor = context.start_offset
 
@@ -214,15 +211,24 @@ class Sequence:
                 start_offset=start,
                 default_duration=entry.duration,
             )
-            events.extend(_score_events_for(entry.payload, child_context))
+            child_render = _sequence_render_for(entry.payload, child_context)
+            if child_render.consumed_duration.mode != cursor.mode:
+                raise ValueError(
+                    "Rendered child consumed_duration mode must match context timing mode "
+                    f"(got {child_render.consumed_duration.mode!r} and {cursor.mode!r})"
+                )
+            events.extend(child_render.events)
 
-            end = start + entry.duration
+            end = start + child_render.consumed_duration
             if entry.offset is None:
                 cursor = end
             elif end > cursor:
                 cursor = end
 
-        return tuple(events)
+        return SequenceRender(
+            events=tuple(events),
+            consumed_duration=cursor - context.start_offset,
+        )
 
     def __len__(self) -> int:
         return len(self.entries)

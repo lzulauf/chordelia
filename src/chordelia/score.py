@@ -205,14 +205,15 @@ class Score:
         ppq: int = 480,
     ) -> "Score":
         """Create a score by normalizing any sequenceable (or adapted) value."""
-        from chordelia.sequenceable import _score_events_for
+        from chordelia.sequenceable import _sequence_render_for
 
         context = ScoreEventContext(
             tempo=tempo,
             time_signature=time_signature,
             key_signature=key_signature,
         )
-        events = _score_events_for(source, context)
+        render = _sequence_render_for(source, context)
+        events = render.events
         metadata = ScoreMetadata(
             tempo=tempo,
             time_signature=time_signature,
@@ -226,6 +227,13 @@ class Score:
 
     def __iter__(self):
         return iter(self.events)
+
+    @property
+    def duration(self) -> Duration:
+        """Return the normalized score span from beat/second zero to timeline end."""
+        if not self.events:
+            return Duration.from_beats(0, None)
+        return max(event.beat + event.duration for event in self.events)
 
 
 def _score_event_sort_key(event: ScoreEvent):
