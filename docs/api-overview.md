@@ -57,6 +57,8 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - Iterable payloads are interpreted as simultaneous layers.
 - Iterable note strings or `Note` values are kept as one convenience chord layer.
 - Iterable values containing chord-like boundaries (for example `Chord`, `Rest`, or mixed `Note` and `Chord`) preserve each item as its own simultaneous layer.
+- Constructor input can include bare `Sequenceable` values, which coerce to default 1-beat entries.
+- Constructor input can include child `Sequence` values; their entries are flattened in order.
 - Empty iterables coerce to `Rest`.
 
 Example:

@@ -171,11 +171,19 @@ class Sequence:
 
     entries: tuple[SequenceEntry, ...]
 
-    def __init__(self, entries: Iterable['SequenceEntryLike'] = ()):
-        normalized_entries = tuple(SequenceEntry.coerce(entry_value) for entry_value in entries)
-        object.__setattr__(self, "entries", normalized_entries)
+    def __init__(self, entries: Iterable['SequenceInputLike'] = ()):
+        normalized_entries: list[SequenceEntry] = []
+        for entry_value in entries:
+            if isinstance(entry_value, Sequence):
+                normalized_entries.extend(entry_value.entries)
+                continue
+            if isinstance(entry_value, Sequenceable):
+                normalized_entries.append(SequenceEntry(payload=entry_value))
+                continue
+            normalized_entries.append(SequenceEntry.coerce(entry_value))
+        object.__setattr__(self, "entries", tuple(normalized_entries))
 
-    def appended(self, *entries: 'SequenceEntryLike') -> "Sequence":
+    def appended(self, *entries: 'SequenceInputLike') -> "Sequence":
         """Return a new sequence with entries appended in order."""
         return Sequence((*self.entries, *entries))
 
@@ -228,3 +236,5 @@ SequenceEntryLike: TypeAlias = (
     | tuple[Any, DurationLike]
     | tuple[Any, DurationLike, DurationLike | None]
 )
+
+SequenceInputLike: TypeAlias = SequenceEntryLike | Sequenceable

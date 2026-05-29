@@ -331,6 +331,73 @@ class TestSequenceScheduling:
             Duration.from_beats(1),
         ]
 
+    def test_sequence_constructor_flattens_child_sequences(self):
+        motif = Sequence(
+            (
+                (Note("C4"), 1),
+                (Note("D4"), 1),
+            )
+        )
+        combined = Sequence((motif, motif))
+
+        events = combined.score_events_for_context(ScoreEventContext())
+
+        assert [event.pitches for event in events] == [(60,), (62,), (60,), (62,)]
+        assert [event.beat for event in events] == [
+            Duration.from_beats(0),
+            Duration.from_beats(1),
+            Duration.from_beats(2),
+            Duration.from_beats(3),
+        ]
+
+    def test_sequence_constructor_flattens_list_multiplied_child_sequences(self):
+        motif = Sequence(
+            (
+                (Chord.from_notes(["A3", "C4", "E4"]), 1),
+                (Chord.from_notes(["D3", "F4", "A4"]), 1),
+            )
+        )
+        repeated = Sequence([motif] * 3)
+
+        events = repeated.score_events_for_context(ScoreEventContext())
+
+        assert len(events) == 6
+        assert [event.beat for event in events] == [
+            Duration.from_beats(0),
+            Duration.from_beats(1),
+            Duration.from_beats(2),
+            Duration.from_beats(3),
+            Duration.from_beats(4),
+            Duration.from_beats(5),
+        ]
+
+    def test_sequence_constructor_accepts_bare_sequenceable_values(self):
+        seq = Sequence(
+            (
+                Note("C4"),
+                Chord.from_notes(["E4", "G4"]),
+            )
+        )
+
+        events = seq.score_events_for_context(ScoreEventContext())
+
+        assert len(events) == 2
+        assert [event.pitches for event in events] == [(60,), (64, 67)]
+        assert [event.beat for event in events] == [Duration.from_beats(0), Duration.from_beats(1)]
+        assert [event.duration for event in events] == [Duration.from_beats(1), Duration.from_beats(1)]
+
+    def test_sequence_constructor_flattens_sequence_before_sequenceable_coercion(self):
+        motif = Sequence(
+            (
+                (Note("C4"), 2),
+                (Note("D4"), 3),
+            )
+        )
+        seq = Sequence((motif,))
+
+        assert len(seq.entries) == 2
+        assert [entry.duration for entry in seq.entries] == [Duration.from_beats(2), Duration.from_beats(3)]
+
     def test_rest_emits_no_events_via_sequenceable_boundary(self):
         """Rest conversion should succeed through _score_events_for and return no events."""
         events = _score_events_for(Rest(), ScoreEventContext())

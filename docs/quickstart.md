@@ -98,6 +98,11 @@ stacked_layers = Sequence((([
 stacked_events = stacked_layers.score_events_for_context(ScoreEventContext())
 print(len(stacked_events))  # 2
 print([event.pitches for event in stacked_events])  # [(60, 64), (67, 71)]
+
+# Child sequences in constructor input are flattened by entries.
+motif = Sequence(((Chord("Am4"), 1), (Chord("Dm4"), 1)))
+arrangement = Sequence([motif] * 2)
+print(len(arrangement.entries))  # 4
 ```
 
 ## MIDI Interface Playback (Optional)
