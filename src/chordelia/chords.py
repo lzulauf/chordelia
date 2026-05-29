@@ -169,8 +169,8 @@ class Chord:
                  root: Union[Note, str],
                  quality: Union[ChordQuality, str] = ChordQuality.MAJOR,
                  extension: Optional[Union[ChordExtension, str]] = None,
-                 additions: Optional[Iterable[Union[Interval, int, str]]] = None,
-                 omissions: Optional[Iterable[Union[Interval, int, str]]] = None,
+                 additions: Optional[Iterable[Union[Interval, str]]] = None,
+                 omissions: Optional[Iterable[Union[Interval, str]]] = None,
                  bass_note: Optional[Union[Note, str]] = None,
                  inversion: int = 0,
                  notes: Optional[Iterable[Union[Note, str]]] = None):
@@ -180,9 +180,9 @@ class Chord:
         Args:
             root: The root note of the chord
             quality: The basic chord quality (major, minor, etc.)
-            extensions: Iterable of extensions (7, 9, 11, 13, etc.) - can be list, tuple, set, etc.
-            additions: Iterable of added notes (add9, add11, etc.) - can be list, tuple, set, etc.
-            omissions: Iterable of omitted chord tones (no3, no5, etc.) - can be list, tuple, set, etc.
+            extension: Optional extension (e.g. "7", "maj7", "9")
+            additions: Iterable of added tones as Interval or str (e.g. "9", "#11")
+            omissions: Iterable of omitted tones as Interval or str (e.g. "3", "5")
             bass_note: Bass note for slash chords
             inversion: Inversion number (1 = first inversion, etc.)
             notes: If provided, creates a chord with exactly these notes (overrides other parameters)
@@ -353,8 +353,8 @@ class Chord:
               root: Optional[Union[Note, str]] = None,
               quality: Optional[Union[ChordQuality, str]] = None,
               extension: Optional[Union[ChordExtension, str]] = None,
-              additions: Optional[Iterable[Union[Interval, int, str]]] = None,
-              omissions: Optional[Iterable[Union[Interval, int, str]]] = None,
+              additions: Optional[Iterable[Union[Interval, str]]] = None,
+              omissions: Optional[Iterable[Union[Interval, str]]] = None,
               bass_note: Optional[Union[Note, str, None]] = ...,
               inversion: Optional[int] = ...) -> 'Chord':
         """
@@ -364,8 +364,8 @@ class Chord:
             root: New root note (defaults to current)
             quality: New chord quality (defaults to current)
             extension: New chord extension (defaults to current) - can be ChordExtension or str
-            additions: New additions iterable (defaults to current) - can be list, tuple, set, etc.
-            omissions: New omissions iterable (defaults to current) - can be list, tuple, set, etc.
+            additions: New additions iterable (defaults to current) as Interval or str
+            omissions: New omissions iterable (defaults to current) as Interval or str
             bass_note: New bass note (defaults to current, use explicit None to remove)
             inversion: New inversion (defaults to current, use explicit None to remove)
             
