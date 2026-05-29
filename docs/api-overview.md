@@ -50,6 +50,8 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - Timing fields in score APIs use `Duration` objects, typically with `Duration.from_beats(...)`.
 - Use `Duration.from_seconds(...)` only for fixed wall-clock offsets that should not adapt to tempo changes.
 - `Score.events` are sorted deterministically for downstream consistency.
+- `Score.with_tempo(...)` returns an immutable score copy with updated tempo.
+- `Score.with_(...)` supports multi-field metadata updates (tempo, time signature, key signature, ppq) and optional source/events replacement in one call.
 
 ### Sequence Payload Coercion
 

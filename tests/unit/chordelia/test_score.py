@@ -113,6 +113,35 @@ class TestScoreEventContext:
 class TestScoreMetadata:
     """Validation behavior for ScoreMetadata."""
 
+    def test_with_tempo_returns_updated_copy(self):
+        metadata = ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480)
+
+        updated = metadata.with_tempo(144)
+
+        assert updated.tempo == 144
+        assert updated.time_signature == (4, 4)
+        assert updated.key_signature == "C"
+        assert updated.ppq == 480
+        assert metadata.tempo == 120
+        assert updated is not metadata
+
+    def test_with_allows_multiple_field_updates(self):
+        metadata = ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480)
+
+        updated = metadata.with_(tempo=96, time_signature=(3, 4), key_signature="G", ppq=960)
+
+        assert updated.tempo == 96
+        assert updated.time_signature == (3, 4)
+        assert updated.key_signature == "G"
+        assert updated.ppq == 960
+
+    def test_with_without_changes_returns_same_instance(self):
+        metadata = ScoreMetadata()
+
+        updated = metadata.with_()
+
+        assert updated is metadata
+
     @pytest.mark.parametrize(
         "kwargs, expected_message",
         [
@@ -192,6 +221,67 @@ class TestScore:
         score = Score(source="x", metadata=ScoreMetadata(), events=())
 
         assert score.duration == Duration.from_beats(0)
+
+    def test_with_tempo_updates_score_metadata_only(self):
+        score = Score(
+            source="x",
+            metadata=ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480),
+            events=(ScoreEvent(beat=0, duration=1, pitches=(60,)),),
+        )
+
+        updated = score.with_tempo(140)
+
+        assert updated.metadata.tempo == 140
+        assert updated.metadata.time_signature == (4, 4)
+        assert updated.metadata.key_signature == "C"
+        assert updated.metadata.ppq == 480
+        assert updated.source == score.source
+        assert updated.events == score.events
+        assert score.metadata.tempo == 120
+
+    def test_with_supports_multiple_metadata_updates_in_one_call(self):
+        score = Score(
+            source="x",
+            metadata=ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480),
+            events=(ScoreEvent(beat=0, duration=1, pitches=(60,)),),
+        )
+
+        updated = score.with_(tempo=90, time_signature=(3, 4), key_signature="Am", ppq=960)
+
+        assert updated.metadata.tempo == 90
+        assert updated.metadata.time_signature == (3, 4)
+        assert updated.metadata.key_signature == "Am"
+        assert updated.metadata.ppq == 960
+
+    def test_with_supports_source_events_and_metadata_override(self):
+        score = Score(
+            source="source-a",
+            metadata=ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480),
+            events=(ScoreEvent(beat=1, duration=1, pitches=(64,)),),
+        )
+        replacement_metadata = ScoreMetadata(tempo=110, time_signature=(6, 8), key_signature="D", ppq=240)
+        replacement_events = (ScoreEvent(beat=0, duration=1, pitches=(60,)),)
+
+        updated = score.with_(
+            source="source-b",
+            metadata=replacement_metadata,
+            events=replacement_events,
+            tempo=132,
+            key_signature="G",
+        )
+
+        assert updated.source == "source-b"
+        assert updated.events == replacement_events
+        assert updated.metadata.tempo == 132
+        assert updated.metadata.time_signature == (6, 8)
+        assert updated.metadata.key_signature == "G"
+        assert updated.metadata.ppq == 240
+
+    def test_with_rejects_non_metadata_override(self):
+        score = Score(source="x", metadata=ScoreMetadata(), events=(ScoreEvent(beat=0, duration=1, pitches=(60,)),))
+
+        with pytest.raises(TypeError, match="ScoreMetadata"):
+            score.with_(metadata="bad")
 
     def test_from_sequenceable_passes_context_and_builds_metadata(self):
         """Score.from_sequenceable should propagate conversion context and metadata values."""

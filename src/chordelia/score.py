@@ -9,6 +9,7 @@ from chordelia.rhythm import Duration
 
 
 DurationLike = Duration | int | float
+_UNCHANGED = object()
 
 
 def _coerce_duration(value: DurationLike, *, field_name: str) -> Duration:
@@ -174,6 +175,33 @@ class ScoreMetadata:
         if self.ppq <= 0:
             raise ValueError(f"ppq must be > 0, got {self.ppq}")
 
+    def with_tempo(self, tempo: int) -> "ScoreMetadata":
+        """Return a copy with updated tempo."""
+        return replace(self, tempo=tempo)
+
+    def with_(
+        self,
+        *,
+        tempo: int | object = _UNCHANGED,
+        time_signature: tuple[int, int] | object = _UNCHANGED,
+        key_signature: str | None | object = _UNCHANGED,
+        ppq: int | object = _UNCHANGED,
+    ) -> "ScoreMetadata":
+        """Return a copy with any combination of metadata field updates."""
+        changes: dict[str, Any] = {}
+        if tempo is not _UNCHANGED:
+            changes["tempo"] = tempo
+        if time_signature is not _UNCHANGED:
+            changes["time_signature"] = time_signature
+        if key_signature is not _UNCHANGED:
+            changes["key_signature"] = key_signature
+        if ppq is not _UNCHANGED:
+            changes["ppq"] = ppq
+
+        if not changes:
+            return self
+        return replace(self, **changes)
+
 
 @dataclass(frozen=True, slots=True)
 class Score:
@@ -234,6 +262,40 @@ class Score:
         if not self.events:
             return Duration.from_beats(0, None)
         return max(event.beat + event.duration for event in self.events)
+
+    def with_tempo(self, tempo: int) -> "Score":
+        """Return a copy with updated metadata tempo."""
+        return self.with_(tempo=tempo)
+
+    def with_(
+        self,
+        *,
+        source: Any = _UNCHANGED,
+        metadata: ScoreMetadata | object = _UNCHANGED,
+        events: tuple[ScoreEvent, ...] | list[ScoreEvent] | object = _UNCHANGED,
+        tempo: int | object = _UNCHANGED,
+        time_signature: tuple[int, int] | object = _UNCHANGED,
+        key_signature: str | None | object = _UNCHANGED,
+        ppq: int | object = _UNCHANGED,
+    ) -> "Score":
+        """Return a copy with source/events and/or metadata fields updated."""
+        next_source = self.source if source is _UNCHANGED else source
+        next_events = self.events if events is _UNCHANGED else events
+
+        base_metadata = self.metadata if metadata is _UNCHANGED else metadata
+        if not isinstance(base_metadata, ScoreMetadata):
+            raise TypeError(
+                f"metadata must be ScoreMetadata, got {type(base_metadata).__name__}"
+            )
+
+        next_metadata = base_metadata.with_(
+            tempo=tempo,
+            time_signature=time_signature,
+            key_signature=key_signature,
+            ppq=ppq,
+        )
+
+        return Score(source=next_source, metadata=next_metadata, events=next_events)
 
 
 def _score_event_sort_key(event: ScoreEvent):
