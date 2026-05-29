@@ -24,6 +24,7 @@ Implement `Sequence` as the primary composition building block for ordering and 
 2. Interactive timeline editing UI.
 3. Full harmonic-context transforms for non-sequenceable types in v1.
 4. Breaking removal of existing helper APIs in one step.
+5. Tree-preserving composite sequence model (tracked separately in `.plans/composite_sequence_tree_plan.md`).
 
 ## Technical design details
 1. Canonical model and invariants:
@@ -74,7 +75,7 @@ Implement `Sequence` as the primary composition building block for ordering and 
    2. `src/chordelia/sequenceable.py`.
    3. `src/chordelia/score.py`.
    4. `src/chordelia/__init__.py`.
-   5. `tests/unit/chordelia/test_sequences.py`.
+   5. `tests/unit/chordelia/test_sequenceable.py`.
 9. Error and validation semantics:
    1. Invalid duration/offset values raise `ValueError`.
    2. Non-sequenceable payload insertion raises `TypeError` with guidance.
@@ -127,11 +128,11 @@ Expected docs delta classification: both README updates and docs updates.
 4. Ensure docs use canonical names only (`Score`, `Sequence`, `Sequenceable`).
 
 ## Progress checklist
-- [ ] Phase 0: Contracts and naming locked
-- [ ] Phase 1: Core Sequence and SequenceEntry implemented
-- [ ] Phase 2: Scheduler and recursive flattening implemented
+- [x] Phase 0: Contracts and naming locked
+- [x] Phase 1: Core Sequence and SequenceEntry implemented
+- [x] Phase 2: Scheduler and recursive flattening implemented
 - [ ] Phase 3: Transform behavior implemented
-- [ ] Phase 4: Score integration completed
+- [x] Phase 4: Score integration completed
 - [ ] Phase 5: Tests and docs completed
 - [ ] First-class sequence support complete
 

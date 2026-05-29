@@ -83,7 +83,7 @@ Expected docs delta classification: both README/docs updates and API updates.
 - [x] Phase 0: Canonical MidiFile API finalized
 - [x] Phase 1: Score-backed constructor and write path implemented
 - [x] Phase 2: File-read to Score path implemented
-- [ ] Phase 3: Compatibility delegates implemented
+- [x] Phase 3: Compatibility delegates implemented
 - [ ] Phase 4: Notebook display hooks implemented
 - [ ] Phase 5: Tests/docs completed
 - [ ] Canonical MidiFile workflow adopted

@@ -1,7 +1,7 @@
 Sheet-music rendering plan for chordelia.
 
 ## Status
-Implementing
+Drafting
 
 ## Goal
 Make `SheetMusic` the canonical sheet-rendering wrapper around `Score` (and therefore `Sequenceable` inputs), supporting file output (SVG/image) and notebook rendering, without file parsing/read support in v1.

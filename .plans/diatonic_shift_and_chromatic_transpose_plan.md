@@ -1,7 +1,7 @@
 Diatonic shifting and chromatic transposing plan for chordelia.
 
 ## Status
-Implementing
+Drafting
 
 ## Goal
 Support two distinct movement models across the library with clear naming and consistent behavior:

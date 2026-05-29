@@ -85,9 +85,9 @@ Expected docs delta classification: both README updates and docs updates.
 3. Document compatibility alias status for old score-ir naming where present.
 
 ## Progress checklist
-- [ ] Phase 0: Score contracts finalized
-- [ ] Phase 1: Score core model implemented
-- [ ] Phase 2: Sequenceable normalization implemented
+- [x] Phase 0: Score contracts finalized
+- [x] Phase 1: Score core model implemented
+- [x] Phase 2: Sequenceable normalization implemented
 - [ ] Phase 3: MidiFile and SheetMusic adapter seams implemented
 - [ ] Phase 4: Parity and performance evaluation completed
 - [ ] Phase 5: Documentation and migration notes completed

@@ -36,7 +36,7 @@ Define and adopt `Sequenceable` as the canonical capability interface for object
 1. Canonical interface:
    1. Add `src/chordelia/sequenceable.py`.
    2. Protocol surface:
-      1. `score_events_for_context(context: ScoreEventContext) -> tuple[ScoreEvent, ...]`.
+   1. `render_for_context(context: ScoreEventContext) -> SequenceRender`.
 2. Canonical implementers (v1):
    1. `Note`.
    2. `Chord`.
@@ -59,10 +59,10 @@ Define and adopt `Sequenceable` as the canonical capability interface for object
 
 ## API signatures (proposed)
 1. `class Sequenceable(Protocol):`
-   1. `def score_events_for_context(self, context: ScoreEventContext) -> tuple[ScoreEvent, ...]: ...`
+   1. `def render_for_context(self, context: ScoreEventContext) -> SequenceRender: ...`
 2. Adapter API:
    1. `register_sequenceable_adapter(type_, adapter)`.
-   2. `score_events_for(value, context)`.
+   2. `sequence_render_for(value, context)`.
 
 ## Adapter registry decommission plan
 1. Ordered native-conversion requirements before removal:
@@ -78,7 +78,7 @@ Define and adopt `Sequenceable` as the canonical capability interface for object
 3. Decommission gates:
    1. Zero adapter registrations in non-test runtime paths.
    2. Public docs list only native `Sequenceable` accepted inputs.
-   3. `score_events_for(...)` no longer consults `_ADAPTER_REGISTRY`.
+   3. `_sequence_render_for(...)` no longer consults `_ADAPTER_REGISTRY`.
    4. `register_sequenceable_adapter`, `unregister_sequenceable_adapter`, and `clear_sequenceable_adapters` are removed from public exports.
 4. Decommission implementation sequence:
    1. Lock accepted-input contract for `Score`, `MidiFile`, and `SheetMusic`.
