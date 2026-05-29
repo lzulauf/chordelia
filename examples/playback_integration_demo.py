@@ -5,7 +5,16 @@ This shows how the playback module integrates with the rest of Chordelia
 to provide musical playback capabilities.
 """
 
+import sys
+
 from chordelia import *
+
+
+# Avoid UnicodeEncodeError on Windows code pages when examples print symbols.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 def demonstrate_playback_integration():
     """Show how playback integrates with existing Chordelia modules."""
