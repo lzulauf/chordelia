@@ -119,6 +119,67 @@ class TestMidiFileReadCompatibility:
         assert str(playback_notes[0].note) == "C4"
 
 
+class TestMidiFileScoreBackedAudioConversion:
+    """Score-to-audio note conversion behavior and articulation policy handling."""
+
+    def test_score_backed_playback_notes_default_to_retrigger_all(self):
+        score = Score(
+            source="manual",
+            metadata=ScoreMetadata(tempo=120, retrigger_policy="retrigger_all"),
+            events=(
+                ScoreEvent(beat=0, duration=1, pitches=(60,), channel=0, velocity=80),
+                ScoreEvent(beat=1, duration=1, pitches=(60,), channel=0, velocity=70),
+            ),
+        )
+        midi = MidiFile(score)
+
+        playback_notes = midi.to_playback_notes()
+
+        assert len(playback_notes) == 2
+        assert playback_notes[0].start_time == pytest.approx(0.0)
+        assert playback_notes[0].duration == pytest.approx(0.5)
+        assert playback_notes[1].start_time == pytest.approx(0.5)
+        assert playback_notes[1].duration == pytest.approx(0.5)
+
+    def test_score_backed_playback_notes_allow_delta_override(self):
+        score = Score(
+            source="manual",
+            metadata=ScoreMetadata(tempo=120, retrigger_policy="retrigger_all"),
+            events=(
+                ScoreEvent(beat=0, duration=1, pitches=(60,), channel=0),
+                ScoreEvent(beat=1, duration=1, pitches=(60,), channel=0),
+            ),
+        )
+        midi = MidiFile(score)
+
+        playback_notes = midi.to_playback_notes(retrigger_policy="delta")
+
+        assert len(playback_notes) == 1
+        assert playback_notes[0].start_time == pytest.approx(0.0)
+        assert playback_notes[0].duration == pytest.approx(1.0)
+
+    def test_delta_mode_does_not_merge_across_channels(self):
+        score = Score(
+            source="manual",
+            metadata=ScoreMetadata(tempo=120, retrigger_policy="delta"),
+            events=(
+                ScoreEvent(beat=0, duration=1, pitches=(60,), channel=0),
+                ScoreEvent(beat=1, duration=1, pitches=(60,), channel=1),
+            ),
+        )
+        midi = MidiFile(score)
+
+        playback_notes = midi.to_playback_notes()
+
+        assert len(playback_notes) == 2
+
+    def test_score_backed_playback_notes_reject_bad_policy(self):
+        midi = MidiFile(Note("C4"))
+
+        with pytest.raises(ValueError, match="retrigger_policy"):
+            midi.to_playback_notes(retrigger_policy="bad")
+
+
 class TestMidiFileInterfacePlayback:
     """Playback-to-interface behavior through the canonical MidiPlayback transport."""
 

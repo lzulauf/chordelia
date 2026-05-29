@@ -494,7 +494,8 @@ class MidiFile:
     def to_playback_notes(self, 
                          track_indices: Optional[List[int]] = None,
                          waveform: Waveform = Waveform.SINE,
-                         velocity_scale: float = 1.0) -> List[PlaybackNote]:
+                         velocity_scale: float = 1.0,
+                         retrigger_policy: Optional[str] = None) -> List[PlaybackNote]:
         """
         Convert MIDI file to a list of PlaybackNote objects.
         
@@ -502,6 +503,8 @@ class MidiFile:
             track_indices: List of track indices to include (None = all tracks)
             waveform: Waveform to use for all notes
             velocity_scale: Scale factor for note velocities (0.0-1.0)
+            retrigger_policy: Optional override for score-backed playback note scheduling
+                ("delta" or "retrigger_all").
             
         Returns:
             List of PlaybackNote objects ready for playback
@@ -509,7 +512,10 @@ class MidiFile:
         if self.midi_file is None:
             if self.score is None:
                 raise ValueError("MidiFile has no MIDI data or score source to convert")
-            return self._score_to_playback_notes(velocity_scale=velocity_scale)
+            return self._score_to_playback_notes(
+                velocity_scale=velocity_scale,
+                retrigger_policy=retrigger_policy,
+            )
 
         playback_notes = []
         
@@ -578,28 +584,108 @@ class MidiFile:
         playback_notes.sort(key=lambda n: n.start_time)
         return playback_notes
 
-    def _score_to_playback_notes(self, *, velocity_scale: float) -> List[PlaybackNote]:
+    @staticmethod
+    def _validate_retrigger_policy(policy: str) -> None:
+        """Validate score-backed audio retrigger policy values."""
+        if policy not in {"delta", "retrigger_all"}:
+            raise ValueError(
+                "retrigger_policy must be 'delta' or 'retrigger_all', "
+                f"got {policy!r}"
+            )
+
+    def _score_to_playback_notes(
+        self,
+        *,
+        velocity_scale: float,
+        retrigger_policy: Optional[str],
+    ) -> List[PlaybackNote]:
         """Convert score-backed state into playback notes without a source MIDI file."""
         assert self.score is not None
 
         playback_notes: list[PlaybackNote] = []
         tempo_bpm = self.score.metadata.tempo
+        effective_policy = (
+            self.score.metadata.retrigger_policy
+            if retrigger_policy is None
+            else retrigger_policy
+        )
+        self._validate_retrigger_policy(effective_policy)
+
+        if effective_policy == "retrigger_all":
+            for event in self.score.events:
+                start_time = self._duration_to_seconds(event.beat, tempo_bpm=tempo_bpm)
+                duration = self._duration_to_seconds(event.duration, tempo_bpm=tempo_bpm)
+                velocity = (event.velocity / 127.0) * velocity_scale
+
+                for pitch in event.pitches:
+                    note = self._midi_note_to_note(pitch)
+                    playback_notes.append(
+                        PlaybackNote(
+                            start_time=start_time,
+                            note=note,
+                            duration=duration,
+                            velocity=velocity,
+                        )
+                    )
+
+            playback_notes.sort(key=lambda note: note.start_time)
+            return playback_notes
+
+        # Delta mode: merge repeated overlapping/contiguous note windows.
+        active_notes: dict[tuple[int, int], dict[str, float | Note]] = {}
+
+        def _flush_finished_notes(before_time: float) -> None:
+            for key, note_info in tuple(active_notes.items()):
+                end_time = note_info["end_time"]
+                if end_time < before_time:
+                    start_time = note_info["start_time"]
+                    duration = end_time - start_time
+                    if duration > 0:
+                        playback_notes.append(
+                            PlaybackNote(
+                                start_time=start_time,
+                                note=note_info["note"],
+                                duration=duration,
+                                velocity=note_info["velocity"],
+                            )
+                        )
+                    del active_notes[key]
 
         for event in self.score.events:
             start_time = self._duration_to_seconds(event.beat, tempo_bpm=tempo_bpm)
             duration = self._duration_to_seconds(event.duration, tempo_bpm=tempo_bpm)
+            end_time = start_time + duration
             velocity = (event.velocity / 127.0) * velocity_scale
 
+            _flush_finished_notes(start_time)
+
             for pitch in event.pitches:
-                note = self._midi_note_to_note(pitch)
-                playback_notes.append(
-                    PlaybackNote(
-                        start_time=start_time,
-                        note=note,
-                        duration=duration,
-                        velocity=velocity,
-                    )
+                key = (event.channel, pitch)
+                note_info = active_notes.get(key)
+                if note_info is not None and note_info["end_time"] >= start_time:
+                    if end_time > note_info["end_time"]:
+                        note_info["end_time"] = end_time
+                    continue
+
+                active_notes[key] = {
+                    "note": self._midi_note_to_note(pitch),
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "velocity": velocity,
+                }
+
+        for note_info in active_notes.values():
+            duration = note_info["end_time"] - note_info["start_time"]
+            if duration <= 0:
+                continue
+            playback_notes.append(
+                PlaybackNote(
+                    start_time=note_info["start_time"],
+                    note=note_info["note"],
+                    duration=duration,
+                    velocity=note_info["velocity"],
                 )
+            )
 
         playback_notes.sort(key=lambda note: note.start_time)
         return playback_notes
