@@ -751,6 +751,10 @@ class Chord:
             ),
         )
 
+    def to_notes(self) -> tuple[Note, ...]:
+        """Represent this chord as its note collection."""
+        return self.notes
+
     def tone_at(self, degree: DegreeLike) -> Note:
         """Get the chord tone at the provided degree index (1-based)."""
         degree_obj = Degree.coerce(degree)

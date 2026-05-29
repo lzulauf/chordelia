@@ -80,6 +80,26 @@ note_score = score_from_sequenceable(Note("F#4"), time_signature=(3, 4))
 print(note_score.events[0].beat, note_score.events[0].duration)
 ```
 
+## Sequence Timelines
+
+```python
+from chordelia import Chord, Sequence, ScoreEventContext
+
+# Iterable note strings are treated as one chord layer.
+single_layer = Sequence(((["C4", "E4", "G4"], 1),))
+single_events = single_layer.score_events_for_context(ScoreEventContext())
+print(len(single_events), single_events[0].pitches)  # 1, (60, 64, 67)
+
+# Iterable chord-like values preserve simultaneous boundaries.
+stacked_layers = Sequence((([
+	Chord.from_notes(["C4", "E4"]),
+	Chord.from_notes(["G4", "B4"]),
+], 1),))
+stacked_events = stacked_layers.score_events_for_context(ScoreEventContext())
+print(len(stacked_events))  # 2
+print([event.pitches for event in stacked_events])  # [(60, 64), (67, 71)]
+```
+
 ## Where to Go Next
 
 - [Notes and Intervals](guides/notes-and-intervals.md)

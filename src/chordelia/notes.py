@@ -380,6 +380,10 @@ class Note:
                 spelling=(str(self),),
             ),
         )
+
+    def to_notes(self) -> tuple['Note', ...]:
+        """Represent this note as a single-note collection."""
+        return (self,)
     
     def _get_enharmonic_for_interval(self, target_note: 'Note', interval: Interval) -> 'Note':
         """

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Callable, Protocol, runtime_checkable
 
 from chordelia.score import ScoreEvent, ScoreEventContext
+
+if TYPE_CHECKING:
+    from chordelia.notes import Note
 
 
 SequenceableAdapter = Callable[[Any, ScoreEventContext], tuple[ScoreEvent, ...]]
@@ -18,6 +21,14 @@ class Sequenceable(Protocol):
 
     def score_events_for_context(self, context: ScoreEventContext) -> tuple[ScoreEvent, ...]:
         """Emit normalized score events for the provided context."""
+
+
+@runtime_checkable
+class NotesLike(Protocol):
+    """Protocol for values that can represent zero or more notes."""
+
+    def to_notes(self) -> tuple[Note, ...]:
+        """Return the note collection represented by this value."""
 
 
 def _register_sequenceable_adapter(type_: type[Any], adapter: SequenceableAdapter) -> None:

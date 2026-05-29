@@ -5,8 +5,10 @@ import pytest
 from chordelia.chords import Chord
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
+from chordelia.sequences import Rest, Sequence, SequenceEntry
 from chordelia.score import Score, ScoreEvent, ScoreEventContext
 from chordelia.sequenceable import (
+    NotesLike,
     Sequenceable,
     _clear_sequenceable_adapters,
     _register_sequenceable_adapter,
@@ -32,6 +34,24 @@ class TestSequenceableProtocol:
     def test_chord_is_runtime_sequenceable(self):
         """Chord exposes the required score_events_for_context protocol surface."""
         assert isinstance(Chord.from_string("C4"), Sequenceable)
+
+    def test_sequence_is_runtime_sequenceable(self):
+        """Sequence exposes the required score_events_for_context protocol surface."""
+        seq = Sequence((SequenceEntry(payload=Note("C4"), duration=1),))
+        assert isinstance(seq, Sequenceable)
+
+    def test_rest_is_runtime_sequenceable(self):
+        """Rest should satisfy Sequenceable and emit silence via the same boundary."""
+        assert isinstance(Rest(), Sequenceable)
+
+    def test_note_is_runtime_notes_like(self):
+        assert isinstance(Note("C4"), NotesLike)
+
+    def test_chord_is_runtime_notes_like(self):
+        assert isinstance(Chord.from_string("C4"), NotesLike)
+
+    def test_rest_is_runtime_notes_like(self):
+        assert isinstance(Rest(), NotesLike)
 
 
 class TestAdapterRegistry:
@@ -131,3 +151,187 @@ class TestScoreFromSequenceable:
             Duration.from_beats(1),
             Duration.from_beats(2),
         ]
+
+
+class TestSequenceScheduling:
+    """Sequence-specific deterministic scheduling behavior."""
+
+    def test_sequence_entry_coerce_from_two_tuple(self):
+        entry = SequenceEntry.coerce((Note("C4"), 2))
+
+        assert isinstance(entry, SequenceEntry)
+        assert entry.duration == Duration.from_beats(2)
+        assert entry.offset is None
+
+    def test_sequence_entry_coerce_from_three_tuple(self):
+        entry = SequenceEntry.coerce((Note("C4"), 2, 1))
+
+        assert isinstance(entry, SequenceEntry)
+        assert entry.duration == Duration.from_beats(2)
+        assert entry.offset == Duration.from_beats(1)
+
+    def test_sequence_entry_coerce_rejects_bad_tuple_arity(self):
+        with pytest.raises(ValueError, match="tuple form must be"):
+            SequenceEntry.coerce((Note("C4"),))
+
+    def test_sequence_coerces_iterable_of_notes_to_chord_payload(self):
+        seq = Sequence(
+            (
+                (["C4", "E4", "G4"], 1),
+            )
+        )
+
+        events = seq.score_events_for_context(ScoreEventContext())
+
+        assert len(events) == 1
+        assert events[0].pitches == (60, 64, 67)
+
+    def test_sequence_coerces_iterable_of_chords_to_simultaneous_layers(self):
+        seq = Sequence(
+            (
+                (
+                    [
+                        Chord.from_notes(["C4", "E4"]),
+                        Chord.from_notes(["G4"]),
+                    ],
+                    1,
+                ),
+            )
+        )
+
+        events = seq.score_events_for_context(ScoreEventContext())
+
+        assert len(events) == 2
+        assert events[0].beat == Duration.from_beats(0)
+        assert events[1].beat == Duration.from_beats(0)
+        assert events[0].pitches == (60, 64)
+        assert events[1].pitches == (67,)
+
+    def test_sequence_coerces_mixed_iterable_notes_like_to_simultaneous_layers(self):
+        seq = Sequence(
+            (
+                (
+                    [
+                        Rest(),
+                        Note("C4"),
+                        Chord.from_notes(["E4", "G4"]),
+                    ],
+                    1,
+                ),
+            )
+        )
+
+        events = seq.score_events_for_context(ScoreEventContext())
+
+        assert len(events) == 2
+        assert events[0].pitches == (60,)
+        assert events[1].pitches == (64, 67)
+
+    def test_sequence_preserves_boundaries_for_simultaneous_layers(self):
+        seq = Sequence(
+            (
+                (
+                    [
+                        Chord.from_notes(["C4", "E4"]),
+                        Note("G4"),
+                    ],
+                    2,
+                ),
+            )
+        )
+
+        events = seq.score_events_for_context(ScoreEventContext())
+
+        assert len(events) == 2
+        assert [event.beat for event in events] == [Duration.from_beats(0), Duration.from_beats(0)]
+        assert [event.duration for event in events] == [Duration.from_beats(2), Duration.from_beats(2)]
+        assert [event.pitches for event in events] == [(60, 64), (67,)]
+
+    def test_sequence_preserves_boundaries_for_mixed_note_strings_and_chords(self):
+        seq = Sequence(
+            (
+                (
+                    [
+                        "C4",
+                        Chord.from_notes(["E4", "G4"]),
+                    ],
+                    1,
+                ),
+            )
+        )
+
+        events = seq.score_events_for_context(ScoreEventContext())
+
+        assert len(events) == 2
+        assert [event.beat for event in events] == [Duration.from_beats(0), Duration.from_beats(0)]
+        assert [event.pitches for event in events] == [(60,), (64, 67)]
+
+    def test_sequence_schedules_entries_sequentially(self):
+        seq = Sequence(
+            (
+                SequenceEntry(payload=Note("C4"), duration=1),
+                SequenceEntry(payload=Note("E4"), duration=2),
+            )
+        )
+
+        events = seq.score_events_for_context(ScoreEventContext())
+
+        assert len(events) == 2
+        assert events[0].beat == Duration.from_beats(0)
+        assert events[0].duration == Duration.from_beats(1)
+        assert events[0].pitches == (60,)
+        assert events[1].beat == Duration.from_beats(1)
+        assert events[1].duration == Duration.from_beats(2)
+        assert events[1].pitches == (64,)
+
+    def test_sequence_offsets_are_relative_to_context_start(self):
+        seq = Sequence(
+            (
+                SequenceEntry(payload=Note("C4"), duration=1, offset=2),
+                SequenceEntry(payload=Note("D4"), duration=1),
+            )
+        )
+
+        events = seq.score_events_for_context(ScoreEventContext(start_offset=Duration.from_beats(3)))
+
+        assert [event.beat for event in events] == [
+            Duration.from_beats(5),
+            Duration.from_beats(6),
+        ]
+
+    def test_sequence_rest_entries_emit_no_events(self):
+        seq = Sequence(
+            (
+                SequenceEntry(payload=Note("C4"), duration=1),
+                SequenceEntry(payload=Rest(), duration=2),
+                SequenceEntry(payload=Note("D4"), duration=1),
+            )
+        )
+
+        events = seq.score_events_for_context(ScoreEventContext())
+
+        assert len(events) == 2
+        assert events[0].beat == Duration.from_beats(0)
+        assert events[1].beat == Duration.from_beats(3)
+
+    def test_sequence_supports_nested_sequences(self):
+        inner = Sequence((SequenceEntry(payload=Note("E4"), duration=1),))
+        outer = Sequence(
+            (
+                SequenceEntry(payload=Note("C4"), duration=1),
+                SequenceEntry(payload=inner, duration=2),
+            )
+        )
+
+        events = outer.score_events_for_context(ScoreEventContext())
+
+        assert [event.pitches for event in events] == [(60,), (64,)]
+        assert [event.beat for event in events] == [
+            Duration.from_beats(0),
+            Duration.from_beats(1),
+        ]
+
+    def test_rest_emits_no_events_via_sequenceable_boundary(self):
+        """Rest conversion should succeed through _score_events_for and return no events."""
+        events = _score_events_for(Rest(), ScoreEventContext())
+        assert events == ()

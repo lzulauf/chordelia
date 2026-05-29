@@ -18,8 +18,9 @@ from chordelia.accidentals import Accidental
 from chordelia.notes import Note, NoteName
 from chordelia.scales import Scale, ScaleType
 from chordelia.chords import Chord, ChordQuality, ChordExtension
+from chordelia.sequences import Sequence, SequenceEntry, SequenceEntryLike, Rest
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
-from chordelia.sequenceable import Sequenceable
+from chordelia.sequenceable import NotesLike, Sequenceable
 from chordelia.rhythm import (
     Duration, TimeSignature, Tempo, Beat, NoteValue,
     whole_note, half_note, quarter_note, eighth_note, sixteenth_note,
@@ -58,12 +59,17 @@ __all__ = [
     "Chord",
     "ChordQuality",
     "ChordExtension",
+    "Sequence",
+    "SequenceEntry",
+    "SequenceEntryLike",
+    "Rest",
     "Score",
     "ScoreEvent",
     "ScoreEventContext",
     "ScoreMetadata",
     "score_from_sequenceable",
     "Sequenceable",
+    "NotesLike",
     "Duration",
     "TimeSignature", 
     "Tempo",
