@@ -908,6 +908,15 @@ class TestChordTransposition:
         assert eb_maj7.quality == ChordQuality.MAJOR
         assert eb_maj7.extension == ChordExtension.MAJOR_SEVENTH
 
+    def test_transpose_accepts_interval_like_string(self):
+        """String interval representations should be coerced for transposition."""
+        c_major = Chord("C", ChordQuality.MAJOR)
+
+        g_major = c_major.transpose("5")
+
+        assert g_major.root.name == NoteName.G
+        assert g_major.quality == ChordQuality.MAJOR
+
 
 class TestChordDegreeHelpers:
     """Test DegreeLike helpers on Chord APIs."""

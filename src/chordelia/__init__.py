@@ -12,7 +12,7 @@ All implementations prioritize algorithms over lookup tables for efficiency
 and clarity, making it suitable for low-end hardware.
 """
 
-from chordelia.intervals import Interval, IntervalQuality
+from chordelia.intervals import Interval, IntervalLike, IntervalQuality
 from chordelia.degrees import Degree, DegreeLike, RomanCase
 from chordelia.accidentals import Accidental
 from chordelia.notes import Note, NoteName
@@ -45,6 +45,7 @@ except ImportError:
 __version__ = "0.3.1"
 __all__ = [
     "Interval",
+    "IntervalLike",
     "IntervalQuality", 
     "Degree",
     "DegreeLike",

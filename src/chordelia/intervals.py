@@ -7,7 +7,7 @@ without relying on lookup tables, making it efficient and suitable for low-end h
 
 from enum import Enum
 import re
-from typing import Union
+from typing import TypeAlias
 from functools import lru_cache
 from chordelia.degrees import Degree
 
@@ -115,6 +115,19 @@ class Interval:
         self._validate()
 
     @classmethod
+    def coerce(cls, value: 'IntervalLike') -> 'Interval':
+        """Coerce IntervalLike input into an Interval."""
+        if isinstance(value, Interval):
+            return value
+        if isinstance(value, str):
+            return cls.from_string(value)
+
+        raise ValueError(
+            "Interval value must be Interval or str. "
+            "Accepted examples: Interval(IntervalQuality.MAJOR, 3), 'M3', '7', '#11'."
+        )
+
+    @classmethod
     def from_string(cls, interval_str: str) -> 'Interval':
         """
         Create an Interval from a string representation.
@@ -131,7 +144,6 @@ class Interval:
         
         quality_str = match.group('quality')
         number_str = match.group('number')
-        print(f"{quality_str=}, {number_str=}")
 
         number = int(number_str)
         if quality_str:
@@ -150,18 +162,11 @@ class Interval:
         return cls(quality, number)
 
     @classmethod
-    def from_unknown(cls, interval: Union['Interval', str]) -> 'Interval':
+    def from_unknown(cls, interval: 'IntervalLike') -> 'Interval':
         """
-        Create an Interval from various input types.
-        
-        Args:
-            interval: An Interval object, a string, or a (quality, number) tuple
+        Backward-compatible alias for Interval.coerce.
         """
-        if isinstance(interval, Interval):
-            return interval
-        elif isinstance(interval, str):
-            return cls.from_string(interval)
-        raise ValueError(f"Invalid interval representation: {interval}")
+        return cls.coerce(interval)
 
     def _validate(self):
         """Validate that the interval quality and number are compatible."""
@@ -390,3 +395,6 @@ MAJOR_NINTH = Interval(IntervalQuality.MAJOR, 9)
 PERFECT_ELEVENTH = Interval(IntervalQuality.PERFECT, 4)
 MINOR_THIRTEENTH = Interval(IntervalQuality.MINOR, 13)
 MAJOR_THIRTEENTH = Interval(IntervalQuality.MAJOR, 13)
+
+
+IntervalLike: TypeAlias = Interval | str

@@ -9,7 +9,7 @@ from enum import Enum
 from typing import List, Optional, Union, Tuple, Iterable, TYPE_CHECKING
 from functools import lru_cache, cached_property
 from chordelia.notes import Note, NoteName, Accidental
-from chordelia.intervals import Interval, IntervalQuality
+from chordelia.intervals import Interval, IntervalLike, IntervalQuality
 from chordelia.degrees import Degree, DegreeLike
 
 if TYPE_CHECKING:
@@ -395,7 +395,7 @@ class Scale:
         # Create a custom scale with this pattern
         return CustomScale(new_root, normalized_pattern)
     
-    def transpose(self, interval: Interval) -> 'Scale':
+    def transpose(self, interval: IntervalLike) -> 'Scale':
         """
         Transpose this scale by an interval.
         
@@ -405,6 +405,7 @@ class Scale:
         Returns:
             A new Scale object transposed by the interval
         """
+        interval = Interval.coerce(interval)
         new_root = self.root.transpose(interval)
         return Scale(new_root, self.scale_type)
     

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from chordelia import intervals
 from chordelia.degrees import Degree, DegreeLike
-from chordelia.intervals import Interval, IntervalQuality
+from chordelia.intervals import Interval, IntervalLike, IntervalQuality
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.scales import Scale, ScaleType
 
@@ -169,8 +169,8 @@ class Chord:
                  root: Union[Note, str],
                  quality: Union[ChordQuality, str] = ChordQuality.MAJOR,
                  extension: Optional[Union[ChordExtension, str]] = None,
-                 additions: Optional[Iterable[Union[Interval, str]]] = None,
-                 omissions: Optional[Iterable[Union[Interval, str]]] = None,
+                 additions: Optional[Iterable[IntervalLike]] = None,
+                 omissions: Optional[Iterable[IntervalLike]] = None,
                  bass_note: Optional[Union[Note, str]] = None,
                  inversion: int = 0,
                  notes: Optional[Iterable[Union[Note, str]]] = None):
@@ -195,8 +195,8 @@ class Chord:
         
         # Convert extensions, additions, omissions to tuples for immutability
         extension = ChordExtension.from_unknown(extension) if extension else None
-        additions = tuple((Interval.from_unknown(a) for a in additions) if additions else [])
-        omissions = tuple((Interval.from_unknown(o) for o in omissions) if omissions else [])
+        additions = tuple((Interval.coerce(a) for a in additions) if additions else [])
+        omissions = tuple((Interval.coerce(o) for o in omissions) if omissions else [])
         
         bass_note = Note.from_string(bass_note) if isinstance(bass_note, str) else bass_note
         
@@ -353,8 +353,8 @@ class Chord:
               root: Optional[Union[Note, str]] = None,
               quality: Optional[Union[ChordQuality, str]] = None,
               extension: Optional[Union[ChordExtension, str]] = None,
-              additions: Optional[Iterable[Union[Interval, str]]] = None,
-              omissions: Optional[Iterable[Union[Interval, str]]] = None,
+              additions: Optional[Iterable[IntervalLike]] = None,
+              omissions: Optional[Iterable[IntervalLike]] = None,
               bass_note: Optional[Union[Note, str, None]] = ...,
               inversion: Optional[int] = ...) -> 'Chord':
         """
@@ -490,9 +490,9 @@ class Chord:
             nonlocal extension
             nonlocal quality
             if content.startswith('no'):
-                omissions.append(Interval.from_string(content[2:]))
+                omissions.append(Interval.coerce(content[2:]))
             elif content.startswith('add'):
-                additions.append(Interval.from_string(content[3:]))
+                additions.append(Interval.coerce(content[3:]))
             else:
                 # No prefix. Assume chord extension if it's the first modification, otherwise addition.
                 if first_modification:
@@ -502,7 +502,7 @@ class Chord:
                         # Some numeric symbols (for example "5") are qualities.
                         quality = ChordQuality.from_string(content)
                 else: 
-                    additions.append(Interval.from_string(content))
+                    additions.append(Interval.coerce(content))
             first_modification = False
 
         while match := _MODIFICATION_RE.match(remaining):
@@ -707,7 +707,7 @@ class Chord:
             temp_note = Note.from_midi_number(temp_midi)
             return temp_note.with_octave(target_octave)
     
-    def transpose(self, interval: Interval) -> 'Chord':
+    def transpose(self, interval: IntervalLike) -> 'Chord':
         """
         Transpose this chord by an interval.
         
@@ -717,6 +717,7 @@ class Chord:
         Returns:
             A new Chord object transposed by the interval
         """
+        interval = Interval.coerce(interval)
         new_root = self.root.transpose(interval)
         new_bass = self.bass_note.transpose(interval) if self.bass_note else None
         

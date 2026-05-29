@@ -431,6 +431,14 @@ class TestNoteTransposition:
         assert f3.pitch_class == 5  # F
         assert f3.octave == 3
 
+    def test_transposition_accepts_interval_like_string(self):
+        """String interval representations should be coerced for transposition."""
+        c = Note(NoteName.C)
+
+        e = c.transpose("3")
+
+        assert e.pitch_class == 4
+
 
 class TestNoteIntervals:
     """Test interval calculation between notes."""

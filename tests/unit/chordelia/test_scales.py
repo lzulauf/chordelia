@@ -376,6 +376,15 @@ class TestScaleTransposition:
         assert str(c_sharp_minor.root) == "C#"
         assert c_sharp_minor.scale_type == ScaleType.NATURAL_MINOR
 
+    def test_transpose_accepts_interval_like_string(self):
+        """String interval representations should be coerced for transposition."""
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        g_major = c_major.transpose("5")
+
+        assert str(g_major.root) == "G"
+        assert g_major.scale_type == ScaleType.MAJOR
+
 
 class TestScaleImmutability:
     """Test that Scale instances are immutable."""
