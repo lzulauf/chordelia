@@ -1,312 +1,229 @@
-"""
-MIDI File Playback Example
+"""Canonical MIDI interface playback examples for Chordelia.
 
-This example demonstrates how to use Chordelia's MIDI module to:
-1. Load and analyze MIDI files
-2. Convert MIDI data to Chordelia's playback format
-3. Play MIDI files using different waveforms
-4. Extract and play individual tracks
+This script demonstrates:
+1. Loading/analyzing a MIDI file with MidiFile
+2. Playing a file to a MIDI output interface with MidiFile.play_to_interface
+3. Playing an in-memory score to a MIDI output interface with MidiPlayback
 
-For this example to work, you'll need:
-1. A MIDI file (you can download free MIDI files from various sources)
-2. The mido library installed: pip install mido
-3. The sounddevice and numpy libraries for audio playback
-
-Example MIDI files you can try:
-- smells_like_teen_spirit.mid (included in examples directory)
-- https://freemidi.org/
-- Any .mid file you have on your system
+Dependencies:
+- mido
 """
 
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 
-# Avoid UnicodeEncodeError on Windows code pages when examples print symbols.
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
 
-# Check if MIDI functionality is available
+
 try:
-    from chordelia import MidiFile, load_midi_file, play_midi_file
+    from chordelia import Chord, MidiFile, MidiPlayback, Score, Sequence
+    from chordelia.midi_playback import get_midi_ports
+
     MIDI_AVAILABLE = True
-    print("🎹 MIDI module available!")
-except ImportError as e:
+except ImportError as exc:
     MIDI_AVAILABLE = False
-    print(f"❌ MIDI module not available: {e}")
-    print("Install dependencies: pip install mido")
-
-# Check if playback is available
-try:
-    from chordelia import Playback, Waveform
-    PLAYBACK_AVAILABLE = True
-    print("🎵 Playback module available!")
-except ImportError as e:
-    PLAYBACK_AVAILABLE = False
-    print(f"❌ Playback module not available: {e}")
-    print("Install dependencies: pip install sounddevice numpy")
+    IMPORT_ERROR = exc
 
 
-def create_sample_midi():
-    """Create a simple MIDI file for testing purposes."""
+def safe_input(prompt: str, default: str = "") -> str:
+    """Read input and return default if stdin is unavailable."""
+    try:
+        return input(prompt)
+    except EOFError:
+        return default
+
+
+def create_sample_midi(sample_path: Path) -> Optional[Path]:
+    """Create a simple single-track MIDI file for local demo use."""
     try:
         import mido
-        
-        # Create a new MIDI file
-        mid = mido.MidiFile()
-        track = mido.MidiTrack()
-        mid.tracks.append(track)
-        
-        # Set tempo to 120 BPM
-        track.append(mido.MetaMessage('set_tempo', tempo=mido.bpm2tempo(120)))
-        
-        # Add a simple melody: C-D-E-F-G-A-B-C (C major scale)
-        notes = [60, 62, 64, 65, 67, 69, 71, 72]  # MIDI note numbers
-        
-        for i, note in enumerate(notes):
-            # Note on
-            track.append(mido.Message('note_on', channel=0, note=note, velocity=64, time=0))
-            # Note off after 480 ticks (quarter note at 480 ticks per beat)
-            track.append(mido.Message('note_off', channel=0, note=note, velocity=64, time=480))
-        
-        # Save the file
-        sample_path = "sample_scale.mid"
-        mid.save(sample_path)
-        print(f"✅ Created sample MIDI file: {sample_path}")
-        return sample_path
-        
     except ImportError:
-        print("❌ Cannot create sample MIDI - mido not available")
+        print("Could not import mido to create sample MIDI file.")
         return None
 
+    mid = mido.MidiFile()
+    track = mido.MidiTrack()
+    mid.tracks.append(track)
+    track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(120), time=0))
 
-def analyze_midi_file(filepath: str):
-    """Analyze and display information about a MIDI file."""
+    for note in [60, 62, 64, 65, 67, 69, 71, 72]:
+        track.append(mido.Message("note_on", channel=0, note=note, velocity=80, time=0))
+        track.append(mido.Message("note_off", channel=0, note=note, velocity=0, time=480))
+
+    track.append(mido.MetaMessage("end_of_track", time=0))
+    mid.save(str(sample_path))
+    print(f"Created sample MIDI file: {sample_path}")
+    return sample_path
+
+
+def choose_output_port(non_interactive: bool) -> Optional[str]:
+    """Select a MIDI output port name or None to use the transport default."""
+    ports = get_midi_ports().get("output", [])
+
+    if not ports:
+        print("No MIDI output ports were detected on this machine.")
+        return None
+
+    print("Available MIDI output ports:")
+    for idx, name in enumerate(ports, start=1):
+        print(f"  {idx}. {name}")
+
+    if non_interactive:
+        print("Non-interactive mode: using the first available output port.")
+        return ports[0]
+
+    choice = safe_input("Select output port number (Enter for default): ").strip()
+    if not choice:
+        return None
+
+    if not choice.isdigit():
+        print("Invalid choice; using transport default output.")
+        return None
+
+    selected = int(choice) - 1
+    if 0 <= selected < len(ports):
+        return ports[selected]
+
+    print("Choice out of range; using transport default output.")
+    return None
+
+
+def analyze_midi_file(filepath: Path) -> Optional[MidiFile]:
+    """Load and print metadata for a MIDI file."""
+    try:
+        midi = MidiFile.load_from_file(filepath)
+    except Exception as exc:
+        print(f"Failed to load MIDI file {filepath}: {exc}")
+        return None
+
+    print(f"\nAnalyzing: {filepath}")
+    print("=" * 50)
+    midi.print_info()
+    return midi
+
+
+def play_file_to_interface(filepath: Path, output_name: Optional[str]) -> None:
+    """Play an on-disk MIDI file to a MIDI output interface."""
+    midi = MidiFile.load_from_file(filepath)
+    midi.play_to_interface(output_name=output_name, blocking=True)
+
+
+def play_generated_score_to_interface(output_name: Optional[str]) -> None:
+    """Play an in-memory score directly through MidiPlayback."""
+    score = Score.from_sequenceable(
+        Sequence(
+            (
+                (Chord("C4"), 1),
+                (Chord("A4", "minor"), 1),
+                (Chord("F4"), 1),
+                (Chord("G4"), 1),
+            )
+        ),
+        tempo=104,
+    )
+
+    with MidiPlayback(output_name=output_name) as playback:
+        playback.play_score(score, blocking=True)
+
+
+def find_candidate_midi_files() -> list[Path]:
+    """Return discovered MIDI files from project root and examples directory."""
+    root = Path(".")
+    examples = Path("examples")
+    candidates = list(root.glob("*.mid")) + list(root.glob("*.midi"))
+    candidates += list(examples.glob("*.mid")) + list(examples.glob("*.midi"))
+    return sorted(set(candidates))
+
+
+def main() -> None:
+    """Run an interactive MIDI interface playback demo."""
+    print("Chordelia MIDI Interface Playback Example")
+    print("=" * 42)
+
     if not MIDI_AVAILABLE:
-        print("❌ MIDI functionality not available")
-        return None
-        
-    try:
-        print(f"\n🔍 ANALYZING MIDI FILE: {filepath}")
-        print("=" * 50)
-        
-        # Load the MIDI file
-        midi = MidiFile(filepath)
-        
-        # Print basic information
-        midi.print_info()
-        
-        return midi
-        
-    except FileNotFoundError:
-        print(f"❌ MIDI file not found: {filepath}")
-        return None
-    except Exception as e:
-        print(f"❌ Error loading MIDI file: {e}")
-        return None
-
-
-def play_midi_with_different_waveforms(filepath: str):
-    """Demonstrate playing the same MIDI file with different waveforms."""
-    if not (MIDI_AVAILABLE and PLAYBACK_AVAILABLE):
-        print("❌ MIDI or playback functionality not available")
+        print(f"MIDI module unavailable: {IMPORT_ERROR}")
+        print("Install dependencies with: pip install chordelia[midi]")
         return
-        
-    try:
-        midi = MidiFile(filepath)
-        
-        # Different waveforms to try
-        waveforms = [
-            (Waveform.SINE, "🌊 Sine wave (pure, clean tone)"),
-            (Waveform.TRIANGLE, "🔺 Triangle wave (soft, mellow)"),
-            (Waveform.SAWTOOTH, "🪚 Sawtooth wave (bright, buzzy)"),
-            (Waveform.SQUARE, "⬜ Square wave (hollow, retro)"),
-        ]
-        
-        print(f"\n🎵 PLAYING WITH DIFFERENT WAVEFORMS")
-        print("=" * 40)
-        
-        for waveform, description in waveforms:
-            print(f"\n{description}")
-            input("Press Enter to play, or Ctrl+C to skip...")
-            
-            try:
-                # Convert MIDI to playback notes with the specified waveform
-                notes = midi.to_playback_notes(waveform=waveform)
-                
-                # Play the notes
-                with Playback(midi.tempo) as playback:
-                    playback.play_sequence(notes, blocking=True)
-                    
-            except KeyboardInterrupt:
-                print("⏭️  Skipped")
-                continue
-                
-    except Exception as e:
-        print(f"❌ Error playing MIDI: {e}")
 
-
-def play_individual_tracks(filepath: str):
-    """Demonstrate playing individual tracks from a MIDI file."""
-    if not (MIDI_AVAILABLE and PLAYBACK_AVAILABLE):
-        print("❌ MIDI or playback functionality not available")
-        return
-        
-    try:
-        midi = MidiFile(filepath)
-        
-        if len(midi.tracks_info) <= 1:
-            print("🎵 MIDI file has only one track")
-            return
-            
-        print(f"\n🎼 PLAYING INDIVIDUAL TRACKS")
-        print("=" * 35)
-        
-        for i, track_info in enumerate(midi.tracks_info):
-            print(f"\n🎵 Track {i}: {track_info.name}")
-            print(f"   Notes: {track_info.note_count}")
-            
-            if track_info.note_count == 0:
-                print("   (No notes to play)")
-                continue
-                
-            response = input("Play this track? (y/n/q): ").lower()
-            
-            if response == 'q':
-                break
-            elif response == 'y':
-                try:
-                    # Get notes for this specific track
-                    notes = midi.get_track_notes(i, waveform=Waveform.SINE)
-                    
-                    if notes:
-                        print(f"   Playing {len(notes)} notes...")
-                        with Playback(midi.tempo) as playback:
-                            playback.play_sequence(notes, blocking=True)
-                    else:
-                        print("   No playable notes found")
-                        
-                except KeyboardInterrupt:
-                    print("   ⏹️  Stopped")
-                    
-    except Exception as e:
-        print(f"❌ Error playing tracks: {e}")
-
-
-def main():
-    """Main example function."""
-    print("🎹 CHORDELIA MIDI PLAYBACK EXAMPLE")
-    print("=" * 40)
     non_interactive = (
         not sys.stdin.isatty()
         or not sys.stdout.isatty()
         or os.environ.get("CHORDELIA_NONINTERACTIVE") == "1"
     )
 
-    def safe_input(prompt: str, default: str = "") -> str:
-        """Read input safely and return default if stdin is unavailable."""
-        try:
-            return input(prompt)
-        except EOFError:
-            return default
-    
-    if not (MIDI_AVAILABLE and PLAYBACK_AVAILABLE):
-        print("❌ Required modules not available")
-        print("Please install: pip install mido sounddevice numpy")
+    output_name = choose_output_port(non_interactive)
+    if output_name is None and not get_midi_ports().get("output"):
         return
-    
-    # Try to find a MIDI file to use
-    midi_file = None
-    
-    # Option 1: Look for MIDI files in current directory and examples directory
-    current_dir = Path(".")
-    examples_dir = Path("examples")
-    
-    midi_files = (list(current_dir.glob("*.mid")) + 
-                 list(current_dir.glob("*.midi")) +
-                 list(examples_dir.glob("*.mid")) + 
-                 list(examples_dir.glob("*.midi")))
-    
-    if midi_files:
-        print(f"🎵 Found MIDI files in current directory:")
-        for i, filepath in enumerate(midi_files[:5]):  # Show first 5
-            print(f"  {i+1}. {filepath.name}")
+
+    created_sample = False
+    midi_file: Optional[Path] = None
+    available_files = find_candidate_midi_files()
+
+    if available_files:
+        print("\nDetected MIDI files:")
+        for idx, path in enumerate(available_files[:8], start=1):
+            print(f"  {idx}. {path}")
 
         if non_interactive:
-            midi_file = str(midi_files[0])
-            print("Non-interactive mode detected: using the first MIDI file.")
+            midi_file = available_files[0]
+            print(f"Non-interactive mode: selected {midi_file}")
         else:
-            try:
-                choice = safe_input("\nSelect a file (1-{}) or press Enter to create sample: ".format(len(midi_files)))
-                if choice.strip() and choice.isdigit():
-                    idx = int(choice) - 1
-                    if 0 <= idx < len(midi_files):
-                        midi_file = str(midi_files[idx])
-            except ValueError:
-                pass
-    
-    # Option 2: Create a sample MIDI file
-    if not midi_file:
-        print("\n📝 Creating sample MIDI file...")
-        midi_file = create_sample_midi()
-    
-    if not midi_file:
-        print("❌ No MIDI file available for testing")
+            choice = safe_input("Select file number (Enter to create sample): ").strip()
+            if choice.isdigit():
+                selected = int(choice) - 1
+                if 0 <= selected < len(available_files):
+                    midi_file = available_files[selected]
+
+    if midi_file is None:
+        sample_path = Path("sample_scale.mid")
+        midi_file = create_sample_midi(sample_path)
+        created_sample = midi_file is not None
+
+    if midi_file is None:
+        print("No MIDI file available for playback.")
         return
-    
-    # Analyze the MIDI file
-    midi = analyze_midi_file(midi_file)
-    if not midi:
+
+    loaded = analyze_midi_file(midi_file)
+    if loaded is None:
         return
 
     if non_interactive:
-        print("\nNon-interactive mode detected: skipping interactive playback menu.")
-        if midi_file == "sample_scale.mid" and os.path.exists(midi_file):
+        print("\nNon-interactive mode: skipping playback actions.")
+    else:
+        while True:
+            print("\nDemo options")
+            print("1. Play selected MIDI file through interface")
+            print("2. Play generated score through interface")
+            print("3. Re-print MIDI analysis")
+            print("4. Quit")
+
+            choice = safe_input("Select option (1-4): ").strip()
+
             try:
-                os.remove(midi_file)
-                print(f"🗑️  Cleaned up sample file: {midi_file}")
-            except Exception:
-                pass
-        return
-    
-    print("\n🎵 DEMO OPTIONS")
-    print("=" * 20)
-    print("1. Play with different waveforms")
-    print("2. Play individual tracks")
-    print("3. Simple playback (sine wave)")
-    print("4. Quit")
-    
-    while True:
+                if choice == "1":
+                    play_file_to_interface(midi_file, output_name)
+                elif choice == "2":
+                    play_generated_score_to_interface(output_name)
+                elif choice == "3":
+                    analyze_midi_file(midi_file)
+                elif choice == "4":
+                    break
+                else:
+                    print("Invalid choice.")
+            except Exception as exc:
+                print(f"Playback error: {exc}")
+
+    if created_sample and midi_file.exists():
         try:
-            choice = safe_input("\nSelect option (1-4): ").strip()
-            
-            if choice == "1":
-                play_midi_with_different_waveforms(midi_file)
-            elif choice == "2":
-                play_individual_tracks(midi_file)
-            elif choice == "3":
-                print("\n🎵 Playing MIDI file...")
-                play_midi_file(midi_file, waveform=Waveform.SINE)
-            elif choice == "4":
-                break
-            else:
-                print("❌ Invalid choice")
-                
-        except KeyboardInterrupt:
-            print("\n👋 Goodbye!")
-            break
-        except Exception as e:
-            print(f"❌ Error: {e}")
-    
-    # Cleanup sample file if we created it
-    if midi_file == "sample_scale.mid" and os.path.exists(midi_file):
-        try:
-            os.remove(midi_file)
-            print(f"🗑️  Cleaned up sample file: {midi_file}")
-        except:
+            midi_file.unlink()
+            print(f"Removed temporary sample file: {midi_file}")
+        except OSError:
             pass
 
 

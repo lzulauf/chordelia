@@ -20,6 +20,12 @@ Back links: [Project README](../README.md)
 
 - [API Overview](api-overview.md): class, value object, enum, and convenience function map.
 
+## Optional MIDI Workflow
+
+- [Quickstart](quickstart.md#midi-interface-playback-optional): Score to MidiFile workflow and interface playback entry points.
+- [API Overview](api-overview.md#midi-workflow-optional): canonical MidiPlayback and MidiFile responsibilities.
+- [MIDI Example Script](../examples/midi_playback_example.py): interactive example for selecting ports and auditioning file or score playback.
+
 ## Development
 
 - [Development Guide](development.md): testing, contribution flow, versioning, and publishing.

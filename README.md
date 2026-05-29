@@ -13,6 +13,7 @@ Chordelia is a Python library for music theory and timing workflows. It emphasiz
 - Sequenceable conversion boundary for score-producing musical objects
 - Sequence timelines with `Sequence`, `SequenceEntry`, and `Rest`
 - Canonical score model with normalized events for downstream rendering/export
+- Optional MIDI interface/file workflow with `MidiPlayback` and `MidiFile`
 
 ## Installation
 

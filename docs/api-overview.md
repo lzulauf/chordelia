@@ -15,6 +15,8 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `SequenceEntry`: One payload plus duration/offset timing metadata.
 - `Rest`: Explicit silent payload marker for sequence timelines.
 - `Score`: Canonical wrapper around a source and ordered normalized events.
+- `MidiPlayback`: Live MIDI output transport for chord, note, and score playback.
+- `MidiFile`: MIDI wrapper for score conversion, file IO, and interface playback.
 - `Duration`: Fractional note duration utilities.
 - `TimeSignature`: Meter representation such as 4/4, 3/4, 6/8.
 - `Tempo`: BPM and traditional marking helpers.
@@ -38,6 +40,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - Duration modification: `dotted(duration)`, `triplet(duration)`
 - Common time signatures: `COMMON_TIME`, `WALTZ_TIME`, `COMPOUND_DUPLE`
 - Score conversion: `score_from_sequenceable(...)`
+- MIDI ports: `get_midi_ports()`
 
 ## Score Conversion Workflow
 
@@ -85,6 +88,15 @@ context = ScoreEventContext(
 - `Scale.degree_for_chord_root(...) -> Degree | None`
 - `Chord.tone_at(...)`, `Chord.degree_for_tone(...) -> Degree | None`
 - `Interval.degree`, `Interval.simple_degree`
+
+## MIDI Workflow (Optional)
+
+- Use `Score.from_sequenceable(...)` to normalize composition data.
+- Use `MidiFile(score)` when you want file export and wrapper methods.
+- Use `MidiFile.to_file(path)` to write a `.mid` file.
+- Use `MidiFile.play_to_interface(...)` to send score-backed playback to a MIDI output.
+- Use `MidiPlayback` directly for repeated live transport sessions and `play_score(...)`.
+- Install optional dependencies with `pip install chordelia[midi]`.
 
 ## Real-World Applications
 

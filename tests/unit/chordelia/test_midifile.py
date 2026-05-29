@@ -1,6 +1,7 @@
 """Tests for the canonical MidiFile score-backed wrapper behavior."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -116,3 +117,28 @@ class TestMidiFileReadCompatibility:
         assert loaded.score is not None
         assert len(playback_notes) == 1
         assert str(playback_notes[0].note) == "C4"
+
+
+class TestMidiFileInterfacePlayback:
+    """Playback-to-interface behavior through the canonical MidiPlayback transport."""
+
+    def test_play_to_interface_delegates_to_midiplayback(self):
+        midi = MidiFile(Note("C4"))
+
+        with patch("chordelia.midi_playback.MidiPlayback") as mock_transport:
+            transport_instance = mock_transport.return_value.__enter__.return_value
+
+            midi.play_to_interface(
+                output_name="Test MIDI Port",
+                blocking=False,
+                velocity_scale=1.2,
+                channel_override=3,
+            )
+
+            mock_transport.assert_called_once_with(output_name="Test MIDI Port")
+            transport_instance.play_score.assert_called_once()
+            args, kwargs = transport_instance.play_score.call_args
+            assert args[0] is midi.score
+            assert kwargs["blocking"] is False
+            assert kwargs["velocity_scale"] == 1.2
+            assert kwargs["channel_override"] == 3

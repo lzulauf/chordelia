@@ -211,6 +211,30 @@ class MidiFile:
 
         raise ValueError("MidiFile has no score or source MIDI data to write")
 
+    def play_to_interface(
+        self,
+        output_name: Optional[str] = None,
+        *,
+        blocking: bool = True,
+        velocity_scale: float = 1.0,
+        channel_override: Optional[int] = None,
+    ) -> None:
+        """Play this wrapper's normalized score to a MIDI output interface."""
+        from chordelia.midi_playback import MidiPlayback
+
+        if self.score is None:
+            if self.filepath is None:
+                raise ValueError("MidiFile has no score or file source to play")
+            self.score = self.score_from_file(self.filepath)
+
+        with MidiPlayback(output_name=output_name) as playback:
+            playback.play_score(
+                self.score,
+                blocking=blocking,
+                velocity_scale=velocity_scale,
+                channel_override=channel_override,
+            )
+
     def _initialize_from_file(self, filepath: Path) -> None:
         """Initialize wrapper state from an on-disk MIDI file."""
         self.filepath = filepath

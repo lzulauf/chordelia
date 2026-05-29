@@ -100,6 +100,36 @@ print(len(stacked_events))  # 2
 print([event.pitches for event in stacked_events])  # [(60, 64), (67, 71)]
 ```
 
+## MIDI Interface Playback (Optional)
+
+```python
+from chordelia import Chord, MidiFile, MidiPlayback, Score, Sequence
+
+progression = Sequence((
+	(Chord("C4"), 1),
+	(Chord("A4", "minor"), 1),
+	(Chord("F4"), 1),
+	(Chord("G4"), 1),
+))
+
+score = Score.from_sequenceable(progression, tempo=104)
+midi = MidiFile(score)
+midi.to_file("progression.mid")
+
+# Play score through a MIDI output interface via MidiFile.
+# midi.play_to_interface(output_name=None, blocking=True)
+
+# Or use MidiPlayback directly for repeated interactive use.
+# with MidiPlayback(output_name=None) as playback:
+#     playback.play_score(score, blocking=True)
+```
+
+Requires MIDI extras:
+
+```bash
+pip install chordelia[midi]
+```
+
 ## Where to Go Next
 
 - [Notes and Intervals](guides/notes-and-intervals.md)

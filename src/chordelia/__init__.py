@@ -36,7 +36,7 @@ except ImportError:
 
 # MIDI modules - optional import (requires mido)
 try:
-    from chordelia.midi_playback import MIDIChordPlayer, MIDIPlaybackNote, get_midi_ports, is_midi_available
+    from chordelia.midi_playback import MidiPlayback, get_midi_ports, is_midi_available
     from chordelia.midi_playback import play_chord as midi_play_chord, play_melody as midi_play_melody
     from chordelia.midifile import MidiFile, MidiTrackInfo, load_midi_file, play_midi_file
     _MIDI_AVAILABLE = True
@@ -102,8 +102,7 @@ if _PLAYBACK_AVAILABLE:
 # Add MIDI playback exports if available  
 if _MIDI_AVAILABLE:
     __all__.extend([
-        "MIDIChordPlayer",
-        "MIDIPlaybackNote",
+        "MidiPlayback",
         "MidiFile",
         "MidiTrackInfo",
         "get_midi_ports", 
