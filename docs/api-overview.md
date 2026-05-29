@@ -9,7 +9,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `Degree`: Degree value object with numeric and Roman coercion helpers.
 - `Scale`: Scale generation with theory-aware note spelling.
 - `Chord`: Chord quality, extensions, inversions, and slash chords.
-- `Sequenceable`: Protocol for objects that render normalized score events and consumed span.
+- `Sequenceable`: Protocol for objects that render normalized score events/consumed span and support transpose transforms.
 - `NotesLike`: Protocol for values that can represent zero or more notes.
 - `Sequence`: Immutable ordered timeline of sequence entries.
 - `SequenceEntry`: One payload plus duration/offset timing metadata.
@@ -59,6 +59,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - Iterable values containing chord-like boundaries (for example `Chord`, `Rest`, or mixed `Note` and `Chord`) preserve each item as its own simultaneous layer.
 - Constructor input can include bare `Sequenceable` values, which coerce to default 1-beat entries.
 - Constructor input can include child `Sequence` values, which are treated as sequenceable payloads and consume their rendered span.
+- `Sequence.transpose(interval)` recursively transposes payloads while preserving entry duration and offset timing metadata.
 - Empty iterables coerce to `Rest`.
 
 Example:

@@ -37,6 +37,7 @@ Define and adopt `Sequenceable` as the canonical capability interface for object
    1. Add `src/chordelia/sequenceable.py`.
    2. Protocol surface:
    1. `render_for_context(context: ScoreEventContext) -> SequenceRender`.
+   2. `transpose(interval: IntervalLike) -> Sequenceable`.
 2. Canonical implementers (v1):
    1. `Note`.
    2. `Chord`.
@@ -60,6 +61,7 @@ Define and adopt `Sequenceable` as the canonical capability interface for object
 ## API signatures (proposed)
 1. `class Sequenceable(Protocol):`
    1. `def render_for_context(self, context: ScoreEventContext) -> SequenceRender: ...`
+   2. `def transpose(self, interval: IntervalLike) -> Sequenceable: ...`
 2. Adapter API:
    1. `register_sequenceable_adapter(type_, adapter)`.
    2. `sequence_render_for(value, context)`.
@@ -101,7 +103,7 @@ Define and adopt `Sequenceable` as the canonical capability interface for object
    1. `tests/unit/chordelia/test_sequenceable.py`.
 
 ## Cross-plan references
-1. `.plans/first_class_sequence_support_plan.md`.
+1. `.plans/archive/first_class_sequence_support_plan.md`.
 2. `.plans/shared_score_ir_implementation_plan.md`.
 3. `.plans/sequence_to_midi_export_plan.md`.
 4. `.plans/sheet_music_rendering_plan.md`.

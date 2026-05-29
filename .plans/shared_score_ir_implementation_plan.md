@@ -54,7 +54,7 @@ Implement canonical `Score` as the top-level wrapper around `Sequenceable` objec
    2. Canonical docs should use `Score` terminology only.
 
 ## Cross-plan and decision links
-1. `.plans/first_class_sequence_support_plan.md`.
+1. `.plans/archive/first_class_sequence_support_plan.md`.
 2. `.plans/sequence_to_midi_export_plan.md`.
 3. `.plans/sheet_music_rendering_plan.md`.
 4. `.plans/common_musical_interfaces_plan.md`.

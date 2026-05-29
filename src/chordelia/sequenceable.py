@@ -9,6 +9,7 @@ from chordelia.score import ScoreEvent, ScoreEventContext
 from chordelia.rhythm import Duration
 
 if TYPE_CHECKING:
+    from chordelia.intervals import IntervalLike
     from chordelia.notes import Note
 
 
@@ -48,10 +49,13 @@ _ADAPTER_REGISTRY: dict[type[Any], SequenceableAdapter] = {}
 
 @runtime_checkable
 class Sequenceable(Protocol):
-    """Protocol for values that can render score events and consumed span under a context."""
+    """Protocol for values that can render and transpose in sequence workflows."""
 
     def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
         """Emit normalized score events and consumed span for the provided context."""
+
+    def transpose(self, interval: 'IntervalLike') -> 'Sequenceable':
+        """Return a transposed value that preserves sequenceable behavior."""
 
 
 @runtime_checkable

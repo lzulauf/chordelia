@@ -50,7 +50,7 @@ Make `SheetMusic` the canonical sheet-rendering wrapper around `Score` (and ther
 
 ## Cross-plan references
 1. `.plans/shared_score_ir_implementation_plan.md`.
-2. `.plans/first_class_sequence_support_plan.md`.
+2. `.plans/archive/first_class_sequence_support_plan.md`.
 3. `.plans/sequence_to_midi_export_plan.md`.
 4. `.plans/common_musical_interfaces_plan.md`.
 5. `decisions/sheet_music_rendering_strategy_decision.md`.

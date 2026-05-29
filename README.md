@@ -65,6 +65,11 @@ stacked_layers = Sequence((([
 	Chord.from_notes(["G4", "B4"]),
 ], 1),))
 print(len(stacked_layers.render_for_context(ScoreEventContext()).events))  # 2
+
+# Recursive sequence transpose preserves timing metadata.
+motif = Sequence((("C4", 1), ("E4", 1)))
+transposed = motif.transpose("2")
+print([event.pitches for event in transposed.render_for_context(ScoreEventContext()).events])
 ```
 
 For a fuller walkthrough, see [docs/quickstart.md](docs/quickstart.md).

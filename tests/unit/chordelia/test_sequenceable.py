@@ -3,6 +3,7 @@
 import pytest
 
 from chordelia.chords import Chord
+from chordelia.intervals import Interval
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
 from chordelia.sequences import Rest, Sequence, SequenceEntry
@@ -28,6 +29,12 @@ def clear_adapter_registry_between_tests():
 class TestSequenceableProtocol:
     """Runtime protocol checks for canonical sequenceable implementers."""
 
+    class RenderOnly:
+        """Implements rendering but intentionally omits transpose."""
+
+        def render_for_context(self, context):
+            return SequenceRender(events=(), consumed_duration=context.default_duration)
+
     def test_note_is_runtime_sequenceable(self):
         """Note exposes the required render_for_context protocol surface."""
         assert isinstance(Note("C4"), Sequenceable)
@@ -44,6 +51,10 @@ class TestSequenceableProtocol:
     def test_rest_is_runtime_sequenceable(self):
         """Rest should satisfy Sequenceable and emit silence via the same boundary."""
         assert isinstance(Rest(), Sequenceable)
+
+    def test_render_only_value_is_not_runtime_sequenceable(self):
+        """Sequenceable requires transpose as part of the canonical protocol."""
+        assert not isinstance(self.RenderOnly(), Sequenceable)
 
     def test_note_is_runtime_notes_like(self):
         assert isinstance(Note("C4"), NotesLike)
@@ -484,3 +495,84 @@ class TestSequenceScheduling:
         render = _sequence_render_for(Rest(), ScoreEventContext())
         assert render.events == ()
         assert render.consumed_duration == Duration.from_beats(1)
+
+
+class TestSequenceTransforms:
+    """Sequence transform behavior and recursive transpose semantics."""
+
+    def test_sequence_transpose_preserves_timing_and_updates_pitches(self):
+        seq = Sequence(
+            (
+                SequenceEntry(payload=Note("C4"), duration=2, offset=1),
+                SequenceEntry(payload=Chord("E4"), duration=1),
+            )
+        )
+
+        transposed = seq.transpose("2")
+        original_render = seq.render_for_context(ScoreEventContext())
+        transposed_render = transposed.render_for_context(ScoreEventContext())
+
+        assert [event.beat for event in transposed_render.events] == [
+            Duration.from_beats(1),
+            Duration.from_beats(3),
+        ]
+        assert [event.duration for event in transposed_render.events] == [
+            Duration.from_beats(2),
+            Duration.from_beats(1),
+        ]
+        assert [event.pitches for event in transposed_render.events] == [(62,), (66, 70, 73)]
+        assert transposed_render.consumed_duration == Duration.from_beats(4)
+
+        # Transpose should return a new sequence and leave the original unchanged.
+        assert transposed is not seq
+        assert [event.pitches for event in original_render.events] == [(60,), (64, 68, 71)]
+
+    def test_sequence_transpose_recurses_into_nested_sequences(self):
+        motif = Sequence(
+            (
+                (Note("C4"), 1),
+                (Note("E4"), 1),
+            )
+        )
+        arrangement = Sequence(
+            (
+                motif,
+                SequenceEntry(payload=Chord("G4"), duration=2),
+            )
+        )
+
+        transposed = arrangement.transpose(Interval.from_semitones(-2))
+        render = transposed.render_for_context(ScoreEventContext())
+
+        assert [event.beat for event in render.events] == [
+            Duration.from_beats(0),
+            Duration.from_beats(1),
+            Duration.from_beats(2),
+        ]
+        assert [event.pitches for event in render.events] == [(58,), (62,), (65, 69, 72)]
+        assert render.consumed_duration == Duration.from_beats(4)
+
+    def test_sequence_transpose_recurses_into_simultaneous_layers(self):
+        seq = Sequence(
+            (
+                (
+                    [
+                        Chord("C4"),
+                        Note("G4"),
+                    ],
+                    1,
+                ),
+            )
+        )
+
+        transposed = seq.transpose("2")
+        render = transposed.render_for_context(ScoreEventContext())
+
+        assert [event.pitches for event in render.events] == [(62, 66, 69), (69,)]
+        assert [event.beat for event in render.events] == [Duration.from_beats(0), Duration.from_beats(0)]
+
+    def test_sequence_transpose_raises_for_unsupported_payloads(self):
+        seq = Sequence((SequenceEntry(payload=object(), duration=1),))
+
+        with pytest.raises(ValueError, match="transpose\(interval\)"):
+            seq.transpose("2")
