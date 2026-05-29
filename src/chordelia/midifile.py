@@ -218,6 +218,9 @@ class MidiFile:
         blocking: bool = True,
         velocity_scale: float = 1.0,
         channel_override: Optional[int] = None,
+        gate_width: Optional[float] = None,
+        gate_offset: Optional[float] = None,
+        retrigger_policy: Optional[str] = None,
     ) -> None:
         """Play this wrapper's normalized score to a MIDI output interface."""
         from chordelia.midi_playback import MidiPlayback
@@ -233,6 +236,9 @@ class MidiFile:
                 blocking=blocking,
                 velocity_scale=velocity_scale,
                 channel_override=channel_override,
+                gate_width=gate_width,
+                gate_offset=gate_offset,
+                retrigger_policy=retrigger_policy,
             )
 
     def _initialize_from_file(self, filepath: Path) -> None:

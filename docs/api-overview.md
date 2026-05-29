@@ -52,6 +52,8 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `Score.events` are sorted deterministically for downstream consistency.
 - `Score.with_tempo(...)` returns an immutable score copy with updated tempo.
 - `Score.with_(...)` supports multi-field metadata updates (tempo, time signature, key signature, ppq) and optional source/events replacement in one call.
+- `ScoreMetadata` includes playback articulation defaults: `gate_width` (default `0.9`), `gate_offset` (default `0.0`), and `retrigger_policy` (default `retrigger_all`; options `delta` or `retrigger_all`).
+- `ScoreEvent` supports optional per-event `gate_width` and `gate_offset` overrides without changing notated duration.
 
 ### Sequence Payload Coercion
 
@@ -101,7 +103,23 @@ context = ScoreEventContext(
 - Use `MidiFile.to_file(path)` to write a `.mid` file.
 - Use `MidiFile.play_to_interface(...)` to send score-backed playback to a MIDI output.
 - Use `MidiPlayback` directly for repeated live transport sessions and `play_score(...)`.
+- `MidiPlayback.play_score(...)` and `MidiFile.play_to_interface(...)` accept optional `gate_width`, `gate_offset`, and `retrigger_policy` overrides.
 - Install optional dependencies with `pip install chordelia[midi]`.
+
+Example overrides:
+
+```python
+from chordelia import MidiPlayback, Score
+
+score = Score.from_sequenceable(sequence, tempo=112)
+
+# Keep full written durations (100% gate) and preserve delta-style note continuity.
+score = score.with_(gate_width=1.0, retrigger_policy="delta")
+
+# Or override at playback call site only.
+with MidiPlayback() as playback:
+	playback.play_score(score, gate_width=1.0, retrigger_policy="delta")
+```
 
 ## Real-World Applications
 

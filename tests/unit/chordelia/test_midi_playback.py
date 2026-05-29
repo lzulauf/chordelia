@@ -136,6 +136,142 @@ class TestMidiPlayback:
             with pytest.raises(RuntimeError, match="No MIDI output ports"):
                 MidiPlayback()
 
+    def test_score_schedule_defaults_to_metadata_gate_width(self, mock_midi):
+        from chordelia.midi_playback import MidiPlayback
+
+        score = Score(
+            source="x",
+            metadata=ScoreMetadata(tempo=120, gate_width=0.9, gate_offset=0.0, retrigger_policy="delta"),
+            events=(ScoreEvent(beat=0, duration=1, pitches=(60,), velocity=100, channel=0),),
+        )
+
+        playback = MidiPlayback()
+        schedule = playback._build_score_schedule(
+            score,
+            velocity_scale=1.0,
+            channel_override=None,
+            gate_width=None,
+            gate_offset=None,
+            retrigger_policy=None,
+        )
+
+        assert len(schedule) == 2
+        assert schedule[0][:4] == (0.0, 1, 0, 60)
+        assert schedule[0][4:] == (100, True)
+        assert schedule[1][1:4] == (0, 0, 60)
+        assert schedule[1][5] is False
+        assert schedule[1][0] == pytest.approx(0.45)
+
+        playback.stop()
+
+    def test_score_schedule_allows_call_level_gate_override(self, mock_midi):
+        from chordelia.midi_playback import MidiPlayback
+
+        score = Score(
+            source="x",
+            metadata=ScoreMetadata(tempo=120, gate_width=0.9),
+            events=(ScoreEvent(beat=0, duration=1, pitches=(60,), channel=0),),
+        )
+
+        playback = MidiPlayback()
+        schedule = playback._build_score_schedule(
+            score,
+            velocity_scale=1.0,
+            channel_override=None,
+            gate_width=1.0,
+            gate_offset=0.0,
+            retrigger_policy="delta",
+        )
+
+        assert schedule[1][0] == pytest.approx(0.5)
+
+        playback.stop()
+
+    def test_score_event_gate_override_takes_precedence(self, mock_midi):
+        from chordelia.midi_playback import MidiPlayback
+
+        score = Score(
+            source="x",
+            metadata=ScoreMetadata(tempo=120, gate_width=0.9),
+            events=(
+                ScoreEvent(beat=0, duration=1, pitches=(60,), channel=0, gate_width=0.5, gate_offset=0.25),
+            ),
+        )
+
+        playback = MidiPlayback()
+        schedule = playback._build_score_schedule(
+            score,
+            velocity_scale=1.0,
+            channel_override=None,
+            gate_width=None,
+            gate_offset=None,
+            retrigger_policy=None,
+        )
+
+        assert schedule[0][0] == pytest.approx(0.125)
+        assert schedule[1][0] == pytest.approx(0.375)
+
+        playback.stop()
+
+    def test_retrigger_all_policy_restarts_repeated_notes(self, mock_midi):
+        from chordelia.midi_playback import MidiPlayback
+
+        score = Score(
+            source="x",
+            metadata=ScoreMetadata(tempo=120, gate_width=1.0, retrigger_policy="retrigger_all"),
+            events=(
+                ScoreEvent(beat=0, duration=1, pitches=(60,), channel=0),
+                ScoreEvent(beat=1, duration=1, pitches=(60,), channel=0),
+            ),
+        )
+
+        playback = MidiPlayback()
+        schedule = playback._build_score_schedule(
+            score,
+            velocity_scale=1.0,
+            channel_override=None,
+            gate_width=None,
+            gate_offset=None,
+            retrigger_policy=None,
+        )
+
+        on_events = [event for event in schedule if event[5] is True]
+        off_events = [event for event in schedule if event[5] is False]
+        assert len(on_events) == 2
+        assert len(off_events) == 2
+
+        playback.stop()
+
+    def test_delta_policy_preserves_repeated_note_without_restart(self, mock_midi):
+        from chordelia.midi_playback import MidiPlayback
+
+        score = Score(
+            source="x",
+            metadata=ScoreMetadata(tempo=120, gate_width=1.0, retrigger_policy="delta"),
+            events=(
+                ScoreEvent(beat=0, duration=1, pitches=(60,), channel=0),
+                ScoreEvent(beat=1, duration=1, pitches=(60,), channel=0),
+            ),
+        )
+
+        playback = MidiPlayback()
+        schedule = playback._build_score_schedule(
+            score,
+            velocity_scale=1.0,
+            channel_override=None,
+            gate_width=None,
+            gate_offset=None,
+            retrigger_policy=None,
+        )
+
+        on_events = [event for event in schedule if event[5] is True]
+        off_events = [event for event in schedule if event[5] is False]
+        assert len(on_events) == 1
+        assert len(off_events) == 1
+        assert off_events[0][0] == pytest.approx(1.0)
+
+        playback.stop()
+
 
 class TestMidiConvenienceFunctions:
     @patch("chordelia.midi_playback.time.sleep")

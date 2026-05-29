@@ -8,7 +8,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set
 from chordelia.chords import Chord
 from chordelia.notes import Note
 from chordelia.rhythm import Duration, Tempo
-from chordelia.score import Score
+from chordelia.score import Score, ScoreEvent
 
 
 try:
@@ -201,12 +201,51 @@ class MidiPlayback:
         beats = float(duration.as_beats())
         return beats * 60.0 / float(tempo_bpm)
 
+    @staticmethod
+    def _validate_gate_value(value: float, *, field_name: str) -> None:
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"{field_name} must be between 0.0 and 1.0, got {value}")
+
+    @staticmethod
+    def _validate_retrigger_policy(policy: str) -> None:
+        if policy not in {"delta", "retrigger_all"}:
+            raise ValueError(
+                "retrigger_policy must be 'delta' or 'retrigger_all', "
+                f"got {policy!r}"
+            )
+
+    def _effective_event_window(
+        self,
+        score: Score,
+        event: ScoreEvent,
+        *,
+        default_gate_width: float,
+        default_gate_offset: float,
+    ) -> tuple[float, float, int, int]:
+        """Compute start/end playback window for one event under gate settings."""
+        channel = event.channel
+        event_start = self._duration_to_seconds(event.beat, score.metadata.tempo)
+        event_duration = self._duration_to_seconds(event.duration, score.metadata.tempo)
+        event_end = event_start + event_duration
+
+        gate_width = default_gate_width if event.gate_width is None else event.gate_width
+        gate_offset = default_gate_offset if event.gate_offset is None else event.gate_offset
+        self._validate_gate_value(gate_width, field_name="gate_width")
+        self._validate_gate_value(gate_offset, field_name="gate_offset")
+
+        sounding_start = event_start + (event_duration * gate_offset)
+        sounding_end = min(event_end, sounding_start + (event_duration * gate_width))
+        return sounding_start, sounding_end, channel, event.velocity
+
     def _build_score_schedule(
         self,
         score: Score,
         *,
         velocity_scale: float,
         channel_override: Optional[int],
+        gate_width: Optional[float],
+        gate_offset: Optional[float],
+        retrigger_policy: Optional[str],
     ) -> List[tuple[float, int, int, int, int, bool]]:
         if velocity_scale <= 0:
             raise ValueError("velocity_scale must be > 0")
@@ -214,18 +253,83 @@ class MidiPlayback:
         if channel_override is not None:
             self._validate_channel(channel_override)
 
+        effective_gate_width = score.metadata.gate_width if gate_width is None else gate_width
+        effective_gate_offset = score.metadata.gate_offset if gate_offset is None else gate_offset
+        effective_retrigger_policy = (
+            score.metadata.retrigger_policy
+            if retrigger_policy is None
+            else retrigger_policy
+        )
+
+        self._validate_gate_value(effective_gate_width, field_name="gate_width")
+        self._validate_gate_value(effective_gate_offset, field_name="gate_offset")
+        self._validate_retrigger_policy(effective_retrigger_policy)
+
         schedule: list[tuple[float, int, int, int, int, bool]] = []
 
+        if effective_retrigger_policy == "retrigger_all":
+            for event in score.events:
+                start_s, end_s, event_channel, event_velocity = self._effective_event_window(
+                    score,
+                    event,
+                    default_gate_width=effective_gate_width,
+                    default_gate_offset=effective_gate_offset,
+                )
+
+                if end_s <= start_s:
+                    continue
+
+                channel = channel_override if channel_override is not None else event_channel
+                velocity = max(0, min(127, int(round(event_velocity * velocity_scale))))
+
+                for pitch in event.pitches:
+                    # order: note_off first at equal timestamp.
+                    schedule.append((start_s, 1, channel, pitch, velocity, True))
+                    schedule.append((end_s, 0, channel, pitch, 0, False))
+
+            schedule.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
+            return schedule
+
+        # Delta mode: preserve currently sounding notes and only retrigger changed notes.
+        active: dict[tuple[int, int], float] = {}
+
+        def flush_finished(before_time: float) -> None:
+            for key, off_time in tuple(active.items()):
+                if off_time < before_time:
+                    channel, pitch = key
+                    schedule.append((off_time, 0, channel, pitch, 0, False))
+                    del active[key]
+
         for event in score.events:
-            channel = channel_override if channel_override is not None else event.channel
-            start_s = self._duration_to_seconds(event.beat, score.metadata.tempo)
-            end_s = start_s + self._duration_to_seconds(event.duration, score.metadata.tempo)
-            velocity = max(0, min(127, int(round(event.velocity * velocity_scale))))
+            start_s, end_s, event_channel, event_velocity = self._effective_event_window(
+                score,
+                event,
+                default_gate_width=effective_gate_width,
+                default_gate_offset=effective_gate_offset,
+            )
+
+            if end_s <= start_s:
+                continue
+
+            flush_finished(start_s)
+
+            channel = channel_override if channel_override is not None else event_channel
+            velocity = max(0, min(127, int(round(event_velocity * velocity_scale))))
 
             for pitch in event.pitches:
-                # order: note_off first at equal timestamp.
+                key = (channel, pitch)
+                current_off = active.get(key)
+                if current_off is not None and current_off >= start_s:
+                    if end_s > current_off:
+                        active[key] = end_s
+                    continue
+
                 schedule.append((start_s, 1, channel, pitch, velocity, True))
-                schedule.append((end_s, 0, channel, pitch, 0, False))
+                active[key] = end_s
+
+        for key, off_time in active.items():
+            channel, pitch = key
+            schedule.append((off_time, 0, channel, pitch, 0, False))
 
         schedule.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
         return schedule
@@ -262,11 +366,17 @@ class MidiPlayback:
         blocking: bool = True,
         velocity_scale: float = 1.0,
         channel_override: Optional[int] = None,
+        gate_width: Optional[float] = None,
+        gate_offset: Optional[float] = None,
+        retrigger_policy: Optional[str] = None,
     ) -> None:
         schedule = self._build_score_schedule(
             score,
             velocity_scale=velocity_scale,
             channel_override=channel_override,
+            gate_width=gate_width,
+            gate_offset=gate_offset,
+            retrigger_policy=retrigger_policy,
         )
 
         self._stop_event.clear()

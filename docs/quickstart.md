@@ -127,6 +127,19 @@ midi.to_file("progression.mid")
 # Or use MidiPlayback directly for repeated interactive use.
 # with MidiPlayback(output_name=None) as playback:
 #     playback.play_score(score, blocking=True)
+
+# Articulation defaults are gate_width=0.9 and retrigger_policy="retrigger_all".
+# To force full-duration playback while keeping delta retrigger behavior:
+score = score.with_(gate_width=1.0, retrigger_policy="delta")
+
+# Equivalent playback-call override:
+with MidiPlayback(output_name=None) as playback:
+    playback.play_score(
+        score,
+        blocking=True,
+        gate_width=1.0,
+        retrigger_policy="delta",
+    )
 ```
 
 Requires MIDI extras:

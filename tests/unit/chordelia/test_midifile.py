@@ -133,6 +133,9 @@ class TestMidiFileInterfacePlayback:
                 blocking=False,
                 velocity_scale=1.2,
                 channel_override=3,
+                gate_width=0.8,
+                gate_offset=0.1,
+                retrigger_policy="retrigger_all",
             )
 
             mock_transport.assert_called_once_with(output_name="Test MIDI Port")
@@ -142,3 +145,6 @@ class TestMidiFileInterfacePlayback:
             assert kwargs["blocking"] is False
             assert kwargs["velocity_scale"] == 1.2
             assert kwargs["channel_override"] == 3
+            assert kwargs["gate_width"] == 0.8
+            assert kwargs["gate_offset"] == 0.1
+            assert kwargs["retrigger_policy"] == "retrigger_all"
