@@ -1,6 +1,6 @@
 ---
 name: plan-use
-description: 'Create and run implementation plans in .plans with clear scope, phases, checklists, milestones, acceptance criteria, and cross-links to related plans or skills. Use when preparing and executing work.'
+description: 'Create and run implementation plans in .plans with clear scope, technical depth, pseudocode, diagrams, phases, checklists, milestones, acceptance criteria, and cross-links to related plans or skills. Use when preparing and executing work.'
 argument-hint: 'Describe the initiative and constraints to generate a phased execution plan'
 user-invocable: true
 ---
@@ -25,7 +25,7 @@ Companion skills: function-naming for naming standards, immutable-types for immu
 ## Plan Location and Naming
 
 - Store plan files in .plans.
-- Keep active/in-progress plans at the .plans root.
+- Keep active (Drafting or Implementing) plans at the .plans root.
 - Archive finished plans under .plans/archive/.
 - Use concise snake_case names ending in _plan.md when possible.
 - Keep one primary goal per plan.
@@ -39,18 +39,36 @@ Examples:
 
 Include these sections in order unless there is a strong reason not to:
 
-1. Goal
-2. Why this comes first (optional but recommended)
-3. Scope
-4. Out of scope
-5. Technical design details
-6. Testing approach
-7. Documentation approach
-8. Progress checklist
-9. Phases (numbered, with concrete deliverables)
-10. Execution order recommendation
-11. Risks and mitigations (optional)
-12. Acceptance criteria
+1. Status
+2. Goal
+3. Why this comes first (optional but recommended)
+4. Scope
+5. Out of scope
+6. Technical design details
+7. Testing approach
+8. Documentation approach
+9. Progress checklist
+10. Phases (numbered, with concrete deliverables)
+11. Execution order recommendation
+12. Risks and mitigations (optional)
+13. Acceptance criteria
+
+## Status Section Rules
+
+- Include an explicit section named "Status" at the top of every plan, immediately before "Goal".
+- Allowed values are exactly:
+	- Drafting
+	- Implementing
+	- Done
+	- Rejected
+- Lifecycle rules:
+	- Default new-plan state is Drafting.
+	- When implementation begins, update status to Implementing as the first implementation step.
+	- When implementation completes successfully, update status to Done and move the plan to .plans/archive/.
+	- If the plan is declined, update status to Rejected and move the plan to .plans/archive/.
+- Active plans in .plans/ should use Drafting or Implementing only.
+- Archived plans in .plans/archive/ must use Done or Rejected only.
+- Update status whenever checklist state or plan lifecycle changes.
 
 ## Technical Design Details Rules
 
@@ -64,6 +82,17 @@ Include these sections in order unless there is a strong reason not to:
 	- Compatibility and migration notes (what breaks, what is removed, and when).
 - Prefer explicit examples for ambiguous contracts (for example input and output forms).
 - If design uncertainty remains after this section, create/link a decision doc before coding.
+
+### Technical depth requirements
+
+- For non-trivial behavior changes, include light pseudocode representations of core algorithms.
+- For new apis, include sample calling code that demonstrates usage.
+
+### Diagram requirements
+
+- For non-trivial class relationships, calling sequences, etc. include diagrams that visually represent the logic or relationships.
+- Mermaid diagrams and/or ascii art can be used as appropriate.
+- Keep diagrams small and focused; brevity and broad understanding are more important than showing every possible detail.
 
 ## Testing Approach Section Rules
 
@@ -122,9 +151,15 @@ Checklist style example:
 
 ## Plan Review Checklist
 
+- Status section exists at the top and reflects current lifecycle state.
+- Status value is one of: Drafting, Implementing, Done, Rejected.
+- Archived plans explicitly show Done or Rejected status.
 - Sections are complete and in logical order.
 - Scope and out-of-scope are explicit.
 - Technical design details are explicit, concrete, and implementation-ready.
+- Technical design details include implementation pseudocode for non-trivial logic.
+- Technical design details include usage pseudocode that demonstrates intended capabilities.
+- Technical design details include Mermaid/ASCII diagrams when they materially improve clarity, or a rationale for omission.
 - Testing approach section is explicit and actionable.
 - Testing approach explicitly states expected test delta classification.
 - Any "no test delta" claim includes rationale and is consistent with the planned code changes.
@@ -145,15 +180,19 @@ Checklist style example:
 
 1. Preserve plan intent and existing completed checklist items.
 2. Apply minimal edits for consistency with current conventions.
-3. Update all internal references after renames.
-4. Update testing and documentation approach if scope, risk, or validation strategy has changed.
-5. Update checklist states to reflect the current project state.
-6. Re-read full plan to ensure no stale names remain.
-7. Note major deltas in commit/PR summary.
+3. Ensure the top Status section exists and is accurate.
+4. Update all internal references after renames.
+5. Update testing and documentation approach if scope, risk, or validation strategy has changed.
+6. Update implementation pseudocode, usage pseudocode, and diagrams when behavior or architecture changes.
+7. Update checklist states to reflect the current project state.
+8. Re-read full plan to ensure no stale names remain.
+9. Note major deltas in commit/PR summary.
 
 ## Plan Completion and Archiving
 
 - Treat a plan as finished when acceptance criteria are met and the progress checklist is complete.
+- Before archiving a completed implementation, update the plan's top Status section to Done.
+- If a plan is not being pursued, update status to Rejected before archiving.
 - Add a brief completion note before archiving when useful (for example: completed date and any key follow-up links).
 - Move the plan from .plans/ to .plans/archive/.
 - Update references from active plans so links point to the archived file path.

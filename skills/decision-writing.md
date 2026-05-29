@@ -38,12 +38,25 @@ Include these sections in order unless there is a strong reason not to:
 1. Decision title
 2. Problem statement
 3. Why this matters now
-4. Constraints and assumptions
-5. Options considered
-6. Tradeoff analysis
-7. Recommendation
-8. Confidence and risks
-9. Follow-up actions
+4. Goals and decision criteria
+5. Constraints and assumptions
+6. Options considered
+7. Tradeoff analysis
+8. Recommendation
+9. Confidence and risks
+10. Follow-up actions
+
+## Goals And Criteria Rules
+
+- Include a dedicated section named "Goals and decision criteria" before options are evaluated.
+- Split this section into two short lists:
+  - Goals: what the decision should achieve in plain language.
+  - Decision criteria: how options will be judged.
+- Keep criteria explicit and measurable where practical (for example: implementation effort, dependency risk, reversibility, runtime performance, portability, delivery speed).
+- Ensure tradeoff scoring/matrices use criteria defined in this section, or explain why a criterion was added/removed later.
+- If criteria are weighted, show weights in this section before the tradeoff table.
+- Require each option section to include an explicit "Criteria impact" block that addresses every listed decision criterion.
+- Allow compact labels (for example high/medium/low or +/0/-), but include a one-line rationale per criterion.
 
 ## Option Design Rules
 
@@ -65,6 +78,7 @@ Include these sections in order unless there is a strong reason not to:
 - Include at least one concrete example per option when practical (code, config, or pseudo-flow).
 - Explain why listed pros/cons follow from the option mechanics, not just outcomes.
 - Avoid one-line options; each option should be detailed enough that a reviewer can imagine implementation boundaries.
+- Include a compact per-option mapping from option behavior to goals and decision criteria.
 
 ## Communication Aids Rules
 
@@ -82,6 +96,7 @@ Include these sections in order unless there is a strong reason not to:
 - Separate facts, assumptions, and unknowns.
 - Identify which risks are acceptable and which are blockers.
 - Ensure each criterion references concrete option behavior (for example dependency model, migration cost, runtime path).
+- Reuse the criteria declared in "Goals and decision criteria" as the source of truth.
 
 ## Analysis Depth Rules
 
@@ -127,8 +142,10 @@ Use a standard comparison for routine decisions and require deeper analysis for 
 
 - Document is in decisions/ and uses .md format.
 - Problem statement and urgency are explicit.
+- Goals and decision criteria section exists and is concrete.
 - Options include both do-nothing and out-of-the-box alternatives.
 - Options are detailed enough to understand implementation shape and dependency impact.
+- Every option includes explicit criteria impact coverage for all declared criteria.
 - Tradeoffs are criteria-based and non-redundant.
 - Pros/cons are justified by concrete option mechanics.
 - At least one diagram and one usage sketch are included for medium/high-impact decisions.
