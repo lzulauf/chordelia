@@ -1,11 +1,10 @@
 """Tests for the Sequenceable protocol, adapter registry, and score normalization."""
 
-from fractions import Fraction
-
 import pytest
 
 from chordelia.chords import Chord
 from chordelia.notes import Note
+from chordelia.rhythm import Duration
 from chordelia.score import Score, ScoreEvent, ScoreEventContext
 from chordelia.sequenceable import (
     Sequenceable,
@@ -68,8 +67,8 @@ class TestAdapterRegistry:
         events = _score_events_for(self.ExternalTone(72), context)
 
         assert len(events) == 1
-        assert events[0].beat == Fraction(1, 1)
-        assert events[0].duration == Fraction(2, 1)
+        assert events[0].beat == Duration.from_beats(1)
+        assert events[0].duration == Duration.from_beats(2)
         assert events[0].pitches == (72,)
         assert events[0].velocity == 88
 
@@ -128,7 +127,7 @@ class TestScoreFromSequenceable:
 
         assert [event.pitches for event in score.events] == [(67,), (60,), (64,)]
         assert [event.beat for event in score.events] == [
-            Fraction(1, 1),
-            Fraction(1, 1),
-            Fraction(2, 1),
+            Duration.from_beats(1),
+            Duration.from_beats(1),
+            Duration.from_beats(2),
         ]

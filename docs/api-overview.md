@@ -39,12 +39,14 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 
 - Use `Score.from_sequenceable(...)` or `score_from_sequenceable(...)` for canonical normalization.
 - `Note` and `Chord` implement `Sequenceable` and provide `score_events_for_context(...)`.
+- Timing fields in score APIs use `Duration` objects, typically with `Duration.from_beats(...)`.
+- Use `Duration.from_seconds(...)` only for fixed wall-clock offsets that should not adapt to tempo changes.
 - `Score.events` are sorted deterministically for downstream consistency.
 
 Example:
 
 ```python
-from chordelia import Chord, Score
+from chordelia import Chord, Score, ScoreEventContext, Duration
 
 score = Score.from_sequenceable(
 	Chord("C4"),
@@ -54,6 +56,11 @@ score = Score.from_sequenceable(
 
 first_event = score.events[0]
 print(first_event.beat, first_event.duration, first_event.pitches)
+
+context = ScoreEventContext(
+	start_offset=Duration.from_beats(1, 2),
+	default_duration=Duration.from_beats(3, 4),
+)
 ```
 
 ## Degree-Aware APIs

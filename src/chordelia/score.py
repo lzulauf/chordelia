@@ -3,27 +3,60 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from fractions import Fraction
 from typing import Any
 
+from chordelia.rhythm import Duration
 
-FractionLike = Fraction | int | float
+
+DurationLike = Duration | int | float
 
 
-def _coerce_fraction(value: FractionLike, *, field_name: str) -> Fraction:
-    """Coerce numeric values into Fraction for deterministic timing."""
+def _coerce_duration(value: DurationLike, *, field_name: str) -> Duration:
+    """Coerce values into beat/time Duration for deterministic event timing."""
+    if isinstance(value, Duration):
+        duration = value
+    else:
+        duration = Duration.from_beats(value, None)
+
+    if duration.mode == "note_fraction":
+        raise ValueError(
+            f"{field_name} must be beat-based or time-based Duration. "
+            "Use Duration.from_beats(...) or Duration.from_seconds(...)."
+        )
+
+    return duration
+
+
+def _is_negative(value: Duration) -> bool:
+    """Check whether a duration value is negative in its own mode."""
+    if value.mode == "seconds":
+        return value.as_seconds() < 0
+    return value.as_beats() < 0
+
+
+def _is_non_positive(value: Duration) -> bool:
+    """Check whether a duration value is <= 0 in its own mode."""
+    if value.mode == "seconds":
+        return value.as_seconds() <= 0
+    return value.as_beats() <= 0
+
+
+def _duration_sort_value(value: Duration):
+    """Return comparable timeline values by mode for deterministic sorting."""
+    if value.mode == "seconds":
+        return value.as_seconds()
     try:
-        return Fraction(value).limit_denominator()
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be numeric, got {value!r}") from exc
+        return value.as_beats()
+    except ValueError:
+        return value.fraction
 
 
 @dataclass(frozen=True, slots=True)
 class ScoreEvent:
     """A single timed event in a normalized score timeline."""
 
-    beat: FractionLike
-    duration: FractionLike
+    beat: DurationLike
+    duration: DurationLike
     pitches: tuple[int, ...]
     velocity: int = 64
     channel: int = 0
@@ -31,12 +64,18 @@ class ScoreEvent:
     spelling: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
-        beat = _coerce_fraction(self.beat, field_name="beat")
-        duration = _coerce_fraction(self.duration, field_name="duration")
+        beat = _coerce_duration(self.beat, field_name="beat")
+        duration = _coerce_duration(self.duration, field_name="duration")
 
-        if beat < 0:
+        if beat.mode != duration.mode:
+            raise ValueError(
+                "beat and duration must use the same timing mode "
+                f"(got {beat.mode!r} and {duration.mode!r})"
+            )
+
+        if _is_negative(beat):
             raise ValueError(f"beat must be >= 0, got {beat}")
-        if duration <= 0:
+        if _is_non_positive(duration):
             raise ValueError(f"duration must be > 0, got {duration}")
         if not self.pitches:
             raise ValueError("pitches must be non-empty")
@@ -67,20 +106,26 @@ class ScoreEventContext:
 
     tempo: int = 120
     time_signature: tuple[int, int] = (4, 4)
-    start_offset: FractionLike = Fraction(0, 1)
-    default_duration: FractionLike = Fraction(1, 1)
+    start_offset: DurationLike = Duration.from_beats(0, None)
+    default_duration: DurationLike = Duration.from_beats(1, None)
     velocity: int = 64
     channel: int = 0
     voice: int = 0
     key_signature: str | None = None
 
     def __post_init__(self) -> None:
-        start_offset = _coerce_fraction(self.start_offset, field_name="start_offset")
-        default_duration = _coerce_fraction(self.default_duration, field_name="default_duration")
+        start_offset = _coerce_duration(self.start_offset, field_name="start_offset")
+        default_duration = _coerce_duration(self.default_duration, field_name="default_duration")
 
-        if start_offset < 0:
+        if start_offset.mode != default_duration.mode:
+            raise ValueError(
+                "start_offset and default_duration must use the same timing mode "
+                f"(got {start_offset.mode!r} and {default_duration.mode!r})"
+            )
+
+        if _is_negative(start_offset):
             raise ValueError(f"start_offset must be >= 0, got {start_offset}")
-        if default_duration <= 0:
+        if _is_non_positive(default_duration):
             raise ValueError(f"default_duration must be > 0, got {default_duration}")
         if self.tempo <= 0:
             raise ValueError(f"tempo must be > 0, got {self.tempo}")
@@ -102,7 +147,7 @@ class ScoreEventContext:
         object.__setattr__(self, "start_offset", start_offset)
         object.__setattr__(self, "default_duration", default_duration)
 
-    def with_start_offset(self, start_offset: FractionLike) -> "ScoreEventContext":
+    def with_start_offset(self, start_offset: DurationLike) -> "ScoreEventContext":
         """Return a copy with a new start offset."""
         return replace(self, start_offset=start_offset)
 
@@ -139,7 +184,14 @@ class Score:
     events: tuple[ScoreEvent, ...]
 
     def __post_init__(self) -> None:
-        ordered_events = tuple(sorted(self.events, key=_score_event_sort_key))
+        events = tuple(self.events)
+        if events:
+            first_mode = events[0].beat.mode
+            for event in events:
+                if event.beat.mode != first_mode or event.duration.mode != first_mode:
+                    raise ValueError("All score events must share the same timing mode")
+
+        ordered_events = tuple(sorted(events, key=_score_event_sort_key))
         object.__setattr__(self, "events", ordered_events)
 
     @classmethod
@@ -176,9 +228,15 @@ class Score:
         return iter(self.events)
 
 
-def _score_event_sort_key(event: ScoreEvent) -> tuple[Fraction, int, int, tuple[int, ...], Fraction]:
+def _score_event_sort_key(event: ScoreEvent):
     """Deterministic ordering key for normalized score events."""
-    return (event.beat, event.channel, event.voice, event.pitches, event.duration)
+    return (
+        _duration_sort_value(event.beat),
+        event.channel,
+        event.voice,
+        event.pitches,
+        _duration_sort_value(event.duration),
+    )
 
 
 def score_from_sequenceable(

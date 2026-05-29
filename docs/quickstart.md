@@ -61,11 +61,19 @@ print(f"Quarter note length: {quarter_ms:.0f}ms")
 ## Score Conversion
 
 ```python
-from chordelia import Chord, Note, Score, score_from_sequenceable
+from chordelia import Chord, Note, Score, ScoreEventContext, Duration, score_from_sequenceable
 
 # Classmethod conversion
 chord_score = Score.from_sequenceable(Chord("C4"), tempo=100)
 print(chord_score.events[0].pitches)  # (60, 64, 67)
+
+# Event-context timing uses Duration values
+context = ScoreEventContext(
+	start_offset=Duration.from_beats(1, 2),
+	default_duration=Duration.from_beats(1),
+)
+event = Chord("F#4").score_events_for_context(context)[0]
+print(event.beat, event.duration)
 
 # Helper conversion
 note_score = score_from_sequenceable(Note("F#4"), time_signature=(3, 4))

@@ -7,6 +7,7 @@ All calculations are done algorithmically for precision and efficiency.
 """
 
 from enum import Enum
+from decimal import Decimal, InvalidOperation
 from typing import Optional, Union, Tuple
 from fractions import Fraction
 import math
@@ -85,7 +86,11 @@ class Duration:
         All operations preserve immutability - the original duration is never modified.
     """
     
-    __slots__ = ('_fraction',)
+    __slots__ = ('_mode', '_fraction', '_beats', '_seconds')
+
+    _MODE_NOTE_FRACTION = 'note_fraction'
+    _MODE_BEATS = 'beats'
+    _MODE_SECONDS = 'seconds'
     
     def __init__(self, value: Union[NoteValue, Fraction, float, str]):
         """
@@ -104,7 +109,86 @@ class Duration:
         else:
             raise ValueError(f"Invalid duration value: {value}")
         
+        self._mode = self._MODE_NOTE_FRACTION
         self._fraction = fraction
+        self._beats = None
+        self._seconds = None
+
+    @classmethod
+    def _from_note_fraction(cls, fraction: Fraction) -> 'Duration':
+        """Internal constructor for note-fraction mode."""
+        instance = cls.__new__(cls)
+        instance._mode = cls._MODE_NOTE_FRACTION
+        instance._fraction = fraction
+        instance._beats = None
+        instance._seconds = None
+        return instance
+
+    @classmethod
+    def _from_beats(cls, beats: Fraction) -> 'Duration':
+        """Internal constructor for beat-count mode."""
+        instance = cls.__new__(cls)
+        instance._mode = cls._MODE_BEATS
+        instance._fraction = None
+        instance._beats = beats
+        instance._seconds = None
+        return instance
+
+    @classmethod
+    def _from_seconds(cls, seconds: Decimal) -> 'Duration':
+        """Internal constructor for wall-clock seconds mode."""
+        instance = cls.__new__(cls)
+        instance._mode = cls._MODE_SECONDS
+        instance._fraction = None
+        instance._beats = None
+        instance._seconds = seconds
+        return instance
+
+    @classmethod
+    def from_beats(cls, numerator: Union[int, float, Fraction], denominator: Optional[int] = 1) -> 'Duration':
+        """
+        Create a beat-based duration.
+
+        Args:
+            numerator: Number of beats or beat numerator
+            denominator: Optional beat denominator. When None, numerator is treated
+                as whole beats.
+        """
+        if denominator is None:
+            beats = Fraction(numerator).limit_denominator()
+        else:
+            if denominator <= 0:
+                raise ValueError(f"Beat denominator must be positive, got {denominator}")
+            beats = Fraction(numerator).limit_denominator() / denominator
+        return cls._from_beats(beats)
+
+    @classmethod
+    def from_seconds(cls, seconds: Union[Decimal, float, int, str]) -> 'Duration':
+        """Create a time-based duration in wall-clock seconds."""
+        try:
+            decimal_seconds = seconds if isinstance(seconds, Decimal) else Decimal(str(seconds))
+        except (InvalidOperation, ValueError) as exc:
+            raise ValueError(f"Invalid seconds value: {seconds!r}") from exc
+
+        if decimal_seconds.is_nan() or decimal_seconds.is_infinite():
+            raise ValueError(f"Invalid seconds value: {seconds!r}")
+
+        return cls._from_seconds(decimal_seconds)
+
+    @classmethod
+    def from_milliseconds(cls, milliseconds: Union[Decimal, float, int, str]) -> 'Duration':
+        """Create a time-based duration from milliseconds."""
+        return cls.from_seconds((Decimal(str(milliseconds))) / Decimal("1000"))
+
+    @property
+    def mode(self) -> str:
+        """Get the timing mode for this duration."""
+        return self._mode
+
+    @property
+    def is_tempo_relative(self) -> bool:
+        """True when this duration scales with tempo changes."""
+        return self._mode in (self._MODE_NOTE_FRACTION, self._MODE_BEATS)
     
     def _parse_duration_string(self, duration_str: str) -> Fraction:
         """Parse a duration string into a fraction."""
@@ -145,13 +229,36 @@ class Duration:
     
     @property
     def fraction(self) -> Fraction:
-        """Get the fractional representation of this duration."""
+        """Get the note-fraction representation of this duration."""
+        if self._mode != self._MODE_NOTE_FRACTION:
+            raise ValueError("fraction is only available for note-fraction durations")
         return self._fraction
+
+    def as_beats(self, beat_unit: int = 4) -> Fraction:
+        """
+        Convert this duration to beat units.
+
+        Args:
+            beat_unit: Denominator note value for one beat (4=quarter, 8=eighth)
+        """
+        if self._mode == self._MODE_BEATS:
+            return self._beats
+        if self._mode == self._MODE_NOTE_FRACTION:
+            if beat_unit <= 0:
+                raise ValueError("beat_unit must be positive")
+            return self._fraction / Fraction(1, beat_unit)
+        raise ValueError("Cannot convert time-based durations to beats without tempo context")
+
+    def as_seconds(self) -> Decimal:
+        """Return this duration in wall-clock seconds mode."""
+        if self._mode != self._MODE_SECONDS:
+            raise ValueError("as_seconds is only available for time-based durations")
+        return self._seconds
     
     @property
     def decimal(self) -> float:
         """Get the decimal representation of this duration."""
-        return float(self._fraction)
+        return float(self._raw_value())
     
     def beats_in_measure(self, time_signature: 'TimeSignature') -> Fraction:
         """
@@ -166,8 +273,12 @@ class Duration:
         # Duration as fraction of a whole note
         # In 4/4 time, a quarter note (1/4) represents 1 beat
         # Beat unit fraction: 1/4 for quarter note beats, 1/8 for eighth note beats
-        beat_unit_fraction = Fraction(1, time_signature.beat_unit)
-        return self._fraction / beat_unit_fraction
+        if self._mode == self._MODE_BEATS:
+            return self._beats
+        if self._mode == self._MODE_NOTE_FRACTION:
+            beat_unit_fraction = Fraction(1, time_signature.beat_unit)
+            return self._fraction / beat_unit_fraction
+        raise ValueError("beats_in_measure is not defined for time-based durations")
     
     def to_milliseconds(self, bpm: float, time_signature: 'TimeSignature') -> float:
         """
@@ -180,39 +291,83 @@ class Duration:
         Returns:
             Duration in milliseconds
         """
-        # Calculate how many beat units this duration represents
+        if self._mode == self._MODE_SECONDS:
+            return float(self._seconds * Decimal("1000"))
+
         beat_units = self.beats_in_measure(time_signature)
-        
-        # Convert beat units to milliseconds: (beat_units / bpm) * 60 * 1000
         minutes = float(beat_units) / bpm
         return minutes * 60 * 1000
     
     def __add__(self, other: 'Duration') -> 'Duration':
         """Add two durations."""
-        return Duration(self._fraction + other._fraction)
+        self._ensure_compatible(other, operation="add")
+        if self._mode == self._MODE_NOTE_FRACTION:
+            return Duration._from_note_fraction(self._fraction + other._fraction)
+        if self._mode == self._MODE_BEATS:
+            return Duration._from_beats(self._beats + other._beats)
+        return Duration._from_seconds(self._seconds + other._seconds)
     
     def __sub__(self, other: 'Duration') -> 'Duration':
         """Subtract two durations."""
-        return Duration(self._fraction - other._fraction)
+        self._ensure_compatible(other, operation="subtract")
+        if self._mode == self._MODE_NOTE_FRACTION:
+            return Duration._from_note_fraction(self._fraction - other._fraction)
+        if self._mode == self._MODE_BEATS:
+            return Duration._from_beats(self._beats - other._beats)
+        return Duration._from_seconds(self._seconds - other._seconds)
     
     def __mul__(self, scalar: Union[int, float, Fraction]) -> 'Duration':
         """Multiply duration by a scalar."""
-        return Duration(self._fraction * scalar)
+        if self._mode == self._MODE_NOTE_FRACTION:
+            return Duration._from_note_fraction(self._fraction * scalar)
+        if self._mode == self._MODE_BEATS:
+            return Duration._from_beats(self._beats * scalar)
+        return Duration._from_seconds(self._seconds * Decimal(str(scalar)))
     
     def __truediv__(self, scalar: Union[int, float, Fraction]) -> 'Duration':
         """Divide duration by a scalar."""
-        return Duration(self._fraction / scalar)
+        if self._mode == self._MODE_NOTE_FRACTION:
+            return Duration._from_note_fraction(self._fraction / scalar)
+        if self._mode == self._MODE_BEATS:
+            return Duration._from_beats(self._beats / scalar)
+        return Duration._from_seconds(self._seconds / Decimal(str(scalar)))
     
     def __eq__(self, other: 'Duration') -> bool:
         """Check equality with another duration."""
-        return isinstance(other, Duration) and self._fraction == other._fraction
+        return (
+            isinstance(other, Duration)
+            and self._mode == other._mode
+            and self._raw_value() == other._raw_value()
+        )
     
     def __lt__(self, other: 'Duration') -> bool:
         """Compare if this duration is less than another."""
-        return isinstance(other, Duration) and self._fraction < other._fraction
+        self._ensure_compatible(other, operation="compare")
+        return self._raw_value() < other._raw_value()
+
+    def __le__(self, other: 'Duration') -> bool:
+        """Compare if this duration is less than or equal to another."""
+        return self == other or self < other
+
+    def __gt__(self, other: 'Duration') -> bool:
+        """Compare if this duration is greater than another."""
+        return not self <= other
+
+    def __ge__(self, other: 'Duration') -> bool:
+        """Compare if this duration is greater than or equal to another."""
+        return not self < other
+
+    def __hash__(self) -> int:
+        """Hash for use in sets and dictionaries."""
+        return hash((self._mode, self._raw_value()))
     
     def __str__(self) -> str:
         """String representation of duration."""
+        if self._mode == self._MODE_BEATS:
+            return f"{self._beats} beats"
+        if self._mode == self._MODE_SECONDS:
+            return f"{self._seconds} seconds"
+
         # Try to match common note values
         for note_value in NoteValue:
             if note_value.value == self._fraction:
@@ -223,7 +378,29 @@ class Duration:
     
     def __repr__(self) -> str:
         """Detailed string representation."""
-        return f"Duration({self._fraction})"
+        if self._mode == self._MODE_NOTE_FRACTION:
+            return f"Duration({self._fraction})"
+        if self._mode == self._MODE_BEATS:
+            return f"Duration.from_beats({self._beats.numerator}, {self._beats.denominator})"
+        return f"Duration.from_seconds('{self._seconds}')"
+
+    def _ensure_compatible(self, other: 'Duration', *, operation: str) -> None:
+        """Ensure two durations can be combined/computed together."""
+        if not isinstance(other, Duration):
+            raise TypeError(f"Can only {operation} Duration with Duration")
+        if self._mode != other._mode:
+            raise TypeError(
+                f"Cannot {operation} durations with different timing modes: "
+                f"{self._mode!r} and {other._mode!r}"
+            )
+
+    def _raw_value(self) -> Union[Fraction, Decimal]:
+        """Return the underlying comparable numeric value for this mode."""
+        if self._mode == self._MODE_NOTE_FRACTION:
+            return self._fraction
+        if self._mode == self._MODE_BEATS:
+            return self._beats
+        return self._seconds
 
 
 class TimeSignature:
