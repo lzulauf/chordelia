@@ -8,20 +8,14 @@ from chordelia.rhythm import Duration
 from chordelia.scales import Scale
 from chordelia.scale_context import reset_chordelia_context, with_chordelia_context
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
-from chordelia.sequenceable import (
-    SequenceRender,
-    _clear_sequenceable_adapters,
-    _register_sequenceable_adapter,
-)
+from chordelia.sequenceable import SequenceRender
 
 
 @pytest.fixture(autouse=True)
-def clear_adapter_registry_between_tests():
-    """Keep private adapter registrations isolated to each test."""
-    _clear_sequenceable_adapters()
+def clear_runtime_context_between_tests():
+    """Keep runtime context isolated to each test."""
     reset_chordelia_context()
     yield
-    _clear_sequenceable_adapters()
     reset_chordelia_context()
 
 
@@ -184,7 +178,16 @@ class TestScore:
     """Score sorting and conversion behavior."""
 
     class External:
-        """Simple adapted source type for conversion tests."""
+        """Simple sequenceable source type for conversion tests."""
+
+        def __init__(self, on_render):
+            self._on_render = on_render
+
+        def render_for_context(self, context):
+            return self._on_render(context)
+
+        def transpose(self, _interval):
+            return self
 
     def test_score_sorts_with_full_deterministic_key(self):
         """Sorting should use beat, channel, voice, pitches, then duration."""
@@ -342,7 +345,7 @@ class TestScore:
         """Score.from_sequenceable should propagate conversion context and metadata values."""
         captured = {}
 
-        def external_adapter(_value, context):
+        def external_render(context):
             captured["context"] = context
             return SequenceRender(
                 events=(
@@ -358,10 +361,8 @@ class TestScore:
                 consumed_duration=context.default_duration,
             )
 
-        _register_sequenceable_adapter(self.External, external_adapter)
-
         score = Score.from_sequenceable(
-            self.External(),
+            self.External(external_render),
             tempo=88,
             time_signature=(6, 8),
             key_signature="G",
@@ -402,7 +403,7 @@ class TestScore:
 
     def test_from_sequenceable_raises_for_unsupported_source(self):
         """Unsupported values should raise TypeError via sequenceable conversion boundary."""
-        with pytest.raises(TypeError, match="_register_sequenceable_adapter"):
+        with pytest.raises(TypeError, match="not Sequenceable"):
             Score.from_sequenceable(object())
 
     @pytest.mark.parametrize(

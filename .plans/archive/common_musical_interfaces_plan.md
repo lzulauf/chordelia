@@ -1,7 +1,7 @@
 Common musical interface plan for chordelia.
 
 ## Status
-Implementing
+Done
 
 ## Dependency state
 1. Core `Sequenceable` contract, context model, and adapter fallback behavior are implemented in the common boundary.
@@ -137,9 +137,14 @@ Expected docs delta classification: both README updates and docs updates.
 - [x] Phase 2: Adapter registry and fallback behavior implemented
 - [x] Phase 3: Score and wrapper integration completed
 - [x] Phase 4: Required native type migrations completed
-- [ ] Phase 5: Adapter registry removed from runtime and public API (deferred: depends on Phase 3 and Phase 4)
-- [ ] Phase 6: Tests/docs completed
-- [ ] Sequenceable adopted as canonical capability seam without adapter registry
+- [x] Phase 5: Adapter registry removed from runtime and public API (deferred: depends on Phase 3 and Phase 4)
+- [x] Phase 6: Tests/docs completed
+- [x] Sequenceable adopted as canonical capability seam without adapter registry
+
+Completion note:
+1. Completed on 2026-05-30 by removing adapter-registry fallback from `src/chordelia/sequenceable.py` and enforcing direct `Sequenceable` conversion semantics.
+2. Test updates removed adapter-registry dependency and added explicit direct-source policy coverage for `Score`, `MidiFile`, and `SheetMusic` boundaries.
+3. Validation evidence: focused `test_sequenceable.py` and `test_score.py` suite plus full pytest suite passing.
 
 ## Phases
 ### Phase 0: Contract lock

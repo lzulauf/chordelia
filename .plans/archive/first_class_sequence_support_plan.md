@@ -59,7 +59,7 @@ Implement `Sequence` as the primary composition building block for ordering and 
    1. `Sequenceable` is canonical interface for payloads.
    2. Initial required implementers: `Note`, `Chord`, `Sequence`.
    3. Non-implementing types may use explicit adapter/coercion only as a temporary migration path.
-   4. Registry decommission target: once required native migrations in `.plans/common_musical_interfaces_plan.md` are complete, sequence paths must not depend on adapter registration.
+   4. Registry decommission target: once required native migrations in `.plans/archive/common_musical_interfaces_plan.md` are complete, sequence paths must not depend on adapter registration.
 6. Score alignment:
    1. `Score` is canonical top-level wrapper around `Sequenceable`.
    2. `Sequence` conversion boundary is `Score(sequence)` or `Score.from_sequenceable(sequence)`.
@@ -94,7 +94,7 @@ Implement `Sequence` as the primary composition building block for ordering and 
    1. `MidiFile` should consume `Score` produced from `Sequence`.
 3. `.plans/sheet_music_rendering_plan.md`:
    1. `SheetMusic` should consume `Score` produced from `Sequence`.
-4. `.plans/common_musical_interfaces_plan.md`:
+4. `.plans/archive/common_musical_interfaces_plan.md`:
    1. Owns the `Sequenceable` contract details and adapter-registry decommission gates.
 
 ## Testing approach
