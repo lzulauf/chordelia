@@ -400,6 +400,41 @@ class TestScaleTransposition:
         assert c_sharp_major.scale_type == ScaleType.MAJOR
 
 
+class TestScaleShift:
+    """Test diatonic shifting behavior based on relative scale degrees."""
+
+    def test_shift_major_scale_forward_and_backward(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        d_mode = c_major.shift(1)
+        b_mode = c_major.shift(-1)
+
+        assert str(d_mode.root) == "D"
+        assert d_mode.pattern == (0, 2, 3, 5, 7, 9, 10)
+        assert str(b_mode.root) == "B"
+        assert b_mode.pattern == (0, 1, 3, 5, 6, 8, 10)
+
+    def test_shift_supports_compound_steps(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        assert str(c_major.shift(7).root) == "C"
+        assert str(c_major.shift(8).root) == "D"
+
+    def test_shift_preserves_immutability(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        shifted = c_major.shift(2)
+
+        assert shifted is not c_major
+        assert str(c_major.root) == "C"
+
+    def test_shift_validates_step_type(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        with pytest.raises(TypeError):
+            c_major.shift(1.5)
+
+
 class TestScaleImmutability:
     """Test that Scale instances are immutable."""
     
