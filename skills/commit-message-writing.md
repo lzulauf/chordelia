@@ -9,7 +9,7 @@ user-invocable: true
 
 Use this skill to generate high-quality commit messages that reflect the actual staged or unstaged changes in the repository.
 
-Companion skills: test-running when you need to report validation commands/results and readme-writing when docs changes are a meaningful part of the commit scope.
+Companion skills: readme-writing when docs changes are a meaningful part of the commit scope.
 
 ## When To Use
 
