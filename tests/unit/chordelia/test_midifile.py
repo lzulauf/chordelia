@@ -1,5 +1,6 @@
 """Tests for the canonical MidiFile score-backed wrapper behavior."""
 
+from fractions import Fraction
 from pathlib import Path
 from unittest.mock import patch
 
@@ -128,6 +129,62 @@ class TestMidiFileWritePath:
 
 class TestMidiFileReadPath:
     """MIDI file read behavior through the score-backed MidiFile wrapper."""
+
+    def test_round_trip_file_score_file_preserves_note_messages(self, tmp_path: Path):
+        source_path = tmp_path / "round_trip_source.mid"
+        round_trip_path = tmp_path / "round_trip_copy.mid"
+
+        midi = mido.MidiFile(ticks_per_beat=480)
+        track = mido.MidiTrack()
+        midi.tracks.append(track)
+        track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(108), time=0))
+        track.append(mido.MetaMessage("time_signature", numerator=4, denominator=4, time=0))
+        track.append(mido.MetaMessage("key_signature", key="D", time=0))
+        track.append(mido.Message("note_on", note=62, velocity=96, channel=0, time=0))
+        track.append(mido.Message("note_off", note=62, velocity=0, channel=0, time=240))
+        track.append(mido.Message("note_on", note=65, velocity=80, channel=1, time=120))
+        track.append(mido.Message("note_off", note=65, velocity=0, channel=1, time=360))
+        track.append(mido.MetaMessage("end_of_track", time=0))
+        midi.save(str(source_path))
+
+        score = MidiFile.score_from_file(source_path)
+        written_path = MidiFile.score_to_file(score, round_trip_path)
+
+        assert written_path == round_trip_path
+        assert round_trip_path.exists()
+        assert score.metadata.tempo == 108
+        assert score.metadata.time_signature == (4, 4)
+        assert score.metadata.key_signature == "D"
+
+        source_messages = _collect_absolute_note_messages(mido.MidiFile(str(source_path)))
+        round_trip_messages = _collect_absolute_note_messages(mido.MidiFile(str(round_trip_path)))
+        assert round_trip_messages == source_messages
+
+    def test_score_from_file_supports_overlapping_note_pairs(self, tmp_path: Path):
+        source_path = tmp_path / "overlap.mid"
+
+        midi = mido.MidiFile(ticks_per_beat=480)
+        track = mido.MidiTrack()
+        midi.tracks.append(track)
+        track.append(mido.Message("note_on", note=60, velocity=100, channel=0, time=0))
+        track.append(mido.Message("note_on", note=60, velocity=90, channel=0, time=120))
+        track.append(mido.Message("note_off", note=60, velocity=0, channel=0, time=120))
+        track.append(mido.Message("note_off", note=60, velocity=0, channel=0, time=120))
+        track.append(mido.MetaMessage("end_of_track", time=0))
+        midi.save(str(source_path))
+
+        score = MidiFile.score_from_file(source_path)
+
+        assert len(score.events) == 2
+        first, second = score.events
+        assert first.pitches == (60,)
+        assert first.velocity == 100
+        assert first.beat.as_beats() == 0
+        assert first.duration.as_beats() == Fraction(1, 2)
+        assert second.pitches == (60,)
+        assert second.velocity == 90
+        assert second.beat.as_beats() == Fraction(1, 4)
+        assert second.duration.as_beats() == Fraction(1, 2)
 
     def test_load_from_file_keeps_playback_conversion_working(self, tmp_path: Path):
         source_path = tmp_path / "source.mid"

@@ -109,6 +109,19 @@ MIDI APIs (midi extra):
 - `get_midi_ports()`, `is_midi_available()`
 - `midi_play_chord(...)`, `midi_play_melody(...)`
 
+Canonical `MidiFile` workflow:
+
+- `MidiFile(source)` where `source` is `Score | Sequenceable`
+- `MidiFile.to_file(path)`
+- `MidiFile.score_to_file(score, path)`
+- `MidiFile.load_from_file(path)`
+- `MidiFile.score_from_file(path)`
+
+Notes:
+
+- MIDI read/write workflows are class-based via `MidiFile`; legacy helper delegates are intentionally not part of the canonical API surface.
+- Notebook rendering remains tracked separately in [MIDI Notebook Rendering Plan](../.plans/midi_notebook_rendering_plan.md).
+
 Articulation controls:
 
 - `ScoreMetadata.gate_width`, `ScoreMetadata.gate_offset`
