@@ -2,196 +2,136 @@
 
 Back links: [Project README](../README.md) | [Docs Index](README.md)
 
-## Core Classes
+Use this page as a symbol map. It tells you where each API area lives and where to
+find deeper behavior docs.
 
-- `Note`: Musical note with optional octave support.
-- `Interval`: Interval quality and number with semitone math.
-- `Degree`: Degree value object with numeric and Roman coercion helpers.
-- `Scale`: Scale generation with theory-aware note spelling.
-- `Chord`: Chord quality, extensions, inversions, and slash chords.
-- `Sequenceable`: Protocol for objects that render normalized score events/consumed span and support transform APIs (`transpose`, and optionally `shift` for diatonic workflows).
-- `NotesLike`: Protocol for values that can represent zero or more notes.
-- `Sequence`: Immutable ordered timeline of sequence entries.
-- `SequenceEntry`: One payload plus duration/offset timing metadata.
-- `Rest`: Explicit silent payload marker for sequence timelines.
-- `Score`: Canonical wrapper around a source and ordered normalized events; includes `score.duration` for normalized timeline span.
-- `SheetMusic`: Canonical sheet wrapper for score-backed SVG output and notebook MIME display.
-- `MidiPlayback`: Live MIDI output transport for chord, note, and score playback.
-- `MidiFile`: MIDI wrapper for score conversion, file IO, and interface playback.
-- `Duration`: Fractional note duration utilities.
-- `TimeSignature`: Meter representation such as 4/4, 3/4, 6/8.
-- `Tempo`: BPM and traditional marking helpers.
-- `Beat`: Position tracking within and across measures.
+## Core Theory
 
-## Enumerations and Value Objects
+Main classes:
 
-- `NoteName`: C, D, E, F, G, A, B
-- `Accidental`: enum with canonical constants (`DOUBLE_FLAT`, `FLAT`, `NATURAL`, `SHARP`, `DOUBLE_SHARP`) and conversion helpers (`coerce`, `from_offset`, `from_string`, `to_offset`, `to_symbol`)
-- `IntervalQuality`: PERFECT, MAJOR, MINOR, AUGMENTED, DIMINISHED, and more
-- `ScaleType`: MAJOR, MINOR, DORIAN, MIXOLYDIAN, PENTATONIC_MAJOR, and more
-- `ChordQuality`: MAJOR, MINOR, DIMINISHED, AUGMENTED, SUSPENDED_2, and more
-- `NoteValue`: WHOLE, HALF, QUARTER, EIGHTH, SIXTEENTH, and more
-- `ScoreEvent`: Timed event with beat, duration, pitches, and playback metadata
-- `ScoreEventContext`: Context used to convert sequenceable values into score events
-- `ScoreMetadata`: Score-level metadata such as tempo, time signature, key, and ppq
+- `Note`, `NoteName`, `Accidental`
+- `Interval`, `IntervalQuality`
+- `Degree`, `RomanCase`
+- `Scale`, `ScaleType`
+- `Chord`, `ChordQuality`, `ChordExtension`
 
-## Convenience Functions
+Related deep docs:
 
-- Duration creation: `whole_note()`, `half_note()`, `quarter_note()`, `eighth_note()`, `sixteenth_note()`
-- Duration modification: `dotted(duration)`, `triplet(duration)`
-- Common time signatures: `COMMON_TIME`, `WALTZ_TIME`, `COMPOUND_DUPLE`
-- Score conversion: `score_from_sequenceable(...)`
-- MIDI ports: `get_midi_ports()`
+- [Notes and Intervals](guides/notes-and-intervals.md)
+- [Scales and Chords](guides/scales-and-chords.md)
 
-## Score Conversion Workflow
+## Rhythm and Timing
 
-- Use `Score.from_sequenceable(...)` or `score_from_sequenceable(...)` for canonical normalization.
-- `Note` and `Chord` implement `Sequenceable` and provide `render_for_context(...)`.
-- `Sequence` and `Rest` implement `Sequenceable` and can be converted the same way.
-- Timing fields in score APIs use `Duration` objects, typically with `Duration.from_beats(...)`.
-- Use `Duration.from_seconds(...)` only for fixed wall-clock offsets that should not adapt to tempo changes.
-- `Score.events` are sorted deterministically for downstream consistency.
-- `Score.with_tempo(...)` returns an immutable score copy with updated tempo.
-- `Score.with_(...)` supports multi-field metadata updates (tempo, time signature, key signature, ppq) and optional source/events replacement in one call.
-- `ScoreMetadata` includes playback articulation defaults: `gate_width` (default `0.9`), `gate_offset` (default `0.0`), and `retrigger_policy` (default `retrigger_all`; options `delta` or `retrigger_all`).
-- `ScoreEvent` supports optional per-event `gate_width` and `gate_offset` overrides without changing notated duration.
+Main classes:
 
-### Sequence Payload Coercion
+- `Duration`, `TimeSignature`, `Tempo`, `Beat`, `NoteValue`
 
-- `SequenceEntry.payload` accepts any `Sequenceable` value directly.
-- Iterable payloads are interpreted as simultaneous layers.
-- Iterable note strings or `Note` values are kept as one convenience chord layer.
-- Iterable values containing chord-like boundaries (for example `Chord`, `Rest`, or mixed `Note` and `Chord`) preserve each item as its own simultaneous layer.
-- Constructor input can include bare `Sequenceable` values, which coerce to default 1-beat entries.
-- Constructor input can include child `Sequence` values, which are treated as sequenceable payloads and consume their rendered span.
-- `Sequence.transpose(interval)` recursively transposes payloads while preserving entry duration and offset timing metadata.
-- `Sequence.shift(steps, scale=None)` recursively applies diatonic shifting while preserving entry duration and offset timing metadata.
-- `Sequence.shift(..., scale="C")` uses explicit scale context; omit `scale` to use global context from `set_global_scale_context(...)` or `with_global_scale_context(...)`.
-- Empty iterables coerce to `Rest`.
+Helpers/constants:
 
-Example:
+- `whole_note()`, `half_note()`, `quarter_note()`, `eighth_note()`, `sixteenth_note()`
+- `dotted(duration)`, `triplet(duration)`
+- `COMMON_TIME`, `WALTZ_TIME`, `COMPOUND_DUPLE`
 
-```python
-from chordelia import Chord, Score, ScoreEventContext, Duration
+Related deep docs:
 
-score = Score.from_sequenceable(
-	Chord("C4"),
-	tempo=96,
-	time_signature=(3, 4),
-)
+- [Rhythm and Timing](guides/rhythm-and-timing.md)
 
-first_event = score.events[0]
-print(first_event.beat, first_event.duration, first_event.pitches)
+## Sequence, Score, and Conversion
 
-context = ScoreEventContext(
-	start_offset=Duration.from_beats(1, 2),
-	default_duration=Duration.from_beats(3, 4),
-)
-```
+Timeline and conversion types:
 
-## Degree-Aware APIs
+- `Sequence`, `SequenceEntry`, `SequenceEntryLike`, `Rest`
+- `Sequenceable`, `NotesLike`
+- `Score`, `ScoreEvent`, `ScoreEventContext`, `ScoreMetadata`
 
-- `Degree.coerce(...)`, `Degree.from_string(...)`, `Degree.to_int()`, `Degree.to_roman(...)`
-- `Degree.accidental`, `Degree.accidental_offset`
-- `Scale.degree(...)`, `Scale.mode_from_degree(...)`
-- `Scale.chord_for_degree(...)`, `Scale.chords_for_degrees(...)`
-- `Scale.degree_for_chord_root(...) -> Degree | None`
-- `Chord.tone_at(...)`, `Chord.degree_for_tone(...) -> Degree | None`
-- `Interval.degree`, `Interval.simple_degree`
+Score conversion entry points:
 
-## MIDI Workflow (Optional)
+- `Score.from_sequenceable(...)`
+- `score_from_sequenceable(...)`
 
-- Use `Score.from_sequenceable(...)` to normalize composition data.
-- Use `MidiFile(score)` when you want file export and wrapper methods.
-- Use `MidiFile.to_file(path)` to write a `.mid` file.
-- Use `score_to_playback_notes(score, ...)` for score-backed audio-note conversion with retrigger policy (`retrigger_all` default, `delta` optional override).
-- Use `MidiPlayback` directly for repeated live transport sessions and `play_score(...)`.
-- `MidiPlayback.play_score(...)` accepts optional `gate_width`, `gate_offset`, and `retrigger_policy` overrides.
-- Install optional dependencies with `pip install chordelia[midi]`.
+Scale context helpers for diatonic workflows:
 
-Example overrides:
+- `set_global_scale_context(...)`
+- `get_global_scale_context()`
+- `reset_global_scale_context()`
+- `with_global_scale_context(...)`
 
-```python
-from chordelia import MidiPlayback, Score
+Key behaviors:
 
-score = Score.from_sequenceable(sequence, tempo=112)
+- `Sequence.appended(...)` composes forms immutably.
+- `Sequence.transpose(...)` is chromatic (semitones).
+- `Sequence.shift(...)` is diatonic (scale steps).
+- `Score.duration` returns normalized timeline span.
+- `Score.with_(...)` returns immutable metadata/source/event updates.
 
-# Keep full written durations (100% gate) and preserve delta-style note continuity.
-score = score.with_(gate_width=1.0, retrigger_policy="delta")
+Related deep docs:
 
-# Or override at playback call site only.
-with MidiPlayback() as playback:
-	playback.play_score(score, gate_width=1.0, retrigger_policy="delta")
-```
+- [Sequences and Score](guides/sequences-and-score.md)
+- [Song Form from a Motif](tutorials/song-form-from-motif.md)
 
-## Sheet Music Workflow
+## Sheet Music and Rendering
 
-- Use `SheetMusic(source, scale=None)` where `source` is `Score` or any `Sequenceable` input accepted by `Score.from_sequenceable(...)`.
-- Use `SheetMusic.to_file(path, format="svg")` to write deterministic SVG output.
-- Use `SheetMusic.score_to_file(score, path, format="svg")` for direct score-based export.
-- Use notebook display via `_repr_mimebundle_` (returns `image/svg+xml` plus plain-text fallback).
-- v1 boundary: write-only output; no parse/load APIs are exposed.
+Core rendering API:
 
-Example:
+- `SheetMusic(source, scale=None)`
+- `SheetMusic.to_file(path, format="svg")`
+- `SheetMusic.score_to_file(score, path, format="svg")`
 
-```python
-from chordelia import Note, Sequence, SheetMusic
+Runtime backend APIs (from `chordelia.sheetmusic_backends`):
 
-phrase = Sequence(((Note("C4"), 1), (Note("D4"), 1), (Note("E4"), 2)))
-sheet = SheetMusic(phrase, scale="C")
-sheet.to_file("phrase.svg")
-```
+- `configure_sheetmusic_rendering(...)`
+- `with_sheetmusic_rendering(...)`
+- `get_sheetmusic_rendering_config()`
+- `reset_sheetmusic_rendering_config()`
+- `install_sequenceable_sheetmusic_display_hooks()`
+- `uninstall_sequenceable_sheetmusic_display_hooks()`
 
-- `SheetMusic` is part of the core package (`pip install chordelia`), with no dependency on MIDI extras.
+Notes:
 
-### Optional LilyPond Backend
+- Built-in SVG rendering is part of the core package.
+- `SheetMusic` is write-only in v1 (render/export, no parse/load API).
 
-- Use `chordelia.sheetmusic_backends.configure_sheetmusic_rendering(...)` with `backend_name="lilypond"` to route `SheetMusic` SVG output through LilyPond.
-- This backend includes score-to-LilyPond conversion and subprocess rendering; calling code only provides the executable path.
-- With `crop=True` (default), LilyPond's cropped SVG output is preferred over full-page SVG.
+Related deep docs:
 
-Example:
+- [Sheet Music Rendering](tutorials/sheet-music-rendering.md)
 
-```python
-from chordelia.sheetmusic_backends import configure_sheetmusic_rendering
+## Playback and MIDI (Optional)
 
-configure_sheetmusic_rendering(
-	backend_name="lilypond",
-	lilypond_executable="C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe",
-	crop=True,
-)
-```
+Audio APIs (audio extra):
 
-### Runtime Rendering Context and Notebook Hooks
+- `Playback`, `PlaybackNote`, `Waveform`
+- `score_to_playback_notes(...)`, `midi_tracks_to_playback_notes(...)`
+- `play_scale(...)`, `play_chord(...)`, `play_melody(...)`, `create_chord_notes(...)`
 
-- Use `configure_sheetmusic_rendering(...)` to set global rendering options such as backend and default scale.
-- Set `enable_notebook_hooks=True` on `configure_sheetmusic_rendering(...)` to install notebook mimebundle hooks for Sequenceable concrete types.
-- Use `with_sheetmusic_rendering(...)` for temporary scoped configuration overrides.
-- Use `install_sequenceable_sheetmusic_display_hooks()` to attach notebook mime rendering hooks to Sequenceable concrete types.
-- Use `reset_sheetmusic_rendering_config()` and `uninstall_sequenceable_sheetmusic_display_hooks()` to reset runtime integration.
-- To change only the default scale while keeping backend and backend options unchanged, call `configure_sheetmusic_rendering(scale="Eb")`.
+MIDI APIs (midi extra):
 
-Example startup wiring:
+- `MidiPlayback`, `MidiFile`, `MidiTrackInfo`
+- `get_midi_ports()`, `is_midi_available()`
+- `midi_play_chord(...)`, `midi_play_melody(...)`
 
-```python
-from chordelia.sheetmusic_backends import configure_sheetmusic_rendering
+Articulation controls:
 
-configure_sheetmusic_rendering(
-	backend_name="lilypond",
-	lilypond_executable="C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe",
-	scale="D",
-	enable_notebook_hooks=True,
-)
-```
+- `ScoreMetadata.gate_width`, `ScoreMetadata.gate_offset`
+- `ScoreMetadata.retrigger_policy` (`"retrigger_all"` or `"delta"`)
+- Per-call overrides on `MidiPlayback.play_score(...)`
 
-## Real-World Applications
+Related deep docs:
 
-- Music education and theory tooling
-- Composition and progression building
-- MIDI conversion and tooling
-- Practice apps and metronome workflows
-- Harmonic and rhythmic analysis
-- Low-resource hardware deployments
+- [Playback and MIDI](tutorials/playback-and-midi.md)
+
+## Immutability Pattern
+
+Chordelia public value objects are immutable. Methods return copies instead of mutating
+in place.
+
+Common copy-constructor style:
+
+- `with_...(...)` methods (for example `with_extension`, `with_inversion`)
+- aggregate update methods (for example `with_(...)`)
+
+Related deep docs:
+
+- [Immutability](immutability.md)
 
 ## Related
 

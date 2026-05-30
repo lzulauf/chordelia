@@ -14,6 +14,15 @@ pytest tests/
 
 Contributions are welcome. Please include tests for behavior changes and keep docs aligned with the final API.
 
+## Documentation Update Expectations
+
+- Keep the project README concise and onboarding-focused.
+- Keep practical recipe-style snippets in [Cookbook](cookbook.md).
+- Put in-depth workflows in `docs/tutorials/`.
+- Put concept depth in `docs/guides/`.
+- Keep symbol inventory and API surface mapping in [API Overview](api-overview.md).
+- Prefer links over duplicated walkthroughs across multiple files.
+
 ## Public vs Internal APIs
 
 - Public APIs are exported from `chordelia` and documented in the API docs.

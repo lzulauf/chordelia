@@ -80,4 +80,5 @@ print(len(chord_notes))
 ## Related
 
 - [Scales and Chords](guides/scales-and-chords.md)
+- [Sequences and Score](guides/sequences-and-score.md)
 - [API Overview](api-overview.md)
