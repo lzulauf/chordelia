@@ -9,6 +9,7 @@ mido = pytest.importorskip("mido")
 
 from chordelia.midifile import MidiFile
 from chordelia.notes import Note
+from chordelia.playback_notes import midi_tracks_to_playback_notes, score_to_playback_notes
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
 
 
@@ -96,8 +97,8 @@ class TestMidiFileWritePath:
         assert ("note_off", 64, 0, 2, 1920) in note_messages
 
 
-class TestMidiFileReadCompatibility:
-    """Legacy file-load compatibility while score-backed APIs roll out."""
+class TestMidiFileReadPath:
+    """MIDI file read behavior through the score-backed MidiFile wrapper."""
 
     def test_load_from_file_keeps_playback_conversion_working(self, tmp_path: Path):
         source_path = tmp_path / "source.mid"
@@ -111,7 +112,11 @@ class TestMidiFileReadCompatibility:
         midi.save(str(source_path))
 
         loaded = MidiFile.load_from_file(source_path)
-        playback_notes = loaded.to_playback_notes()
+        assert loaded.midi_file is not None
+        playback_notes = midi_tracks_to_playback_notes(
+            loaded.midi_file,
+            tempo_bpm=loaded.tempo.bpm,
+        )
 
         assert loaded.filepath == source_path
         assert loaded.score is not None
@@ -131,9 +136,7 @@ class TestMidiFileScoreBackedAudioConversion:
                 ScoreEvent(beat=1, duration=1, pitches=(60,), channel=0, velocity=70),
             ),
         )
-        midi = MidiFile(score)
-
-        playback_notes = midi.to_playback_notes()
+        playback_notes = score_to_playback_notes(score)
 
         assert len(playback_notes) == 2
         assert playback_notes[0].start_time == pytest.approx(0.0)
@@ -150,9 +153,7 @@ class TestMidiFileScoreBackedAudioConversion:
                 ScoreEvent(beat=1, duration=1, pitches=(60,), channel=0),
             ),
         )
-        midi = MidiFile(score)
-
-        playback_notes = midi.to_playback_notes(retrigger_policy="delta")
+        playback_notes = score_to_playback_notes(score, retrigger_policy="delta")
 
         assert len(playback_notes) == 1
         assert playback_notes[0].start_time == pytest.approx(0.0)
@@ -167,17 +168,15 @@ class TestMidiFileScoreBackedAudioConversion:
                 ScoreEvent(beat=1, duration=1, pitches=(60,), channel=1),
             ),
         )
-        midi = MidiFile(score)
-
-        playback_notes = midi.to_playback_notes()
+        playback_notes = score_to_playback_notes(score)
 
         assert len(playback_notes) == 2
 
     def test_score_backed_playback_notes_reject_bad_policy(self):
-        midi = MidiFile(Note("C4"))
+        score = Score.from_sequenceable(Note("C4"))
 
         with pytest.raises(ValueError, match="retrigger_policy"):
-            midi.to_playback_notes(retrigger_policy="bad")
+            score_to_playback_notes(score, retrigger_policy="bad")
 
 
 class TestMidiFileInterfacePlayback:

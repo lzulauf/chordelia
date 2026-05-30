@@ -101,7 +101,7 @@ context = ScoreEventContext(
 - Use `Score.from_sequenceable(...)` to normalize composition data.
 - Use `MidiFile(score)` when you want file export and wrapper methods.
 - Use `MidiFile.to_file(path)` to write a `.mid` file.
-- Score-backed `MidiFile.to_playback_notes(...)` honors retrigger policy (`retrigger_all` default, `delta` optional override).
+- Use `score_to_playback_notes(score, ...)` for score-backed audio-note conversion with retrigger policy (`retrigger_all` default, `delta` optional override).
 - Use `MidiFile.play_to_interface(...)` to send score-backed playback to a MIDI output.
 - Use `MidiPlayback` directly for repeated live transport sessions and `play_score(...)`.
 - `MidiPlayback.play_score(...)` and `MidiFile.play_to_interface(...)` accept optional `gate_width`, `gate_offset`, and `retrigger_policy` overrides.

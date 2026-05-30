@@ -30,6 +30,7 @@ from chordelia.rhythm import (
 # Audio playback module - optional import (requires sounddevice and numpy)
 try:
     from chordelia.audio_playback import Playback, PlaybackNote, Waveform, play_scale, play_chord, play_melody, create_chord_notes
+    from chordelia.playback_notes import midi_tracks_to_playback_notes, score_to_playback_notes
     _PLAYBACK_AVAILABLE = True
 except ImportError:
     _PLAYBACK_AVAILABLE = False
@@ -93,6 +94,8 @@ if _PLAYBACK_AVAILABLE:
         "Playback",
         "PlaybackNote", 
         "Waveform",
+        "midi_tracks_to_playback_notes",
+        "score_to_playback_notes",
         "play_scale",
         "play_chord",
         "play_melody",
