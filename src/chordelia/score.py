@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from chordelia.rhythm import Duration
+from chordelia.scale_context import get_default_note_duration_context
 
 
 DurationLike = Duration | int | float
@@ -267,6 +268,7 @@ class Score:
         tempo: int = 120,
         time_signature: tuple[int, int] = (4, 4),
         key_signature: str | None = None,
+        default_duration: DurationLike | None = None,
         ppq: int = 480,
         gate_width: float = 0.9,
         gate_offset: float = 0.0,
@@ -275,10 +277,21 @@ class Score:
         """Create a score by normalizing any sequenceable (or adapted) value."""
         from chordelia.sequenceable import _sequence_render_for
 
+        resolved_default_duration = (
+            default_duration
+            if default_duration is not None
+            else get_default_note_duration_context()
+        )
+
         context = ScoreEventContext(
             tempo=tempo,
             time_signature=time_signature,
             key_signature=key_signature,
+            default_duration=(
+                resolved_default_duration
+                if resolved_default_duration is not None
+                else Duration.from_beats(1, None)
+            ),
         )
         render = _sequence_render_for(source, context)
         events = render.events
@@ -364,6 +377,7 @@ def score_from_sequenceable(
     tempo: int = 120,
     time_signature: tuple[int, int] = (4, 4),
     key_signature: str | None = None,
+    default_duration: DurationLike | None = None,
     gate_width: float = 0.9,
     gate_offset: float = 0.0,
     retrigger_policy: RetriggerPolicy = "retrigger_all",
@@ -374,6 +388,7 @@ def score_from_sequenceable(
         tempo=tempo,
         time_signature=time_signature,
         key_signature=key_signature,
+        default_duration=default_duration,
         gate_width=gate_width,
         gate_offset=gate_offset,
         retrigger_policy=retrigger_policy,

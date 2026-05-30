@@ -4,6 +4,7 @@ import pytest
 
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
+from chordelia.scale_context import reset_chordelia_context, with_chordelia_context
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
 from chordelia.sequenceable import (
     SequenceRender,
@@ -16,8 +17,10 @@ from chordelia.sequenceable import (
 def clear_adapter_registry_between_tests():
     """Keep private adapter registrations isolated to each test."""
     _clear_sequenceable_adapters()
+    reset_chordelia_context()
     yield
     _clear_sequenceable_adapters()
+    reset_chordelia_context()
 
 
 class TestScoreEvent:
@@ -238,6 +241,21 @@ class TestScore:
         score = Score(source="x", metadata=ScoreMetadata(), events=())
 
         assert score.duration == Duration.from_beats(0)
+
+    def test_from_sequenceable_uses_context_default_note_duration(self):
+        with with_chordelia_context(default_note_duration=Duration.from_beats(1, 2)):
+            score = Score.from_sequenceable(Note("C4"))
+
+        assert score.events[0].duration == Duration.from_beats(1, 2)
+
+    def test_from_sequenceable_explicit_default_duration_overrides_context(self):
+        with with_chordelia_context(default_note_duration=Duration.from_beats(1, 2)):
+            score = Score.from_sequenceable(
+                Note("C4"),
+                default_duration=Duration.from_beats(3, 4),
+            )
+
+        assert score.events[0].duration == Duration.from_beats(3, 4)
 
     def test_with_tempo_updates_score_metadata_only(self):
         score = Score(
