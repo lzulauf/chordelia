@@ -1,4 +1,4 @@
-"""MIDI interface playback utilities and canonical live transport API."""
+﻿"""MIDI interface playback utilities and canonical live transport API."""
 
 from contextlib import contextmanager
 import threading
@@ -447,9 +447,9 @@ def play_chord(
     if not _MIDI_AVAILABLE:
         raise ImportError("MIDI playback requires 'mido' package. Install with: pip install mido")
 
-    from chordelia.rhythm import TimeSignature, whole_note
+    from chordelia.rhythm import TimeSignature
 
-    hold_duration = whole_note() if duration is None else duration
+    hold_duration = Duration("whole") if duration is None else duration
     with MidiPlayback(output_name=output_name, channel=channel, default_velocity=velocity) as playback:
         playback.play_chord_with_duration(chord, hold_duration, tempo, channel=channel, velocity=velocity)
         time_sig = TimeSignature(4, 4)
@@ -503,3 +503,4 @@ def get_midi_ports() -> Dict[str, List[str]]:
 def is_midi_available() -> bool:
     """Check if MIDI functionality is available."""
     return _MIDI_AVAILABLE
+

@@ -34,8 +34,7 @@ from chordelia.scale_context import (
     with_global_scale_context,
 )
 from chordelia.rhythm import (
-    Duration, TimeSignature, Tempo, Beat, NoteValue,
-    whole_note, half_note, quarter_note, eighth_note, sixteenth_note,
+    Duration, TimeSignature, Tempo, Beat,
     dotted, triplet, COMMON_TIME, WALTZ_TIME, COMPOUND_DUPLE
 )
 
@@ -97,12 +96,6 @@ __all__ = [
     "TimeSignature", 
     "Tempo",
     "Beat",
-    "NoteValue",
-    "whole_note",
-    "half_note", 
-    "quarter_note",
-    "eighth_note",
-    "sixteenth_note",
     "dotted",
     "triplet",
     "COMMON_TIME",

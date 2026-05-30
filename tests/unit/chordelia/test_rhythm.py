@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for the rhythm module.
 
 This module tests musical timing, durations, time signatures, tempo,
@@ -9,49 +9,18 @@ import pytest
 from decimal import Decimal
 from fractions import Fraction
 from chordelia.rhythm import (
-    Duration, TimeSignature, Tempo, Beat, NoteValue,
-    whole_note, half_note, quarter_note, eighth_note, sixteenth_note,
+    Duration, TimeSignature, Tempo, Beat,
     dotted, triplet, COMMON_TIME, CUT_TIME, WALTZ_TIME, COMPOUND_DUPLE,
     coerce_timeline_duration, context_beat_unit,
 )
 
 
-class TestNoteValue:
-    """Test NoteValue enumeration."""
-    
-    def test_note_value_fractions(self):
-        """Test that note values have correct fractional values."""
-        assert NoteValue.WHOLE.value == Fraction(1, 1)
-        assert NoteValue.HALF.value == Fraction(1, 2)
-        assert NoteValue.QUARTER.value == Fraction(1, 4)
-        assert NoteValue.EIGHTH.value == Fraction(1, 8)
-        assert NoteValue.SIXTEENTH.value == Fraction(1, 16)
-    
-    def test_dotted_note_values(self):
-        """Test dotted note values are 1.5x original."""
-        assert NoteValue.DOTTED_QUARTER.value == Fraction(3, 8)
-        assert NoteValue.DOTTED_EIGHTH.value == Fraction(3, 16)
-        assert NoteValue.DOTTED_HALF.value == Fraction(3, 4)
-    
-    def test_triplet_note_values(self):
-        """Test triplet note values are 2/3 original."""
-        assert NoteValue.QUARTER_TRIPLET.value == Fraction(1, 6)
-        assert NoteValue.EIGHTH_TRIPLET.value == Fraction(1, 12)
-        assert NoteValue.HALF_TRIPLET.value == Fraction(1, 3)
-    
-    def test_note_value_string_representation(self):
-        """Test string representation of note values."""
-        assert str(NoteValue.QUARTER) == "quarter"
-        assert str(NoteValue.DOTTED_QUARTER) == "dotted quarter"
-        assert str(NoteValue.QUARTER_TRIPLET) == "quarter triplet"
-
-
 class TestDuration:
     """Test Duration class."""
     
-    def test_create_from_note_value(self):
-        """Test creating duration from NoteValue."""
-        quarter = Duration(NoteValue.QUARTER)
+    def test_create_from_named_string(self):
+        """Test creating duration from a named rhythm string."""
+        quarter = Duration("quarter")
         assert quarter.fraction == Fraction(1, 4)
         assert quarter.decimal == 0.25
     
@@ -91,8 +60,8 @@ class TestDuration:
     
     def test_duration_arithmetic(self):
         """Test duration arithmetic operations."""
-        quarter = Duration(NoteValue.QUARTER)
-        eighth = Duration(NoteValue.EIGHTH)
+        quarter = Duration("quarter")
+        eighth = Duration("eighth")
         
         # Addition
         result = quarter + eighth
@@ -112,8 +81,8 @@ class TestDuration:
     
     def test_duration_comparison(self):
         """Test duration comparison operations."""
-        quarter = Duration(NoteValue.QUARTER)
-        eighth = Duration(NoteValue.EIGHTH)
+        quarter = Duration("quarter")
+        eighth = Duration("eighth")
         another_quarter = Duration(Fraction(1, 4))
         
         assert quarter == another_quarter
@@ -122,8 +91,8 @@ class TestDuration:
     
     def test_beats_in_measure(self):
         """Test calculating beats in measure."""
-        quarter = Duration(NoteValue.QUARTER)
-        eighth = Duration(NoteValue.EIGHTH)
+        quarter = Duration("quarter")
+        eighth = Duration("eighth")
         
         # In 4/4 time, quarter note = 1 beat
         time_sig_4_4 = TimeSignature(4, 4)
@@ -132,11 +101,11 @@ class TestDuration:
     
     def test_duration_immutability(self):
         """Test that Duration instances are immutable."""
-        quarter = Duration(NoteValue.QUARTER)
+        quarter = Duration("quarter")
         original_fraction = quarter.fraction
         
         # Test that arithmetic operations return new instances
-        result = quarter + Duration(NoteValue.EIGHTH)
+        result = quarter + Duration("eighth")
         assert result is not quarter
         assert quarter.fraction == original_fraction  # Original unchanged
         
@@ -157,7 +126,7 @@ class TestDuration:
     
     def test_to_milliseconds(self):
         """Test conversion to milliseconds."""
-        quarter = Duration(NoteValue.QUARTER)
+        quarter = Duration("quarter")
         time_sig = TimeSignature(4, 4)
         
         # At 120 BPM in 4/4, quarter note = 1 beat unit = 500ms
@@ -170,7 +139,7 @@ class TestDuration:
     
     def test_duration_string_representation(self):
         """Test string representation of durations."""
-        quarter = Duration(NoteValue.QUARTER)
+        quarter = Duration("quarter")
         assert str(quarter) == "quarter"
         
         custom = Duration(Fraction(5, 16))
@@ -210,9 +179,9 @@ class TestDuration:
 class TestTimelineCoercion:
     """Tests for shared timeline coercion helpers."""
 
-    def test_coerce_timeline_duration_from_note_value_uses_beat_unit(self):
+    def test_coerce_timeline_duration_from_duration_uses_beat_unit(self):
         duration = coerce_timeline_duration(
-            NoteValue.QUARTER,
+            Duration("quarter"),
             field_name="duration",
             beat_unit=4,
         )
@@ -400,7 +369,7 @@ class TestTempo:
     def test_duration_to_ms(self):
         """Test converting duration to milliseconds."""
         tempo = Tempo(120)
-        quarter = Duration(NoteValue.QUARTER)
+        quarter = Duration("quarter")
         time_sig = TimeSignature(4, 4)
         
         ms = tempo.duration_to_ms(quarter, time_sig)
@@ -492,14 +461,14 @@ class TestBeat:
         """Test adding duration to beat position."""
         time_sig = TimeSignature(4, 4)
         beat = Beat(0, 0, time_sig)
-        quarter = Duration(NoteValue.QUARTER)
+        quarter = Duration("quarter")
         
         new_beat = beat.add_duration(quarter)
         assert new_beat.measure == 0
         assert abs(new_beat.beat - 1.0) < 0.001  # Quarter note = 1 beat in 4/4
         
         # Add enough to cross measure boundary
-        whole = Duration(NoteValue.WHOLE)
+        whole = Duration("whole")
         new_beat = beat.add_duration(whole)
         assert new_beat.measure == 1
         assert abs(new_beat.beat - 0.0) < 0.001
@@ -517,29 +486,29 @@ class TestConvenienceFunctions:
     
     def test_note_creation_functions(self):
         """Test note duration creation functions."""
-        assert whole_note().fraction == Fraction(1, 1)
-        assert half_note().fraction == Fraction(1, 2)
-        assert quarter_note().fraction == Fraction(1, 4)
-        assert eighth_note().fraction == Fraction(1, 8)
-        assert sixteenth_note().fraction == Fraction(1, 16)
+        assert Duration("whole").fraction == Fraction(1, 1)
+        assert Duration("half").fraction == Fraction(1, 2)
+        assert Duration("quarter").fraction == Fraction(1, 4)
+        assert Duration("eighth").fraction == Fraction(1, 8)
+        assert Duration("sixteenth").fraction == Fraction(1, 16)
     
     def test_dotted_function(self):
         """Test dotted duration function."""
-        quarter = quarter_note()
+        quarter = Duration("quarter")
         dotted_quarter = dotted(quarter)
         assert dotted_quarter.fraction == Fraction(3, 8)
         
-        eighth = eighth_note()
+        eighth = Duration("eighth")
         dotted_eighth = dotted(eighth)
         assert dotted_eighth.fraction == Fraction(3, 16)
     
     def test_triplet_function(self):
         """Test triplet duration function."""
-        quarter = quarter_note()
+        quarter = Duration("quarter")
         quarter_triplet = triplet(quarter)
         assert quarter_triplet.fraction == Fraction(1, 6)
         
-        eighth = eighth_note()
+        eighth = Duration("eighth")
         eighth_triplet = triplet(eighth)
         assert eighth_triplet.fraction == Fraction(1, 12)
 
@@ -586,10 +555,10 @@ class TestRealWorldExamples:
         
         # Syncopated rhythm: quarter, eighth, dotted quarter, eighth
         rhythm = [
-            quarter_note(),     # 1/4
-            eighth_note(),      # 1/8  
-            dotted(quarter_note()),  # 3/8
-            eighth_note()       # 1/8
+            Duration("quarter"),     # 1/4
+            Duration("eighth"),      # 1/8  
+            dotted(Duration("quarter")),  # 3/8
+            Duration("eighth")       # 1/8
         ]
         # Total: 1/4 + 1/8 + 3/8 + 1/8 = 2/8 + 1/8 + 3/8 + 1/8 = 7/8
         
@@ -612,7 +581,7 @@ class TestRealWorldExamples:
         time_sig_2 = TimeSignature(3, 4)
         tempo_2 = tempo_1  # Same BPM since quarter note = quarter note
         
-        quarter = quarter_note()
+        quarter = Duration("quarter")
         
         # Quarter note duration should be same in both time signatures
         ms_1 = tempo_1.duration_to_ms(quarter, time_sig_1)
@@ -626,3 +595,4 @@ class TestRealWorldExamples:
         beat_context_2 = quarter.beats_in_measure(time_sig_2)
         
         assert beat_context_1 == beat_context_2  # Quarter note = 1 beat in both 4/4 and 3/4
+

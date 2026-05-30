@@ -1,4 +1,4 @@
-# Rhythm and Timing
+﻿# Rhythm and Timing
 
 Back links: [Project README](../../README.md) | [Docs Index](../README.md)
 
@@ -6,14 +6,14 @@ Back links: [Project README](../../README.md) | [Docs Index](../README.md)
 
 ```python
 from chordelia import (
-    Duration, TimeSignature, Tempo, Beat, NoteValue,
-    quarter_note, dotted, triplet,
+    Duration, TimeSignature, Tempo, Beat,
+    dotted, triplet,
     COMMON_TIME, WALTZ_TIME, COMPOUND_DUPLE,
 )
 
-quarter = Duration(NoteValue.QUARTER)
-dotted_quarter = dotted(quarter_note())
-quarter_triplet = triplet(quarter_note())
+quarter = Duration("quarter")
+dotted_quarter = dotted(Duration("quarter"))
+quarter_triplet = triplet(Duration("quarter"))
 
 print(quarter)          # quarter
 print(dotted_quarter)   # dotted quarter
@@ -31,21 +31,21 @@ print(f"Beat duration: {tempo.beat_duration_ms():.1f}ms")
 ## Beat Tracking
 
 ```python
-from chordelia import Beat, COMMON_TIME, dotted, quarter_note
+from chordelia import Beat, COMMON_TIME, dotted, Duration
 
 beat = Beat(0, 0, COMMON_TIME)
-beat = beat.add_duration(dotted(quarter_note()))
+beat = beat.add_duration(dotted(Duration("quarter")))
 print(beat)
 ```
 
 ## Real-Time Conversion
 
 ```python
-from chordelia import Tempo, TimeSignature, quarter_note
+from chordelia import Tempo, TimeSignature, Duration
 
 tempo = Tempo(120)
 time_sig = TimeSignature(4, 4)
-quarter_ms = quarter_note().to_milliseconds(tempo.bpm, time_sig)
+quarter_ms = Duration("quarter").to_milliseconds(tempo.bpm, time_sig)
 print(f"Quarter note at 120 BPM: {quarter_ms:.0f}ms")
 ```
 
@@ -71,3 +71,4 @@ def practice_metronome(bpm, beats_per_measure=4, num_measures=2):
 - Return to [Quickstart](../quickstart.md)
 - Continue with [Sequences and Score](sequences-and-score.md)
 - Review [Development Guide](../development.md)
+

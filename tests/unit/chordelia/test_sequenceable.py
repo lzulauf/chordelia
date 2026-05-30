@@ -5,7 +5,7 @@ import pytest
 from chordelia.chords import Chord
 from chordelia.intervals import Interval
 from chordelia.notes import Note
-from chordelia.rhythm import Duration, NoteValue
+from chordelia.rhythm import Duration
 from chordelia.scale_context import reset_global_scale_context, with_global_scale_context
 from chordelia.sequences import Rest, Sequence, SequenceEntry
 from chordelia.score import Score, ScoreEvent, ScoreEventContext
@@ -103,9 +103,9 @@ class TestSequenceRenderBoundary:
         with pytest.raises(TypeError, match="not Sequenceable"):
             _sequence_render_for(object(), ScoreEventContext())
 
-    def test_sequence_render_normalizes_note_value_consumed_duration(self):
-        """SequenceRender should normalize NoteValue consumed_duration inputs."""
-        render = SequenceRender(events=(), consumed_duration=NoteValue.QUARTER)
+    def test_sequence_render_normalizes_note_fraction_consumed_duration(self):
+        """SequenceRender should normalize note-fraction Duration consumed inputs."""
+        render = SequenceRender(events=(), consumed_duration=Duration("quarter"))
 
         assert render.consumed_duration == Duration.from_beats(1)
 
@@ -304,13 +304,13 @@ class TestSequenceScheduling:
             Duration.from_beats(6),
         ]
 
-    def test_sequence_entry_accepts_note_value_duration_and_offset(self):
+    def test_sequence_entry_accepts_note_fraction_duration_and_offset(self):
         seq = Sequence(
             (
                 SequenceEntry(
                     payload=Note("C4"),
-                    duration=NoteValue.EIGHTH,
-                    offset=NoteValue.QUARTER,
+                    duration=Duration("eighth"),
+                    offset=Duration("quarter"),
                 ),
             )
         )

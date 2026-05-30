@@ -1,4 +1,4 @@
-# API Overview
+﻿# API Overview
 
 Back links: [Project README](../README.md) | [Docs Index](README.md)
 
@@ -24,11 +24,11 @@ Related deep docs:
 
 Main classes:
 
-- `Duration`, `TimeSignature`, `Tempo`, `Beat`, `NoteValue`
+- `Duration`, `TimeSignature`, `Tempo`, `Beat`
 
 Helpers/constants:
 
-- `whole_note()`, `half_note()`, `quarter_note()`, `eighth_note()`, `sixteenth_note()`
+- `Duration("whole")`, `Duration("half")`, `Duration("quarter")`, `Duration("eighth")`, `Duration("sixteenth")`
 - `dotted(duration)`, `triplet(duration)`
 - `COMMON_TIME`, `WALTZ_TIME`, `COMPOUND_DUPLE`
 
@@ -157,3 +157,4 @@ Related deep docs:
 
 - [Quickstart](quickstart.md)
 - [Development Guide](development.md)
+

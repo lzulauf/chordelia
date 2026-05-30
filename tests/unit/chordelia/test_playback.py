@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for the Chordelia playback module.
 
 These tests focus on timing accuracy, frequency calculations, and integration
@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch, MagicMock
 import pytest
 
 from chordelia.notes import Note
-from chordelia.rhythm import Duration, Tempo, quarter_note, half_note, whole_note
+from chordelia.rhythm import Duration, Tempo
 from chordelia.scales import Scale, ScaleType
 from chordelia.chords import Chord
 
@@ -22,7 +22,7 @@ class TestPlaybackNote(unittest.TestCase):
     
     def setUp(self):
         self.note_c4 = Note("C4")
-        self.quarter = quarter_note()
+        self.quarter = Duration("quarter")
         
     def test_create_playback_note(self):
         """Test creating a basic PlaybackNote."""
@@ -166,15 +166,15 @@ class TestPlaybackTiming(unittest.TestCase):
         playback = Playback(self.tempo_120, COMMON_TIME)
         
         # At 120 BPM, quarter note = 500ms
-        quarter_ms = playback._convert_to_milliseconds(quarter_note())
+        quarter_ms = playback._convert_to_milliseconds(Duration("quarter"))
         self.assertEqual(quarter_ms, 500.0)
         
         # Half note = 1000ms
-        half_ms = playback._convert_to_milliseconds(half_note())
+        half_ms = playback._convert_to_milliseconds(Duration("half"))
         self.assertEqual(half_ms, 1000.0)
         
         # Whole note = 2000ms
-        whole_ms = playback._convert_to_milliseconds(whole_note())
+        whole_ms = playback._convert_to_milliseconds(Duration("whole"))
         self.assertEqual(whole_ms, 2000.0)
     
     @patch('chordelia.audio_playback.AUDIO_AVAILABLE', True)
@@ -197,12 +197,12 @@ class TestPlaybackTiming(unittest.TestCase):
         
         # 120 BPM: quarter = 500ms
         playback_120 = Playback(self.tempo_120, COMMON_TIME)
-        quarter_120 = playback_120._convert_to_milliseconds(quarter_note())
+        quarter_120 = playback_120._convert_to_milliseconds(Duration("quarter"))
         self.assertEqual(quarter_120, 500.0)
         
         # 60 BPM: quarter = 1000ms
         playback_60 = Playback(self.tempo_60, COMMON_TIME)
-        quarter_60 = playback_60._convert_to_milliseconds(quarter_note())
+        quarter_60 = playback_60._convert_to_milliseconds(Duration("quarter"))
         self.assertEqual(quarter_60, 1000.0)
 
 
@@ -262,7 +262,7 @@ class TestPlaybackIntegration(unittest.TestCase):
         from chordelia.audio_playback import PlaybackNote
         
         note = Note("C4")
-        duration = quarter_note()
+        duration = Duration("quarter")
         
         playback_note = PlaybackNote(
             start_time=Duration(0),
@@ -280,9 +280,9 @@ class TestPlaybackIntegration(unittest.TestCase):
         from chordelia.rhythm import COMMON_TIME
         
         notes = [
-            PlaybackNote(Duration(0), Note("C4"), quarter_note(), 0.7),
-            PlaybackNote(quarter_note(), Note("D4"), quarter_note(), 0.7),
-            PlaybackNote(half_note(), Note("E4"), quarter_note(), 0.7),
+            PlaybackNote(Duration(0), Note("C4"), Duration("quarter"), 0.7),
+            PlaybackNote(Duration("quarter"), Note("D4"), Duration("quarter"), 0.7),
+            PlaybackNote(Duration("half"), Note("E4"), Duration("quarter"), 0.7),
         ]
         
         playback = Playback(self.tempo, COMMON_TIME)
@@ -331,7 +331,7 @@ class TestConvenienceFunctions(unittest.TestCase):
         scale = Scale("C", ScaleType.MAJOR)
         
         # Should not raise an exception
-        play_scale(scale, self.tempo, quarter_note(), octave=4)
+        play_scale(scale, self.tempo, Duration("quarter"), octave=4)
         
         # Verify audio stream was used
         self.mock_sd.OutputStream.assert_called()
@@ -351,7 +351,7 @@ class TestConvenienceFunctions(unittest.TestCase):
             mock_playback_class.return_value.__enter__.return_value = mock_playback_instance
             
             # Call play_scale - should use the scale's octave information
-            play_scale(scale_with_octave, self.tempo, quarter_note())
+            play_scale(scale_with_octave, self.tempo, Duration("quarter"))
             
             # Verify play_sequence was called
             mock_playback_instance.play_sequence.assert_called_once()
@@ -388,7 +388,7 @@ class TestConvenienceFunctions(unittest.TestCase):
             mock_playback_class.return_value.__enter__.return_value = mock_playback_instance
             
             # Call play_scale with explicit octave parameter
-            play_scale(scale_no_octave, self.tempo, quarter_note(), octave=5)
+            play_scale(scale_no_octave, self.tempo, Duration("quarter"), octave=5)
             
             # Get the notes that were passed to play_sequence
             call_args = mock_playback_instance.play_sequence.call_args[0]
@@ -407,7 +407,7 @@ class TestConvenienceFunctions(unittest.TestCase):
         chord = Chord.from_string("C")
         
         # Should not raise an exception
-        play_chord(chord, self.tempo, whole_note(), octave=4)
+        play_chord(chord, self.tempo, Duration("whole"), octave=4)
         
         # Verify audio stream was used
         self.mock_sd.OutputStream.assert_called()
@@ -420,9 +420,9 @@ class TestConvenienceFunctions(unittest.TestCase):
         from chordelia.audio_playback import play_melody
         
         melody = [
-            (Note("C4"), quarter_note()),
-            (Note("D4"), quarter_note()),  
-            (Note("E4"), half_note()),
+            (Note("C4"), Duration("quarter")),
+            (Note("D4"), Duration("quarter")),  
+            (Note("E4"), Duration("half")),
         ]
         
         # Should not raise an exception
@@ -437,8 +437,8 @@ class TestConvenienceFunctions(unittest.TestCase):
         from chordelia.audio_playback import play_melody
         
         melody_no_octaves = [
-            (Note("C"), quarter_note()),  # No octave
-            (Note("D"), quarter_note()),  # No octave
+            (Note("C"), Duration("quarter")),  # No octave
+            (Note("D"), Duration("quarter")),  # No octave
         ]
         
         with self.assertRaises(ValueError):
@@ -487,7 +487,7 @@ class TestPlaybackErrorHandling(unittest.TestCase):
         tempo = Tempo(120)
         playback = Playback(tempo, COMMON_TIME)
         
-        notes = [PlaybackNote(Duration(0), Note("C4"), quarter_note(), 0.7)]
+        notes = [PlaybackNote(Duration(0), Note("C4"), Duration("quarter"), 0.7)]
         
         # Mock the playing state
         playback._playing = True
@@ -534,7 +534,7 @@ class TestRealWorldScenarios(unittest.TestCase):
         
         notes = []
         current_time = Duration(0)
-        chord_duration = whole_note()
+        chord_duration = Duration("whole")
         
         for chord_name in progression:
             chord = Chord.from_string(chord_name)
@@ -562,20 +562,20 @@ class TestRealWorldScenarios(unittest.TestCase):
     def test_melody_with_varying_durations(self):
         """Test melody with different note durations.""" 
         from chordelia.audio_playback import Playback, PlaybackNote
-        from chordelia.rhythm import COMMON_TIME, eighth_note, dotted
+        from chordelia.rhythm import COMMON_TIME, dotted
         
         # "Mary Had a Little Lamb" rhythm pattern
         melody_rhythm = [
-            (Note("E4"), quarter_note()),
-            (Note("D4"), quarter_note()),
-            (Note("C4"), quarter_note()),
-            (Note("D4"), quarter_note()),
-            (Note("E4"), quarter_note()),
-            (Note("E4"), quarter_note()),
-            (Note("E4"), half_note()),
-            (Note("D4"), quarter_note()),
-            (Note("D4"), quarter_note()),
-            (Note("D4"), half_note()),
+            (Note("E4"), Duration("quarter")),
+            (Note("D4"), Duration("quarter")),
+            (Note("C4"), Duration("quarter")),
+            (Note("D4"), Duration("quarter")),
+            (Note("E4"), Duration("quarter")),
+            (Note("E4"), Duration("quarter")),
+            (Note("E4"), Duration("half")),
+            (Note("D4"), Duration("quarter")),
+            (Note("D4"), Duration("quarter")),
+            (Note("D4"), Duration("half")),
         ]
         
         notes = []
@@ -601,3 +601,4 @@ class TestRealWorldScenarios(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

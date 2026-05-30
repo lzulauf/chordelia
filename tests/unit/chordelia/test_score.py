@@ -4,7 +4,7 @@ import pytest
 
 from chordelia.degrees import Degree
 from chordelia.notes import Note
-from chordelia.rhythm import Duration, NoteValue
+from chordelia.rhythm import Duration
 from chordelia.scales import Scale
 from chordelia.scale_context import reset_chordelia_context, with_chordelia_context
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
@@ -95,7 +95,7 @@ class TestScoreEventContext:
         context = ScoreEventContext(
             time_signature=(6, 8),
             start_offset=Duration("quarter"),
-            default_duration=NoteValue.EIGHTH,
+            default_duration=Duration("eighth"),
         )
 
         assert context.start_offset == Duration.from_beats(2)
