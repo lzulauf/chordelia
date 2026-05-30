@@ -8,7 +8,7 @@ All calculations are done algorithmically for precision and efficiency.
 
 from enum import Enum
 from decimal import Decimal, InvalidOperation
-from typing import Optional, Union, Tuple
+from typing import Optional, Union, Tuple, TypeAlias
 from fractions import Fraction
 import math
 
@@ -108,7 +108,7 @@ class Duration:
             fraction = self._parse_duration_string(value)
         else:
             raise ValueError(f"Invalid duration value: {value}")
-        
+
         self._mode = self._MODE_NOTE_FRACTION
         self._fraction = fraction
         self._beats = None
@@ -401,6 +401,52 @@ class Duration:
         if self._mode == self._MODE_BEATS:
             return self._beats
         return self._seconds
+
+
+TimelineLike: TypeAlias = Duration | NoteValue | int | float | Fraction
+
+
+def context_beat_unit(
+    time_signature: tuple[int, int] | None,
+    *,
+    default: int = 4,
+) -> int:
+    """Resolve denominator beat unit from an optional time signature."""
+    if time_signature is None:
+        return default
+    if len(time_signature) != 2:
+        raise ValueError("time_signature must be (numerator, denominator)")
+    _numerator, denominator = time_signature
+    if denominator <= 0:
+        raise ValueError(f"time signature denominator must be > 0, got {denominator}")
+    return denominator
+
+
+def coerce_timeline_duration(
+    value: TimelineLike,
+    *,
+    field_name: str,
+    beat_unit: int = 4,
+) -> Duration:
+    """Coerce scheduling-boundary values into beat/time Duration modes."""
+    if beat_unit <= 0:
+        raise ValueError(f"beat_unit must be > 0, got {beat_unit}")
+
+    if isinstance(value, Duration):
+        if value.mode == "note_fraction":
+            return Duration.from_beats(value.as_beats(beat_unit=beat_unit), None)
+        return value
+
+    if isinstance(value, NoteValue):
+        return Duration.from_beats(value.value / Fraction(1, beat_unit), None)
+
+    if isinstance(value, (int, float, Fraction)) and not isinstance(value, bool):
+        return Duration.from_beats(value, None)
+
+    raise TypeError(
+        f"{field_name} must be Duration, NoteValue, int, float, or Fraction; "
+        f"got {type(value).__name__}"
+    )
 
 
 class TimeSignature:

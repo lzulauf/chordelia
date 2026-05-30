@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
-from chordelia.rhythm import Duration
+from chordelia.rhythm import Duration, TimelineLike, coerce_timeline_duration, context_beat_unit
 from chordelia.scale_context import get_default_note_duration_context
 
 
-DurationLike = Duration | int | float
+DurationLike: TypeAlias = TimelineLike
 _UNCHANGED = object()
 RetriggerPolicy = Literal["delta", "retrigger_all"]
 
@@ -29,20 +29,9 @@ def _validate_retrigger_policy(value: str) -> None:
         )
 
 
-def _coerce_duration(value: DurationLike, *, field_name: str) -> Duration:
+def _coerce_duration(value: DurationLike, *, field_name: str, beat_unit: int = 4) -> Duration:
     """Coerce values into beat/time Duration for deterministic event timing."""
-    if isinstance(value, Duration):
-        duration = value
-    else:
-        duration = Duration.from_beats(value, None)
-
-    if duration.mode == "note_fraction":
-        raise ValueError(
-            f"{field_name} must be beat-based or time-based Duration. "
-            "Use Duration.from_beats(...) or Duration.from_seconds(...)."
-        )
-
-    return duration
+    return coerce_timeline_duration(value, field_name=field_name, beat_unit=beat_unit)
 
 
 def _is_negative(value: Duration) -> bool:
@@ -138,8 +127,26 @@ class ScoreEventContext:
     key_signature: str | None = None
 
     def __post_init__(self) -> None:
-        start_offset = _coerce_duration(self.start_offset, field_name="start_offset")
-        default_duration = _coerce_duration(self.default_duration, field_name="default_duration")
+        if len(self.time_signature) != 2:
+            raise ValueError("time_signature must be (numerator, denominator)")
+
+        numerator, denominator = self.time_signature
+        if numerator <= 0:
+            raise ValueError(f"time signature numerator must be > 0, got {numerator}")
+        if denominator <= 0:
+            raise ValueError(f"time signature denominator must be > 0, got {denominator}")
+
+        beat_unit = context_beat_unit(self.time_signature)
+        start_offset = _coerce_duration(
+            self.start_offset,
+            field_name="start_offset",
+            beat_unit=beat_unit,
+        )
+        default_duration = _coerce_duration(
+            self.default_duration,
+            field_name="default_duration",
+            beat_unit=beat_unit,
+        )
 
         if start_offset.mode != default_duration.mode:
             raise ValueError(
@@ -153,14 +160,6 @@ class ScoreEventContext:
             raise ValueError(f"default_duration must be > 0, got {default_duration}")
         if self.tempo <= 0:
             raise ValueError(f"tempo must be > 0, got {self.tempo}")
-        if len(self.time_signature) != 2:
-            raise ValueError("time_signature must be (numerator, denominator)")
-
-        numerator, denominator = self.time_signature
-        if numerator <= 0:
-            raise ValueError(f"time signature numerator must be > 0, got {numerator}")
-        if denominator <= 0:
-            raise ValueError(f"time signature denominator must be > 0, got {denominator}")
         if not 0 <= self.velocity <= 127:
             raise ValueError(f"velocity must be 0-127, got {self.velocity}")
         if self.channel < 0:

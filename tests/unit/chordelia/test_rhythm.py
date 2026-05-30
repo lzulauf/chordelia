@@ -11,7 +11,8 @@ from fractions import Fraction
 from chordelia.rhythm import (
     Duration, TimeSignature, Tempo, Beat, NoteValue,
     whole_note, half_note, quarter_note, eighth_note, sixteenth_note,
-    dotted, triplet, COMMON_TIME, CUT_TIME, WALTZ_TIME, COMPOUND_DUPLE
+    dotted, triplet, COMMON_TIME, CUT_TIME, WALTZ_TIME, COMPOUND_DUPLE,
+    coerce_timeline_duration, context_beat_unit,
 )
 
 
@@ -204,6 +205,55 @@ class TestDuration:
 
         with pytest.raises(TypeError):
             _ = beats + seconds
+
+
+class TestTimelineCoercion:
+    """Tests for shared timeline coercion helpers."""
+
+    def test_coerce_timeline_duration_from_note_value_uses_beat_unit(self):
+        duration = coerce_timeline_duration(
+            NoteValue.QUARTER,
+            field_name="duration",
+            beat_unit=4,
+        )
+        assert duration == Duration.from_beats(1)
+
+    def test_coerce_timeline_duration_converts_note_fraction_duration(self):
+        duration = coerce_timeline_duration(
+            Duration("quarter"),
+            field_name="duration",
+            beat_unit=8,
+        )
+        assert duration == Duration.from_beats(2)
+
+    def test_coerce_timeline_duration_accepts_fraction_beat_counts(self):
+        duration = coerce_timeline_duration(
+            Fraction(3, 2),
+            field_name="duration",
+        )
+        assert duration == Duration.from_beats(Fraction(3, 2))
+
+    def test_coerce_timeline_duration_preserves_seconds_mode(self):
+        duration = Duration.from_seconds("0.5")
+
+        coerced = coerce_timeline_duration(duration, field_name="duration")
+
+        assert coerced is duration
+        assert coerced.mode == "seconds"
+
+    def test_coerce_timeline_duration_rejects_bool(self):
+        with pytest.raises(TypeError, match="duration must be Duration"):
+            coerce_timeline_duration(True, field_name="duration")
+
+    def test_context_beat_unit_from_time_signature(self):
+        assert context_beat_unit((6, 8)) == 8
+
+    def test_context_beat_unit_defaults_when_missing(self):
+        assert context_beat_unit(None) == 4
+
+    def test_context_beat_unit_rejects_invalid_denominator(self):
+        with pytest.raises(ValueError, match="denominator must be > 0"):
+            context_beat_unit((4, 0))
 
 
 class TestTimeSignature:

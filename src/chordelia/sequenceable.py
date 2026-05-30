@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable, TypeAlias
 
 from chordelia.score import ScoreEvent, ScoreEventContext
-from chordelia.rhythm import Duration
+from chordelia.rhythm import Duration, TimelineLike, coerce_timeline_duration
 
 if TYPE_CHECKING:
     from chordelia.intervals import IntervalLike
     from chordelia.notes import Note
 
 
-DurationLike = Duration | int | float
+DurationLike: TypeAlias = TimelineLike
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,16 +63,7 @@ class NotesLike(Protocol):
 
 def _coerce_consumed_duration(value: DurationLike) -> Duration:
     """Coerce consumed span values into beat/time Duration values."""
-    if isinstance(value, Duration):
-        duration = value
-    else:
-        duration = Duration.from_beats(value, None)
-
-    if duration.mode == "note_fraction":
-        raise ValueError(
-            "consumed_duration must be beat-based or time-based Duration. "
-            "Use Duration.from_beats(...) or Duration.from_seconds(...)."
-        )
+    duration = coerce_timeline_duration(value, field_name="consumed_duration")
 
     if duration.mode == "seconds":
         non_positive = duration.as_seconds() <= 0

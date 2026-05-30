@@ -5,7 +5,7 @@ import pytest
 from chordelia.chords import Chord
 from chordelia.intervals import Interval
 from chordelia.notes import Note
-from chordelia.rhythm import Duration
+from chordelia.rhythm import Duration, NoteValue
 from chordelia.scale_context import reset_global_scale_context, with_global_scale_context
 from chordelia.sequences import Rest, Sequence, SequenceEntry
 from chordelia.score import Score, ScoreEvent, ScoreEventContext
@@ -102,6 +102,12 @@ class TestSequenceRenderBoundary:
         """Unsupported values should fail with actionable guidance."""
         with pytest.raises(TypeError, match="not Sequenceable"):
             _sequence_render_for(object(), ScoreEventContext())
+
+    def test_sequence_render_normalizes_note_value_consumed_duration(self):
+        """SequenceRender should normalize NoteValue consumed_duration inputs."""
+        render = SequenceRender(events=(), consumed_duration=NoteValue.QUARTER)
+
+        assert render.consumed_duration == Duration.from_beats(1)
 
 
 class TestScoreFromSequenceable:
@@ -297,6 +303,23 @@ class TestSequenceScheduling:
             Duration.from_beats(5),
             Duration.from_beats(6),
         ]
+
+    def test_sequence_entry_accepts_note_value_duration_and_offset(self):
+        seq = Sequence(
+            (
+                SequenceEntry(
+                    payload=Note("C4"),
+                    duration=NoteValue.EIGHTH,
+                    offset=NoteValue.QUARTER,
+                ),
+            )
+        )
+
+        render = seq.render_for_context(ScoreEventContext())
+
+        assert render.events[0].beat == Duration.from_beats(1)
+        assert render.events[0].duration == Duration.from_beats(1, 2)
+        assert render.consumed_duration == Duration.from_beats(3, 2)
 
     def test_sequence_rest_entries_emit_no_events(self):
         seq = Sequence(

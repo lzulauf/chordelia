@@ -1,7 +1,7 @@
 Duration model unification plan for chordelia.
 
 ## Status
-Drafting
+Implementing
 
 ## Goal
 Unify and simplify timing inputs so users can reason about durations with one consistent model across Sequence, Score, and playback workflows.
@@ -195,14 +195,14 @@ Expected docs delta classification: both README and docs updates.
 4. Update selected examples under [examples](examples) to use the clarified canonical model.
 
 ## Progress checklist
-- [ ] Audit matrix documented for all timing entry points and coercion boundaries
-- [ ] Shared timeline coercion helper implemented in rhythm module
-- [ ] Sequence module migrated to shared timing coercion
-- [ ] Score module migrated to shared timing coercion
-- [ ] SequenceRender coercion migrated to shared timing coercion
-- [ ] DurationLike aliases unified across modules
-- [ ] Focused timing tests added/updated and passing
-- [ ] Full test suite passing
+- [x] Audit matrix documented for all timing entry points and coercion boundaries
+- [x] Shared timeline coercion helper implemented in rhythm module
+- [x] Sequence module migrated to shared timing coercion
+- [x] Score module migrated to shared timing coercion
+- [x] SequenceRender coercion migrated to shared timing coercion
+- [x] DurationLike aliases unified across modules
+- [x] Focused timing tests added/updated and passing
+- [x] Full test suite passing
 - [ ] Docs and examples updated to canonical model
 
 ## Phases

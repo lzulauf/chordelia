@@ -286,7 +286,7 @@ Sequenceable-input alignment:
 2. Constructor ergonomics such as SheetMusic(sequenceable) are additive and should delegate into the canonical score/notation normalization pipeline.
 3. Avoid mandatory inheritance across musical domain classes; prefer structural capability plus adapters to reduce coupling and migration churn.
 
-Linked implementation plan: .plans/sheet_music_rendering_plan.md
+Linked implementation plan: .plans/archive/sheet_music_rendering_plan.md
 
 ## Confidence and risks
 Confidence: medium-high.
@@ -302,7 +302,7 @@ Risk controls:
 3. Add dependency-isolation tests across sheet/sheet-notebook and midi/midi-notebook combinations.
 
 ## Follow-up actions
-1. Keep .plans/sheet_music_rendering_plan.md synchronized with this option framing and locked dependency-group names.
+1. Keep .plans/archive/sheet_music_rendering_plan.md synchronized with this option framing and locked dependency-group names.
 2. Convert implementation phases into decision-backed execution milestones with explicit adapter contracts.
 3. Add comparison checkpoints for in-house vs bridge path quality, cost, and portability.
 4. Add docs/examples showing notebook and non-notebook flows with independent optional extras.

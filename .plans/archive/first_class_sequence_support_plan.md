@@ -92,7 +92,7 @@ Implement `Sequence` as the primary composition building block for ordering and 
    1. `Score`/event model boundary consumed by this plan.
 2. `.plans/archive/sequence_to_midi_export_plan.md`:
    1. `MidiFile` should consume `Score` produced from `Sequence`.
-3. `.plans/sheet_music_rendering_plan.md`:
+3. `.plans/archive/sheet_music_rendering_plan.md`:
    1. `SheetMusic` should consume `Score` produced from `Sequence`.
 4. `.plans/archive/common_musical_interfaces_plan.md`:
    1. Owns the `Sequenceable` contract details and adapter-registry decommission gates.
