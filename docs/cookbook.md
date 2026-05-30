@@ -126,6 +126,78 @@ with Playback(Tempo(score.metadata.tempo)) as player:
     player.play_sequence(playback_notes, blocking=True)
 ```
 
+## 10) Seeded random progression generation
+
+```python
+from chordelia import Random
+
+rng = Random(seed=202606)
+scale = rng.scale()
+progression = tuple(rng.chord(scale=scale) for _ in range(4))
+
+print(scale.name)
+print([chord.name for chord in progression])
+```
+
+## 11) Weighted scale type selection
+
+```python
+from chordelia import Random, ScaleType
+
+rng = Random(seed=99)
+weighted_scale = rng.scale(
+    root_weights={"C": 1, "D": 10},
+    scale_type_weights={ScaleType.MAJOR: 8, ScaleType.NATURAL_MINOR: 2},
+)
+
+print(weighted_scale.name)
+```
+
+Weights are relative scores, so `8:2` behaves the same as `80:20`.
+
+## 12) Use global scale context for random degrees, notes, and chords
+
+```python
+from chordelia import Random, with_global_scale_context
+
+rng = Random(seed=7)
+with with_global_scale_context("D minor"):
+    print(rng.degree())
+    print(rng.note())
+    print(rng.chord())
+```
+
+## 13) Compare scale-aware and chromatic random selectors
+
+```python
+from chordelia import Random, Scale, ScaleType
+
+rng = Random(seed=12)
+c_major = Scale("C", ScaleType.MAJOR)
+
+print(rng.note(scale=c_major))          # constrained to C major
+print(rng.chromatic_note())             # unconstrained chromatic choice
+print(rng.interval())                   # unconstrained interval choice
+print(rng.chromatic_chord().name)       # unconstrained root/quality choice
+```
+
+## 14) Choose between instance and global singleton workflows
+
+```python
+from chordelia import Random, configure_global_random, get_global_random, reset_global_random
+
+# Isolated reproducible stream
+instance_rng = Random(seed=111)
+print(instance_rng.chromatic_note())
+
+# Shared process-wide singleton stream
+configure_global_random(seed=111)
+print(Random.chromatic_note())
+print(get_global_random().chromatic_note())
+
+reset_global_random()
+```
+
 ## Related
 
 - [Quickstart](quickstart.md)

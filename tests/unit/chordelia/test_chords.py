@@ -18,7 +18,7 @@ from chordelia.chords import (
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.intervals import Interval, IntervalQuality
 from chordelia.rhythm import Duration
-from chordelia.scale_context import reset_global_scale_context, with_global_scale_context
+from chordelia.scale_context import with_global_scale_context
 from chordelia.score import ScoreEventContext
 from chordelia.scales import Scale, ScaleType
 
@@ -934,14 +934,9 @@ class TestChordTransposition:
         assert c_sharp_major.quality == ChordQuality.MAJOR
 
 
+@pytest.mark.usefixtures("reset_global_scale_context_state")
 class TestChordShift:
     """Test chord diatonic shifting behavior within explicit/global scale context."""
-
-    @pytest.fixture(autouse=True)
-    def _reset_global_scale_context(self):
-        reset_global_scale_context()
-        yield
-        reset_global_scale_context()
 
     def test_shift_moves_root_with_explicit_scale(self):
         c_major = Scale("C", ScaleType.MAJOR)

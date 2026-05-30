@@ -21,11 +21,7 @@ from chordelia.rhythm import Duration
 from chordelia.scales import Scale
 
 
-@pytest.fixture(autouse=True)
-def _clear_global_scale_context():
-    reset_chordelia_context()
-    yield
-    reset_chordelia_context()
+pytestmark = pytest.mark.usefixtures("reset_chordelia_context_state")
 
 
 class TestScaleContextCoercion:
@@ -72,6 +68,16 @@ class TestDefaultDurationContextCoercion:
 class TestChordeliaContext:
     """Unified runtime context getter/setter and nested sparse override behavior."""
 
+    def test_reset_chordelia_context_returns_previous_context(self):
+        set_chordelia_context(scale="C", default_note_duration=Fraction(1, 2))
+
+        previous = reset_chordelia_context()
+
+        assert str(previous.scale.root) == "C"
+        assert previous.default_note_duration.as_beats() == Fraction(1, 2)
+        assert get_chordelia_context().scale is None
+        assert get_chordelia_context().default_note_duration is None
+
     def test_set_chordelia_context_sparse_updates(self):
         set_chordelia_context(scale="C", default_note_duration=1)
 
@@ -101,6 +107,30 @@ class TestChordeliaContext:
                 active = get_chordelia_context()
                 assert active.scale is None
                 assert active.default_note_duration.as_beats() == 1
+
+    def test_set_chordelia_context_accepts_positional_base_context(self):
+        set_chordelia_context(scale="C", default_note_duration=1)
+        source_context = get_chordelia_context()
+
+        set_chordelia_context(scale="F", default_note_duration=2)
+        applied = set_chordelia_context(source_context)
+
+        assert str(applied.scale.root) == "C"
+        assert applied.default_note_duration.as_beats() == 1
+        assert str(get_chordelia_context().scale.root) == "C"
+
+    def test_set_chordelia_context_positional_context_supports_sparse_overrides(self):
+        set_chordelia_context(scale="C", default_note_duration=1)
+        source_context = get_chordelia_context()
+
+        applied = set_chordelia_context(source_context, scale="G")
+
+        assert str(applied.scale.root) == "G"
+        assert applied.default_note_duration.as_beats() == 1
+
+    def test_set_chordelia_context_rejects_invalid_positional_context(self):
+        with pytest.raises(TypeError, match="context must be ChordeliaContext or None"):
+            set_chordelia_context(object())
 
 
 class TestGlobalScaleContext:

@@ -36,6 +36,34 @@ Related deep docs:
 
 - [Rhythm and Timing](guides/rhythm-and-timing.md)
 
+## Randomization
+
+Main APIs:
+
+- `Random(seed=None, engine=None)`
+- `Random.choice(...)`, `Random.weighted_choice(...)`, `Random.weighted_choice_map(...)`
+- `Random.scale(...)`, `Random.degree(...)`, `Random.note(...)`, `Random.chord(...)`
+- `Random.chromatic_note(...)`, `Random.chromatic_chord(...)`, `Random.interval(...)`
+- `get_global_random()`, `configure_global_random(...)`, `reset_global_random()`
+
+Key behaviors:
+
+- Uniform selectors sample from non-empty candidate sets.
+- Weighted selectors use relative numeric values (integers are fine; totals do not need to sum to 1 or 100) and reject negative, non-finite, or all-zero inputs.
+- Scale-aware selectors (`degree`, `note`, `chord`) resolve scale in this order: explicit `scale=...`, then global context helpers.
+- Chromatic selectors ignore scale context by design.
+- `Random.engine` exposes the wrapped stdlib engine so direct engine calls share state with Random selectors.
+- Selector methods support both instance and class calls; class calls route through the lazy global singleton.
+
+Usage note:
+
+- Prefer `rng = Random(seed=...)` for isolated reproducible workflows.
+- Use `Random.scale(...)` and other class calls when a shared process-global random stream is desired.
+
+Related deep docs:
+
+- [Cookbook](cookbook.md)
+
 ## Sequence, Score, and Conversion
 
 Timeline and conversion types:

@@ -6,30 +6,17 @@ import chordelia.sheetmusic_backends.runtime as runtime
 from chordelia.notes import Note
 from chordelia.scale_context import (
     get_global_scale_context,
-    reset_global_scale_context,
     set_global_scale_context,
 )
 from chordelia.scales import Scale
 from chordelia.sheet_music import SheetMusic
 
 
-@pytest.fixture(autouse=True)
-def _restore_runtime_state():
-    """Keep runtime rendering state isolated across tests."""
-
-    previous_config = runtime.get_sheetmusic_rendering_config()
-    previous_adapters = dict(SheetMusic._RENDER_BACKEND_ADAPTERS)
-
-    runtime.uninstall_sequenceable_sheetmusic_display_hooks()
-    runtime.reset_sheetmusic_rendering_config()
-    reset_global_scale_context()
-    yield
-
-    runtime.uninstall_sequenceable_sheetmusic_display_hooks()
-    runtime._RENDERING_CONFIG.set(previous_config)  # type: ignore[attr-defined]
-    set_global_scale_context(previous_config.scale)
-    SheetMusic._RENDER_BACKEND_ADAPTERS.clear()
-    SheetMusic._RENDER_BACKEND_ADAPTERS.update(previous_adapters)
+pytestmark = pytest.mark.usefixtures(
+    "restore_sheetmusic_runtime_rendering_config_state",
+    "reset_global_scale_context_state",
+    "restore_sheetmusic_backend_adapters_state",
+)
 
 
 class TestSheetMusicRuntimeConfig:

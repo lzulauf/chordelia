@@ -62,6 +62,16 @@ print(Note("E4").transpose(1))  # F4 (one semitone)
 
 Use `shift(...)` for diatonic scale-step movement and `transpose(...)` for chromatic semitone movement.
 
+Seeded random workflow quick check:
+
+```python
+rng = Random(seed=202606)
+scale = rng.scale()
+progression = [rng.chord(scale=scale).name for _ in range(4)]
+```
+
+For weighted and global-singleton randomization recipes, see [Cookbook](docs/cookbook.md).
+
 The resulting `Score` is the canonical shared boundary for both rendering and MIDI export.
 
 ### 2) Render that same song as sheet music

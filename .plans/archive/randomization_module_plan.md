@@ -1,7 +1,16 @@
 Randomization module plan for chordelia.
 
 ## Status
-Drafting
+Done
+
+## Completion note
+Completed on 2026-05-30.
+1. Added `src/chordelia/randomization.py` with seeded wrapper behavior, weighted selectors, scale-aware selectors, chromatic selectors, and dual invocation support.
+2. Simplified final scale selector contract by removing mode-strategy arguments; modal output is selected directly via `ScaleType` weights.
+3. Exported `Random`, `get_global_random`, `configure_global_random`, and `reset_global_random` from package root.
+4. Added focused coverage in `tests/unit/chordelia/test_randomization.py` for determinism, validation, scale-context fallback, chromatic isolation, singleton lifecycle, and class/instance parity.
+5. Updated `docs/api-overview.md`, `docs/cookbook.md`, and `README.md` with usage guidance and examples.
+6. Validation passed: focused randomization tests, related scale/chord tests, full suite, and coverage run.
 
 ## Goal
 Add a deterministic, seedable randomization module that can generate musical objects (for example scales, degrees, notes, and chords) with optional weighted choices, optional global-scale-context fallback for scale-aware selectors, explicit chromatic selectors that ignore scale context, direct access to the wrapped stdlib engine, and a lazily initialized global Random instance that powers class-level API calls when no instance is constructed.
@@ -484,12 +493,12 @@ Expected docs delta classification: both README updates and docs updates.
     3. Verify terminology matches existing Scale, Degree, Chord, and Interval vocabulary.
 
 ## Progress checklist
-- [ ] Phase 0 complete: API contract and defaults agreed
-- [ ] Phase 1 complete: random engine wrapper and weighted helpers implemented
-- [ ] Phase 2 complete: scale-aware selectors (degree, note, chord) and chromatic selectors implemented
-- [ ] Phase 3 complete: tests added and passing
-- [ ] Phase 4 complete: docs and README updates merged
-- [ ] Acceptance criteria met and plan moved to .plans/archive/ with Status updated
+- [x] Phase 0 complete: API contract and defaults agreed
+- [x] Phase 1 complete: random engine wrapper and weighted helpers implemented
+- [x] Phase 2 complete: scale-aware selectors (degree, note, chord) and chromatic selectors implemented
+- [x] Phase 3 complete: tests added and passing
+- [x] Phase 4 complete: docs and README updates merged
+- [x] Acceptance criteria met and plan moved to .plans/archive/ with Status updated
 
 ## Phases
 ### Phase 0: Contract lock

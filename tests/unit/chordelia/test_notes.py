@@ -13,7 +13,7 @@ from chordelia.notes import (
 )
 from chordelia.intervals import Interval, IntervalQuality
 from chordelia.rhythm import Duration
-from chordelia.scale_context import reset_global_scale_context, with_global_scale_context
+from chordelia.scale_context import with_global_scale_context
 from chordelia.scales import Scale, ScaleType
 from chordelia.score import ScoreEventContext
 
@@ -461,14 +461,9 @@ class TestNoteTransposition:
         assert str(c4.transpose(1)) == "C#4"
 
 
+@pytest.mark.usefixtures("reset_global_scale_context_state")
 class TestNoteShift:
     """Test note diatonic shifting behavior within explicit scale context."""
-
-    @pytest.fixture(autouse=True)
-    def _reset_global_scale_context(self):
-        reset_global_scale_context()
-        yield
-        reset_global_scale_context()
 
     def test_shift_in_scale_without_octave(self):
         c_major = Scale("C", ScaleType.MAJOR)

@@ -69,12 +69,27 @@ def get_chordelia_context() -> ChordeliaContext:
 
 
 def set_chordelia_context(
+    context: ChordeliaContext | None = None,
     *,
     scale: Scale | str | None | object = _UNSET,
     default_note_duration: Duration | int | float | Fraction | None | object = _UNSET,
 ) -> ChordeliaContext:
-    """Set runtime context values with sparse overrides and return applied context."""
-    current = get_chordelia_context()
+    """Set runtime context values and return the applied context.
+
+    Args:
+        context: Optional base context. When omitted, updates apply to the active context.
+        scale: Optional sparse override for the scale field.
+        default_note_duration: Optional sparse override for default note duration.
+    """
+    if context is None:
+        base_context = get_chordelia_context()
+    elif isinstance(context, ChordeliaContext):
+        base_context = context
+    else:
+        raise TypeError(
+            "context must be ChordeliaContext or None; "
+            f"got {type(context).__name__}"
+        )
 
     updates: dict[str, Any] = {}
     if scale is not _UNSET:
@@ -82,14 +97,16 @@ def set_chordelia_context(
     if default_note_duration is not _UNSET:
         updates["default_note_duration"] = coerce_default_note_duration_value(default_note_duration)
 
-    next_context = replace(current, **updates) if updates else current
+    next_context = replace(base_context, **updates) if updates else base_context
     _CHORDELIA_CONTEXT.set(next_context)
     return next_context
 
 
-def reset_chordelia_context() -> None:
-    """Reset all runtime context defaults to their baseline values."""
+def reset_chordelia_context() -> ChordeliaContext:
+    """Reset all runtime context defaults and return the previous context."""
+    previous = get_chordelia_context()
     _CHORDELIA_CONTEXT.set(_DEFAULT_CONTEXT)
+    return previous
 
 
 @contextmanager

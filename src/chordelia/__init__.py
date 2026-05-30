@@ -37,6 +37,12 @@ from chordelia.rhythm import (
     Duration, TimeSignature, Tempo, Beat,
     dotted, triplet, COMMON_TIME, WALTZ_TIME, COMPOUND_DUPLE
 )
+from chordelia.randomization import (
+    Random,
+    configure_global_random,
+    get_global_random,
+    reset_global_random,
+)
 
 # Audio playback module - optional import (requires sounddevice and numpy)
 try:
@@ -101,6 +107,10 @@ __all__ = [
     "COMMON_TIME",
     "WALTZ_TIME", 
     "COMPOUND_DUPLE",
+    "Random",
+    "get_global_random",
+    "configure_global_random",
+    "reset_global_random",
 ]
 
 # Add audio playback exports if available
