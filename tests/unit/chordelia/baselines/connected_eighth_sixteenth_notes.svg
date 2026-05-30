@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="220" viewBox="0 0 640 220">
+<rect x="0" y="0" width="640" height="220" fill="#fffdf8"/>
+<text x="68.00" y="24.00" font-family="Georgia, serif" font-size="14" fill="#1a1a1a">CHORDELIA SHEET</text>
+<text x="68.00" y="42.00" font-family="Georgia, serif" font-size="12" fill="#444">tempo 120 | meter 4/4</text>
+<text x="38.00" y="132.00" font-family="Bravura, Noto Music, serif" font-size="44" fill="#111">&#119070;</text>
+<line class="staff-line" x1="68.00" y1="80.00" x2="610.00" y2="80.00" stroke="#222" stroke-width="1"/>
+<line class="staff-line" x1="68.00" y1="92.00" x2="610.00" y2="92.00" stroke="#222" stroke-width="1"/>
+<line class="staff-line" x1="68.00" y1="104.00" x2="610.00" y2="104.00" stroke="#222" stroke-width="1"/>
+<line class="staff-line" x1="68.00" y1="116.00" x2="610.00" y2="116.00" stroke="#222" stroke-width="1"/>
+<line class="staff-line" x1="68.00" y1="128.00" x2="610.00" y2="128.00" stroke="#222" stroke-width="1"/>
+<line class="staff-barline" x1="68.00" y1="80.00" x2="68.00" y2="128.00" stroke="#222" stroke-width="1.2"/>
+<line class="staff-barline" x1="610.00" y1="80.00" x2="610.00" y2="128.00" stroke="#222" stroke-width="1.2"/>
+<line class="ledger-line" x1="60.00" y1="152.00" x2="76.00" y2="152.00" stroke="#111" stroke-width="1"/>
+<line class="ledger-line" x1="60.00" y1="140.00" x2="76.00" y2="140.00" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="68.00" cy="152.00" rx="5" ry="3.6" fill="#111"/>
+<line class="note-stem" x1="72.80" y1="152.00" x2="72.80" y2="124.00" stroke="#111" stroke-width="1"/>
+<line class="ledger-line" x1="150.33" y1="140.00" x2="166.33" y2="140.00" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="158.33" cy="146.00" rx="5" ry="3.6" fill="#111"/>
+<line class="note-stem" x1="163.13" y1="146.00" x2="163.13" y2="118.00" stroke="#111" stroke-width="1"/>
+<line class="ledger-line" x1="240.67" y1="140.00" x2="256.67" y2="140.00" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="248.67" cy="140.00" rx="5" ry="3.6" fill="#111"/>
+<line class="note-stem" x1="253.47" y1="140.00" x2="253.47" y2="112.00" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="339.00" cy="134.00" rx="5" ry="3.6" fill="#111"/>
+<line class="note-stem" x1="343.80" y1="134.00" x2="343.80" y2="106.00" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="429.33" cy="128.00" rx="5" ry="3.6" fill="#111"/>
+<line class="note-stem" x1="434.13" y1="128.00" x2="434.13" y2="100.00" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="474.50" cy="122.00" rx="5" ry="3.6" fill="#111"/>
+<line class="note-stem" x1="479.30" y1="122.00" x2="479.30" y2="94.00" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="519.67" cy="116.00" rx="5" ry="3.6" fill="#111"/>
+<line class="note-stem" x1="524.47" y1="116.00" x2="524.47" y2="88.00" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="564.83" cy="110.00" rx="5" ry="3.6" fill="#111"/>
+<line class="note-stem" x1="569.63" y1="110.00" x2="569.63" y2="82.00" stroke="#111" stroke-width="1"/>
+<polygon class="note-beam" points="72.80,124.00 569.63,82.00 569.63,84.80 72.80,126.80" fill="#111"/>
+<polygon class="note-beam" points="434.13,95.00 569.63,77.00 569.63,79.80 434.13,97.80" fill="#111"/>
+</svg>

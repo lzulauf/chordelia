@@ -37,15 +37,15 @@ The sheet-music plan needs a concrete backend strategy. Without a clear decision
 Goals:
 1. Ship a usable v1 sheet output path within scoped notation coverage.
 2. Preserve deterministic, testable rendering behavior for regression checks.
-3. Keep core usage independent from notebook and cross-domain optional dependencies.
+3. Keep core usage lightweight and portable with minimal setup burden, preferring a pure Python path that avoids manual installation of external software.
 4. Maintain an architecture that can extend toward interoperability without lock-in.
 
 Decision criteria:
-1. v1 delivery speed (20%)
-2. Output quality ceiling (20%)
-3. Dependency footprint/portability (20%)
-4. Deterministic testability (20%)
-5. Long-term maintainability (20%)
+1. Portability and setup simplicity (prefer pure Python, avoid manual system installs) (25%)
+2. Deterministic testability (20%)
+3. Long-term maintainability (20%)
+4. Output quality ceiling (20%)
+5. v1 delivery speed (15%)
 
 ## Constraints and assumptions
 1. Chordelia is Python-first and should avoid mandatory heavyweight runtime dependencies for core flows.
@@ -96,7 +96,7 @@ Goal alignment:
 Criteria impact:
 1. v1 delivery speed: high (mature external engines accelerate early output).
 2. Output quality ceiling: high (external engravers usually provide broad quality potential).
-3. Dependency footprint/portability: low (binary/runtime variance across environments).
+3. Portability and setup simplicity: low (binary/runtime variance and manual install burden across environments).
 4. Deterministic testability: low (cross-environment output drift risk).
 5. Long-term maintainability: medium (less internal engraving code, more integration maintenance).
 
@@ -144,7 +144,7 @@ Goal alignment:
 Criteria impact:
 1. v1 delivery speed: medium (focused implementation effort still required).
 2. Output quality ceiling: medium (good for scoped v1, limited for advanced engraving).
-3. Dependency footprint/portability: high (core path remains lightweight and portable).
+3. Portability and setup simplicity: high (core path remains lightweight, portable, and pure Python friendly).
 4. Deterministic testability: high (owned renderer enables stable snapshots).
 5. Long-term maintainability: medium (single-path ownership but ongoing feature expansion cost).
 
@@ -187,7 +187,7 @@ Goal alignment:
 Criteria impact:
 1. v1 delivery speed: high (ship scoped internal path while deferring optional bridge depth).
 2. Output quality ceiling: high (core output now, bridge supports advanced workflows later).
-3. Dependency footprint/portability: high (core lightweight, bridge remains optional).
+3. Portability and setup simplicity: high (core lightweight and pure Python friendly; bridge remains optional).
 4. Deterministic testability: high (primary deterministic renderer stays under project control).
 5. Long-term maintainability: high (adapter boundaries isolate complexity and support phased growth).
 
@@ -214,7 +214,7 @@ Goal alignment:
 Criteria impact:
 1. v1 delivery speed: high (export-only scope is narrower than rendering).
 2. Output quality ceiling: low (quality depends entirely on external renderers).
-3. Dependency footprint/portability: high (core avoids renderer dependencies).
+3. Portability and setup simplicity: high (core avoids renderer dependencies and manual install requirements).
 4. Deterministic testability: medium (export can be deterministic; rendered output is not controlled).
 5. Long-term maintainability: medium (simpler core, but unresolved rendering gap persists).
 
@@ -237,28 +237,28 @@ Goal alignment:
 Criteria impact:
 1. v1 delivery speed: low (no delivery).
 2. Output quality ceiling: low (no rendering capability).
-3. Dependency footprint/portability: high (no new dependencies introduced).
+3. Portability and setup simplicity: high (no new dependencies or manual install steps introduced).
 4. Deterministic testability: high (no rendering variability because no renderer exists).
 5. Long-term maintainability: low (capability debt and roadmap blockage increase over time).
 
 ## Tradeoff analysis
 
 Criteria and weights from Goals and decision criteria:
-1. v1 delivery speed (20%)
-2. Output quality ceiling (20%)
-3. Dependency footprint/portability (20%)
-4. Deterministic testability (20%)
-5. Long-term maintainability (20%)
+1. Portability and setup simplicity (prefer pure Python, avoid manual system installs) (25%)
+2. Deterministic testability (20%)
+3. Long-term maintainability (20%)
+4. Output quality ceiling (20%)
+5. v1 delivery speed (15%)
 
 Weighted comparison (1 low, 5 high):
 
-| Option | Speed | Quality Ceiling | Low Dependency Risk | Determinism | Maintainability | Weighted Result |
+| Option | Portability/Setup | Determinism | Maintainability | Quality Ceiling | Speed | Weighted Result |
 |---|---:|---:|---:|---:|---:|---:|
-| Option 1: third-party-first | 4 | 5 | 2 | 2 | 3 | 3.20 |
-| Option 2: in-house SVG-first | 3 | 3 | 5 | 5 | 3 | 3.80 |
+| Option 1: third-party-first | 2 | 2 | 3 | 5 | 4 | 3.10 |
+| Option 2: in-house SVG-first | 5 | 5 | 3 | 3 | 3 | 3.90 |
 | Option 3: hybrid | 4 | 4 | 4 | 4 | 4 | 4.00 |
-| Option 4: export-only | 4 | 2 | 4 | 3 | 3 | 3.20 |
-| Option 5: do nothing | 1 | 1 | 5 | 5 | 1 | 2.60 |
+| Option 4: export-only | 4 | 3 | 3 | 2 | 4 | 3.20 |
+| Option 5: do nothing | 5 | 5 | 1 | 1 | 1 | 2.80 |
 
 Dependency implications by option:
 1. Option 1 increases probability of mandatory operational complexity.

@@ -1,7 +1,7 @@
 Sheet-music rendering plan for chordelia.
 
 ## Status
-Drafting
+Implementing
 
 ## Goal
 Make `SheetMusic` the canonical sheet-rendering wrapper around `Score` (and therefore `Sequenceable` inputs), supporting file output (SVG/image) and notebook rendering, without file parsing/read support in v1.
@@ -80,8 +80,8 @@ Expected docs delta classification: both README/docs updates and API updates.
 3. Add notebook examples for inline sheet rendering.
 
 ## Progress checklist
-- [ ] Phase 0: Canonical SheetMusic API finalized
-- [ ] Phase 1: Score-backed write path implemented
+- [x] Phase 0: Canonical SheetMusic API finalized
+- [x] Phase 1: Score-backed write path implemented
 - [ ] Phase 2: Backend adapter integration completed
 - [ ] Phase 3: Notebook hooks implemented
 - [ ] Phase 4: Tests and visual regression completed
@@ -92,10 +92,12 @@ Expected docs delta classification: both README/docs updates and API updates.
 ### Phase 0: API lock
 1. Lock class and method signatures.
 2. Lock no-parse/read boundary for v1.
+3. Current state: complete in `SheetMusic` implementation and tests.
 
 ### Phase 1: Score-backed writing
 1. Implement constructor normalization.
 2. Implement `to_file` and `score_to_file`.
+3. Current state: complete with pure-Python SVG file output path.
 
 ### Phase 2: Backend adapters
 1. Connect canonical output to selected rendering backend(s).
