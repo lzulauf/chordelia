@@ -14,6 +14,8 @@ from chordelia.degrees import Degree, DegreeLike
 
 if TYPE_CHECKING:
     from chordelia.chords import Chord, ChordQuality
+    from chordelia.score import ScoreEventContext
+    from chordelia.sequenceable import SequenceRender
 
 
 class ScaleType(Enum):
@@ -197,8 +199,9 @@ class Scale:
                 if target_midi >= 128:  # Handle MIDI overflow
                     target_midi = 127
                 
-                # Derive octave directly from MIDI number for correct octave crossing
-                target_octave = (target_midi // 12) - 1  # MIDI octave formula
+                # Keep octave progression aligned to diatonic letter sequence so
+                # spellings like B# in C# major remain in the expected octave.
+                target_octave = self.root.octave + ((root_index + i) // 7)
                 target_pitch_class = target_midi % 12
             else:
                 # For notes without octave, work with pitch classes
@@ -263,22 +266,32 @@ class Scale:
         """
         Determine whether to prefer sharps or flats based on the root note.
         """
+        key_preference_root = self._key_signature_preference_root()
+
         # If root has sharps, prefer sharps; if root has flats, prefer flats
-        if self.root.accidental == Accidental.SHARP or self.root.accidental == Accidental.DOUBLE_SHARP:
+        if key_preference_root.accidental == Accidental.SHARP or key_preference_root.accidental == Accidental.DOUBLE_SHARP:
             return True
-        elif self.root.accidental == Accidental.FLAT or self.root.accidental == Accidental.DOUBLE_FLAT:
+        elif key_preference_root.accidental == Accidental.FLAT or key_preference_root.accidental == Accidental.DOUBLE_FLAT:
             return False
         
         # For natural roots, use key signature logic
         sharp_keys = [NoteName.G, NoteName.D, NoteName.A, NoteName.E, NoteName.B]
         flat_keys = [NoteName.F]
         
-        if self.root.name in sharp_keys:
+        if key_preference_root.name in sharp_keys:
             return True
-        elif self.root.name in flat_keys:
+        elif key_preference_root.name in flat_keys:
             return False
         else:
             return True  # Default to sharps
+
+    def _key_signature_preference_root(self) -> Note:
+        """Return key-center root used for enharmonic preference decisions."""
+        if self.scale_type in {ScaleType.PENTATONIC_MINOR, ScaleType.BLUES}:
+            # Minor pentatonic/blues spellings should track the relative major key family.
+            relative_major_root = Scale(self.root, ScaleType.NATURAL_MINOR).notes[2]
+            return relative_major_root.with_octave(None)
+        return self.root
     
     def _coerce_scale_degree(
         self,
@@ -435,6 +448,62 @@ class Scale:
         """
         new_root = self.root.transpose(interval)
         return Scale(new_root, self.scale_type)
+
+    def render_for_context(self, context: 'ScoreEventContext') -> 'SequenceRender':
+        """Render this scale as a quarter-note sequence over its scale tones."""
+        from chordelia.sequences import Sequence
+
+        notes = self.notes
+        if any(note.octave is None for note in notes):
+            notes = self.with_octave(4).notes
+
+        if notes and notes[0].octave is not None:
+            tonic = notes[0]
+            notes = tuple(notes) + (tonic.with_octave(tonic.octave + 1),)
+
+        return Sequence(notes).render_for_context(context)
+
+    def sheet_music_global_scale(self) -> 'Scale':
+        """Signal SheetMusic to use this scale as the global rendering scale."""
+        return self
+
+    def key_signature_notes(self) -> list[Note]:
+        """Return key-signature accidentals for this scale's tonal family."""
+        if self.scale_type in {
+            ScaleType.CHROMATIC,
+            ScaleType.WHOLE_TONE,
+            ScaleType.DIMINISHED,
+        }:
+            return []
+
+        reference_scale = self
+        if self.scale_type == ScaleType.PENTATONIC_MAJOR:
+            reference_scale = Scale(self.root, ScaleType.MAJOR)
+        elif self.scale_type in {
+            ScaleType.PENTATONIC_MINOR,
+            ScaleType.BLUES,
+            ScaleType.HARMONIC_MINOR,
+            ScaleType.MELODIC_MINOR,
+        }:
+            # These families conventionally use the natural minor key signature.
+            reference_scale = Scale(self.root, ScaleType.NATURAL_MINOR)
+
+        signature_notes: list[Note] = []
+        seen: set[tuple[NoteName, int]] = set()
+
+        for note in reference_scale.notes:
+            accidental = int(note.accidental.value)
+            if accidental == 0:
+                continue
+
+            key = (note.name, accidental)
+            if key in seen:
+                continue
+
+            seen.add(key)
+            signature_notes.append(note.with_octave(None))
+
+        return signature_notes
     
     def contains_note(self, note: Note) -> bool:
         """
@@ -583,6 +652,11 @@ class CustomScale(Scale):
         
         # Set custom scale specific attributes
         self._custom_pattern = tuple(pattern)  # Store as immutable tuple
+
+    def with_octave(self, octave: int):
+        """Return a custom scale copy with root and notes anchored to one octave."""
+        new_root = self.root.with_octave(octave)
+        return CustomScale(new_root, self._custom_pattern)
 
     @property
     def pattern(self) -> Tuple[int, ...]:

@@ -101,10 +101,28 @@ configure_sheetmusic_rendering(
 )
 ```
 
-Enable notebook hooks for direct Note/Chord/Sequence rendering:
+Enable notebook hooks for direct Note/Chord/Sequence/Scale rendering:
 
 ```python
 configure_sheetmusic_rendering(enable_notebook_hooks=True, scale="C")
+```
+
+Render a scale directly in a notebook cell as a quarter-note progression:
+
+```python
+from chordelia import Scale, ScaleType
+
+c_major = Scale("C", ScaleType.MAJOR)
+c_major  # notebook display renders like Sequence(c_major.notes)
+```
+
+Render a whole list of renderable objects in one output:
+
+```python
+from chordelia import Random, SheetMusic
+
+sheet = SheetMusic([Random.scale() for _ in range(10)])
+sheet
 ```
 
 ## 8) Check optional feature availability at runtime

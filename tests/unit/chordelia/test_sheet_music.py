@@ -55,14 +55,53 @@ class TestSheetMusicConstruction:
         assert sheet.score.metadata.time_signature == (6, 8)
         assert sheet.score.metadata.key_signature == "G"
 
+    def test_constructor_accepts_iterable_of_renderables(self):
+        sheet = SheetMusic([Note("C4"), Note("E4"), Note("G4")])
+
+        assert isinstance(sheet.score, Score)
+        assert [event.pitches for event in sheet.score.events] == [(60,), (64,), (67,)]
+        assert [float(event.beat.as_beats()) for event in sheet.score.events] == [0.0, 4.0, 8.0]
+
+    def test_constructor_accepts_iterable_of_sheetmusic_instances(self):
+        values = [
+            SheetMusic(Note("C4"), tempo=96, time_signature=(3, 4)),
+            SheetMusic(Note("D4"), tempo=96, time_signature=(3, 4)),
+        ]
+
+        sheet = SheetMusic(values, tempo=96, time_signature=(3, 4))
+
+        assert isinstance(sheet.score, Score)
+        assert [event.pitches for event in sheet.score.events] == [(60,), (62,)]
+        assert [float(event.beat.as_beats()) for event in sheet.score.events] == [0.0, 3.0]
+
+    def test_constructor_accepts_iterable_of_scales(self):
+        sheet = SheetMusic([Scale("D", "major"), Scale("Bb", "major")])
+
+        mimebundle = sheet._repr_mimebundle_()
+        assert "image/svg+xml" in mimebundle
+        assert mimebundle["image/svg+xml"].count("<svg") == 1
+        assert mimebundle["image/svg+xml"].count('class="key-accidental"') == 4
+        assert mimebundle["image/svg+xml"].count('class="scale-label"') == 2
+        assert "D Major" in mimebundle["image/svg+xml"]
+        assert "Bb Major" in mimebundle["image/svg+xml"]
+
+    def test_constructor_rejects_non_renderable_iterable_values(self):
+        with pytest.raises(TypeError, match="not Sequenceable"):
+            SheetMusic(["C4", "D4"])
+
     def test_constructor_rejects_non_sequenceable_values(self):
         with pytest.raises(TypeError, match="not Sequenceable"):
             SheetMusic({"bad": "payload"})
 
+    def test_constructor_accepts_direct_scale_source(self):
+        sheet = SheetMusic(Scale("C", "major"))
+
+        assert isinstance(sheet.score, Score)
+        assert len(sheet.score.events) == 8
+
     @pytest.mark.parametrize(
         "source",
         (
-            Scale("C", "major"),
             Degree(1),
         ),
     )
@@ -87,6 +126,16 @@ class TestSheetMusicFileOutput:
         assert content.startswith("<?xml")
         assert "<svg" in content
         assert "CHORDELIA SHEET" in content
+
+    def test_svg_renders_tempo_only_for_score_sources(self, tmp_path: Path):
+        score_sheet = SheetMusic(Score.from_sequenceable(Note("C4"), tempo=104))
+        note_sheet = SheetMusic(Note("C4"), tempo=104)
+
+        score_content = score_sheet.to_file(tmp_path / "score_source.svg").read_text(encoding="utf-8")
+        note_content = note_sheet.to_file(tmp_path / "note_source.svg").read_text(encoding="utf-8")
+
+        assert "tempo 104" in score_content
+        assert "tempo 104" not in note_content
 
     def test_to_file_supports_seconds_mode_timeline(self, tmp_path: Path):
         score = Score(
@@ -139,6 +188,30 @@ class TestSheetMusicFileOutput:
         content = output_path.read_text(encoding="utf-8")
         assert content.count('class="key-accidental"') == 2
         assert "&#9839;" in content
+
+    def test_to_file_renders_key_signature_from_pentatonic_minor_scale(self, tmp_path: Path):
+        sequence = Sequence((
+            (Note("G4"), 1),
+            (Note("Bb4"), 1),
+            (Note("D5"), 1),
+        ))
+
+        output_path = SheetMusic(
+            sequence,
+            scale=Scale("G", "pentatonic_minor"),
+        ).to_file(tmp_path / "with_pentatonic_minor_key_signature.svg")
+
+        content = output_path.read_text(encoding="utf-8")
+        assert content.count('class="key-accidental"') == 2
+        assert "&#9837;" in content
+
+    def test_scale_source_uses_its_own_global_scale_before_explicit_override(self):
+        mimebundle = SheetMusic(
+            Scale("G", "pentatonic_minor"),
+            scale=Scale("C", "major"),
+        )._repr_mimebundle_()
+
+        assert mimebundle["image/svg+xml"].count('class="key-accidental"') == 2
 
     def test_to_file_renders_key_signature_from_scale_string(self, tmp_path: Path):
         sequence = Sequence((
@@ -297,6 +370,38 @@ class TestSheetMusicFileOutput:
         )
         rendered = renderer(sheet)
         assert "lilypond-uncropped" in rendered
+
+    def test_lilypond_source_for_iterable_scales_includes_measure_keys_and_labels(self):
+        sheet = SheetMusic([Scale("D", "major"), Scale("Bb", "major")])
+
+        source = lilypond_backend._sheet_to_lilypond_source(sheet)
+
+        assert "\\set Staff.printKeyCancellation = ##f" in source
+        assert "\\omit Staff.KeyCancellation" in source
+        assert "\\set Staff.keyAlterations = #`((3 . ,SHARP) (0 . ,SHARP))" in source
+        assert "\\set Staff.keyAlterations = #`((6 . ,FLAT) (2 . ,FLAT))" in source
+        assert source.count("\\mark \\markup") >= 2
+        assert "D Major" in source
+        assert "Bb Major" in source
+
+    def test_lilypond_source_for_pentatonic_minor_scale_uses_custom_key_alterations(self):
+        sheet = SheetMusic([Scale("G", "pentatonic_minor")])
+
+        source = lilypond_backend._sheet_to_lilypond_source(sheet)
+
+        assert "\\set Staff.keyAlterations = #`((6 . ,FLAT) (2 . ,FLAT))" in source
+        assert "G Minor Pentatonic" in source
+
+    def test_lilypond_source_omits_tempo_for_non_score_wrappers(self):
+        source = lilypond_backend._sheet_to_lilypond_source(SheetMusic(Note("C4"), tempo=101))
+
+        assert "\\tempo 4 =" not in source
+
+    def test_lilypond_source_keeps_tempo_for_score_sources(self):
+        score = Score.from_sequenceable(Note("C4"), tempo=101)
+        source = lilypond_backend._sheet_to_lilypond_source(SheetMusic(score))
+
+        assert "\\tempo 4 = 101" in source
 
     def test_score_to_file_requires_score_instance(self, tmp_path: Path):
         with pytest.raises(TypeError, match="Score instance"):

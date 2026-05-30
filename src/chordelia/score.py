@@ -311,6 +311,10 @@ class Score:
     def __iter__(self):
         return iter(self.events)
 
+    def sheet_music_should_render_tempo_metadata(self) -> bool:
+        """Signal SheetMusic to render tempo metadata for score-backed sources."""
+        return True
+
     @property
     def duration(self) -> Duration:
         """Return the normalized score span from beat/second zero to timeline end."""

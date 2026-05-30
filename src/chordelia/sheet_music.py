@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable as IterableABC
 from fractions import Fraction
 from pathlib import Path
 import re
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
-from chordelia.score import Score
+from chordelia.rhythm import Duration
+from chordelia.score import Score, ScoreEvent, ScoreMetadata
 from chordelia.scales import Scale
+from chordelia.sequenceable import Sequenceable
 
 
 class SheetMusic:
@@ -65,8 +68,19 @@ class SheetMusic:
         ppq: int = 480,
         scale: Scale | str | None = None,
     ):
+        self._measure_scale_annotations: tuple[tuple[Fraction, Scale, str], ...] = ()
+        self._render_tempo_metadata = self._is_song_or_score_source(source)
+
         if isinstance(source, Score):
             self.score = source
+        elif self._is_renderable_iterable_source(source):
+            self.score, self._measure_scale_annotations = self._score_from_renderable_iterable(
+                source,
+                tempo=tempo,
+                time_signature=time_signature,
+                key_signature=key_signature,
+                ppq=ppq,
+            )
         else:
             self.score = Score.from_sequenceable(
                 source,
@@ -77,10 +91,184 @@ class SheetMusic:
             )
 
         self._staff_scale = self._resolve_staff_scale(
+            source=source,
             scale=scale,
             metadata_key=self.score.metadata.key_signature,
         )
         self._staff_key_accidental_map = self._key_accidental_map_from_scale(self._staff_scale)
+
+    @staticmethod
+    def _is_song_or_score_source(source: Any) -> bool:
+        """Return True when source opts in to tempo metadata rendering."""
+        render_tempo = getattr(source, "sheet_music_should_render_tempo_metadata", None)
+        if callable(render_tempo):
+            return bool(render_tempo())
+        return False
+
+    @staticmethod
+    def _is_renderable_iterable_source(source: Any) -> bool:
+        """Return True when source should be treated as a gallery-style iterable."""
+        if isinstance(source, (str, bytes, bytearray)):
+            return False
+        if isinstance(source, Sequenceable):
+            return False
+        return isinstance(source, IterableABC)
+
+    @classmethod
+    def _score_from_renderable_iterable(
+        cls,
+        source: Iterable[Any],
+        *,
+        tempo: int,
+        time_signature: tuple[int, int],
+        key_signature: str | None,
+        ppq: int,
+    ) -> tuple[Score, tuple[tuple[Fraction, Scale, str], ...]]:
+        """Normalize iterable renderables into one combined score timeline."""
+        values = tuple(source)
+        combined_events: list[ScoreEvent] = []
+        scale_annotations: list[tuple[Fraction, Scale, str]] = []
+        cursor: Duration | None = None
+        measure_duration = Duration.from_beats(time_signature[0], None)
+
+        for value in values:
+            item_score = cls._coerce_gallery_value_to_score(
+                value,
+                tempo=tempo,
+                time_signature=time_signature,
+                key_signature=key_signature,
+                ppq=ppq,
+            )
+            item_mode = cls._score_timing_mode(item_score)
+
+            if cursor is None:
+                cursor = (
+                    Duration.from_seconds(0)
+                    if item_mode == "seconds"
+                    else Duration.from_beats(0, None)
+                )
+            elif cursor.mode != item_mode:
+                raise ValueError(
+                    "All renderable values in a SheetMusic iterable must share the same timing mode"
+                )
+
+            item_start = cursor
+            scale_annotation = cls._coerce_scale_annotation(value)
+            if item_start.mode == "beats" and scale_annotation is not None:
+                scale_annotations.append(
+                    (item_start.as_beats(), scale_annotation, scale_annotation.name)
+                )
+
+            for event in item_score.events:
+                combined_events.append(
+                    ScoreEvent(
+                        beat=event.beat + cursor,
+                        duration=event.duration,
+                        pitches=event.pitches,
+                        velocity=event.velocity,
+                        channel=event.channel,
+                        voice=event.voice,
+                        spelling=event.spelling,
+                        gate_width=event.gate_width,
+                        gate_offset=event.gate_offset,
+                    )
+                )
+
+            cursor = cls._next_gallery_cursor(
+                cursor,
+                consumed=item_score.duration,
+                measure_duration=measure_duration,
+            )
+
+        metadata = ScoreMetadata(
+            tempo=tempo,
+            time_signature=time_signature,
+            key_signature=key_signature,
+            ppq=ppq,
+        )
+        return (
+            Score(source=values, metadata=metadata, events=tuple(combined_events)),
+            tuple(scale_annotations),
+        )
+
+    @staticmethod
+    def _coerce_scale_annotation(value: Any) -> Scale | None:
+        """Extract a concrete Scale when one value semantically represents a scale."""
+        if isinstance(value, Scale):
+            return value
+
+        if isinstance(value, SheetMusic) and isinstance(value.score.source, Scale):
+            return value.score.source
+
+        return None
+
+    @staticmethod
+    def _coerce_gallery_value_to_score(
+        value: Any,
+        *,
+        tempo: int,
+        time_signature: tuple[int, int],
+        key_signature: str | None,
+        ppq: int,
+    ) -> Score:
+        """Coerce one gallery value into a Score instance."""
+        if isinstance(value, SheetMusic):
+            return value.score
+
+        return Score.from_sequenceable(
+            value,
+            tempo=tempo,
+            time_signature=time_signature,
+            key_signature=key_signature,
+            ppq=ppq,
+        )
+
+    @staticmethod
+    def _score_timing_mode(score: Score) -> str:
+        """Return timing mode for a score, defaulting empty scores to beat mode."""
+        if not score.events:
+            return "beats"
+        return score.events[0].beat.mode
+
+    @classmethod
+    def _next_gallery_cursor(
+        cls,
+        cursor: Duration,
+        *,
+        consumed: Duration,
+        measure_duration: Duration,
+    ) -> Duration:
+        """Advance to the next item start, aligning beat-mode timelines to measures."""
+        if consumed.mode != cursor.mode:
+            raise ValueError(
+                "All renderable values in a SheetMusic iterable must share the same timing mode"
+            )
+
+        next_cursor = cursor + consumed
+        if next_cursor.mode != "beats":
+            return next_cursor
+
+        return cls._align_to_measure_boundary(next_cursor, measure_duration)
+
+    @staticmethod
+    def _align_to_measure_boundary(position: Duration, measure_duration: Duration) -> Duration:
+        """Round beat-mode positions up to the next measure boundary."""
+        if position.mode != "beats" or measure_duration.mode != "beats":
+            return position
+
+        measure_beats = measure_duration.as_beats()
+        if measure_beats <= 0:
+            return position
+
+        beats = position.as_beats()
+        if beats <= 0:
+            return position
+
+        measure_index = beats / measure_beats
+        whole_measures = (
+            measure_index.numerator + measure_index.denominator - 1
+        ) // measure_index.denominator
+        return Duration.from_beats(whole_measures * measure_beats, None)
 
     @classmethod
     def score_to_file(
@@ -162,19 +350,91 @@ class SheetMusic:
         staff_top = 80.0
         staff_spacing = 12.0
         staff_bottom = staff_top + (4 * staff_spacing)
-        key_sig_accidentals = self._key_signature_accidentals_for_render()
-        key_sig_width = len(key_sig_accidentals) * 10.0
-        content_start_x = left_margin + key_sig_width + (8.0 if key_sig_width > 0 else 0.0)
+        timing_mode = score.events[0].beat.mode if score.events else "beats"
 
+        end_beats = Fraction(1, 1)
         if score.events:
-            end_time = max(self._duration_value(event.beat + event.duration) for event in score.events)
-            if end_time <= 0:
-                end_time = 1.0
+            end_duration = max(event.beat + event.duration for event in score.events)
+            if timing_mode == "beats":
+                end_beats = end_duration.as_beats()
+                if end_beats <= 0:
+                    end_beats = Fraction(1, 1)
+                end_time = float(end_beats)
+            else:
+                end_time = self._duration_value(end_duration)
+                if end_time <= 0:
+                    end_time = 1.0
         else:
             end_time = 1.0
 
-        timeline_width = max(1.0, width - left_margin - right_margin)
+        default_key_sig_accidentals = self._key_signature_accidentals_for_render()
+        scale_annotation_entries = self._scale_measure_annotations_for_render()
+
+        measure_key_signatures: dict[Fraction, list[tuple[str, int]]] = {}
+        measure_labels: dict[Fraction, str] = {}
+        if timing_mode == "beats":
+            for beat, accidentals, label in scale_annotation_entries:
+                measure_key_signatures[beat] = accidentals
+                measure_labels[beat] = label
+
+            if Fraction(0, 1) not in measure_key_signatures and default_key_sig_accidentals:
+                measure_key_signatures[Fraction(0, 1)] = default_key_sig_accidentals
+
+        key_width_by_measure: dict[Fraction, float] = {}
+        if timing_mode == "beats":
+            for beat, accidentals in measure_key_signatures.items():
+                width_value = (len(accidentals) * 10.0) + (8.0 if accidentals else 0.0)
+                if width_value > 0:
+                    key_width_by_measure[beat] = width_value
+            sorted_key_markers = tuple(sorted(key_width_by_measure))
+            total_key_width = sum(
+                key_width_by_measure[marker]
+                for marker in sorted_key_markers
+                if marker < end_beats
+            )
+            content_start_x = left_margin
+            timeline_width = max(1.0, width - left_margin - right_margin - total_key_width)
+        else:
+            key_sig_width = (len(default_key_sig_accidentals) * 10.0) + (
+                8.0 if default_key_sig_accidentals else 0.0
+            )
+            content_start_x = left_margin + key_sig_width
+            sorted_key_markers = ()
+            timeline_width = max(1.0, width - left_margin - right_margin)
+
         pixels_per_unit = timeline_width / end_time
+
+        def _cumulative_key_width(beat: Fraction, *, include_current: bool) -> float:
+            if not sorted_key_markers:
+                return 0.0
+
+            total = 0.0
+            for marker in sorted_key_markers:
+                if include_current:
+                    if marker <= beat:
+                        total += key_width_by_measure[marker]
+                else:
+                    if marker < beat:
+                        total += key_width_by_measure[marker]
+            return total
+
+        def _x_for_beat(beat: Duration) -> float:
+            if beat.mode != "beats":
+                return content_start_x + (self._duration_value(beat) * pixels_per_unit)
+
+            beat_value = beat.as_beats()
+            return (
+                content_start_x
+                + (float(beat_value) * pixels_per_unit)
+                + _cumulative_key_width(beat_value, include_current=True)
+            )
+
+        def _x_for_measure_start(beat: Fraction) -> float:
+            return (
+                content_start_x
+                + (float(beat) * pixels_per_unit)
+                + _cumulative_key_width(beat, include_current=False)
+            )
 
         lines: list[str] = [
             '<?xml version="1.0" encoding="UTF-8"?>',
@@ -182,16 +442,21 @@ class SheetMusic:
             f'<rect x="0" y="0" width="{width}" height="{height}" fill="#fffdf8"/>',
             f'<text x="{left_margin:.2f}" y="{top_margin:.2f}" font-family="Georgia, serif" font-size="14" fill="#1a1a1a">CHORDELIA SHEET</text>',
             (
-                f'<text x="{left_margin:.2f}" y="{top_margin + 18:.2f}" '
-                'font-family="Georgia, serif" font-size="12" fill="#444">'
-                f'tempo {score.metadata.tempo} | meter {score.metadata.time_signature[0]}/{score.metadata.time_signature[1]}'
-                "</text>"
-            ),
-            (
                 f'<text x="{left_margin - 30:.2f}" y="{staff_bottom + 4:.2f}" '
                 'font-family="Bravura, Noto Music, serif" font-size="44" fill="#111">&#119070;</text>'
             ),
         ]
+
+        if self._render_tempo_metadata:
+            lines.insert(
+                4,
+                (
+                    f'<text x="{left_margin:.2f}" y="{top_margin + 18:.2f}" '
+                    'font-family="Georgia, serif" font-size="12" fill="#444">'
+                    f'tempo {score.metadata.tempo} | meter {score.metadata.time_signature[0]}/{score.metadata.time_signature[1]}'
+                    "</text>"
+                ),
+            )
 
         for line_index in range(5):
             y = staff_top + (line_index * staff_spacing)
@@ -206,32 +471,67 @@ class SheetMusic:
             f'<line class="staff-barline" x1="{width - right_margin:.2f}" y1="{staff_top:.2f}" x2="{width - right_margin:.2f}" y2="{staff_bottom:.2f}" stroke="#222" stroke-width="1.2"/>'
         )
 
-        lines.extend(
-            self._render_key_signature(
-                key_sig_accidentals,
-                x_start=left_margin + 6.0,
-                staff_bottom=staff_bottom,
-                staff_spacing=staff_spacing,
-            )
-        )
+        if timing_mode == "beats":
+            for marker, accidentals in sorted(measure_key_signatures.items(), key=lambda item: item[0]):
+                if marker < 0 or marker >= end_beats:
+                    continue
 
-        lines.extend(
-            self._render_measure_barlines(
-                content_start_x,
-                width - right_margin,
-                staff_top,
-                staff_bottom,
-                pixels_per_unit,
+                key_start_x = _x_for_measure_start(marker) + 6.0
+                lines.extend(
+                    self._render_key_signature(
+                        accidentals,
+                        x_start=key_start_x,
+                        staff_bottom=staff_bottom,
+                        staff_spacing=staff_spacing,
+                    )
+                )
+
+                scale_label = measure_labels.get(marker)
+                if scale_label is not None:
+                    lines.append(
+                        f'<text class="scale-label" x="{key_start_x:.2f}" y="{top_margin + 34:.2f}" font-family="Georgia, serif" font-size="11" fill="#444">{scale_label}</text>'
+                    )
+
+            numerator, _denominator = score.metadata.time_signature
+            if numerator > 0:
+                marker = Fraction(numerator, 1)
+                while marker < end_beats:
+                    x = _x_for_measure_start(marker)
+                    if x >= (width - right_margin):
+                        break
+                    lines.append(
+                        f'<line class="measure-barline" x1="{x:.2f}" y1="{staff_top:.2f}" x2="{x:.2f}" y2="{staff_bottom:.2f}" stroke="#444" stroke-width="1"/>'
+                    )
+                    marker += Fraction(numerator, 1)
+        else:
+            lines.extend(
+                self._render_key_signature(
+                    default_key_sig_accidentals,
+                    x_start=left_margin + 6.0,
+                    staff_bottom=staff_bottom,
+                    staff_spacing=staff_spacing,
+                )
             )
-        )
+
+            lines.extend(
+                self._render_measure_barlines(
+                    content_start_x,
+                    width - right_margin,
+                    staff_top,
+                    staff_bottom,
+                    pixels_per_unit,
+                )
+            )
 
         rendered_events: list[dict[str, Any]] = []
         for event in score.events:
-            x = content_start_x + (self._duration_value(event.beat) * pixels_per_unit)
+            x = _x_for_beat(event.beat)
+            event_key_accidental_map = self._key_accidental_map_for_beat(event.beat)
             note_render_data = self._event_note_render_data(
                 event,
                 staff_bottom=staff_bottom,
                 staff_spacing=staff_spacing,
+                key_accidental_map=event_key_accidental_map,
             )
             steps = tuple(int(item["step"]) for item in note_render_data)
             duration_beats = self._duration_beats(event.duration)
@@ -325,25 +625,77 @@ class SheetMusic:
     def _resolve_staff_scale(
         self,
         *,
+        source: Any,
         scale: Scale | str | None,
         metadata_key: str | None,
     ) -> Scale | None:
         """Resolve optional rendering scale input to a Scale instance."""
+        source_scale = self._scale_from_wrapped_source(source)
+        if source_scale is not None:
+            return source_scale
         if scale is not None:
             return self._coerce_scale_value(scale)
         if metadata_key is not None:
             return self._coerce_scale_value(metadata_key)
         return None
 
-    def _coerce_scale_value(self, value: Scale | str) -> Scale:
-        """Coerce user scale values into a concrete Scale."""
+    @staticmethod
+    def _scale_from_wrapped_source(source: Any) -> Scale | None:
+        """Ask wrapped source types for their preferred staff scale when available."""
+        resolve_scale = getattr(source, "sheet_music_global_scale", None)
+        if callable(resolve_scale):
+            resolved = resolve_scale()
+            if resolved is None:
+                return None
+            if isinstance(resolved, (Scale, str)):
+                return SheetMusic._coerce_scale_value_static(resolved)
+            raise TypeError(
+                "sheet_music_global_scale() must return Scale, str, or None; "
+                f"got {type(resolved).__name__}."
+            )
+        return None
+
+    @staticmethod
+    def _coerce_scale_value_static(value: Scale | str) -> Scale:
+        """Static helper for coercing scale values outside instance context."""
         if isinstance(value, Scale):
             return value
         if isinstance(value, str):
-            return self._scale_from_string(value)
+            raw = value.strip()
+            compact = raw.replace(" ", "")
+
+            minor_suffix = compact.endswith("m") and len(compact) >= 2
+            if minor_suffix:
+                root_text = compact[:-1]
+                scale_type = "natural_minor"
+            else:
+                match = re.match(
+                    r"^([A-Ga-g](?:#|b)?)(?:\s*(major|minor|natural_minor|harmonic_minor|melodic_minor))?$",
+                    raw,
+                    re.IGNORECASE,
+                )
+                if match is None:
+                    raise ValueError(
+                        f"Could not parse scale string {value!r}. Expected forms like 'D', 'Bb', 'Am', or 'E minor'."
+                    )
+                root_text = match.group(1)
+                mode_text = match.group(2)
+                if mode_text is None:
+                    scale_type = "major"
+                else:
+                    normalized_mode = mode_text.lower()
+                    scale_type = "natural_minor" if normalized_mode == "minor" else normalized_mode
+
+            return Scale(root_text, scale_type)
         raise TypeError(
             f"scale must be Scale or str, got {type(value).__name__}"
         )
+
+    def _coerce_scale_value(self, value: Scale | str) -> Scale:
+        """Coerce user scale values into a concrete Scale."""
+        if isinstance(value, str):
+            return self._scale_from_string(value)
+        return self._coerce_scale_value_static(value)
 
     def _scale_from_string(self, text: str) -> Scale:
         """Parse compact scale strings like 'D', 'Bb', 'Am', or 'E minor'."""
@@ -378,23 +730,37 @@ class SheetMusic:
         """Build expected letter-accidental map from a diatonic scale when possible."""
         if scale is None:
             return {}
-        if len(scale.notes) < 7:
-            return {}
 
         accidental_map: dict[str, int] = {}
-        for note in scale.notes[:7]:
-            accidental_map[note.name.name] = int(note.accidental.value)
+        for note in scale.key_signature_notes():
+            letter = note.name.name
+            accidental = int(note.accidental.value)
+            existing = accidental_map.get(letter)
+            if existing is not None and existing != accidental:
+                return {}
+            accidental_map[letter] = accidental
 
-        if len(accidental_map) != 7:
-            return {}
         return accidental_map
 
     def _key_signature_accidentals_for_render(self) -> list[tuple[str, int]]:
         """Return ordered key-signature accidental glyphs from the active scale map."""
-        if not self._staff_key_accidental_map:
+        return self._key_signature_accidentals_for_map(self._staff_key_accidental_map)
+
+    def _key_signature_accidentals_for_scale(self, scale: Scale) -> list[tuple[str, int]]:
+        """Return ordered key-signature accidentals for one concrete scale."""
+        return self._key_signature_accidentals_for_map(
+            self._key_accidental_map_from_scale(scale)
+        )
+
+    def _key_signature_accidentals_for_map(
+        self,
+        accidental_map: dict[str, int],
+    ) -> list[tuple[str, int]]:
+        """Return ordered key-signature accidental glyphs for one accidental map."""
+        if not accidental_map:
             return []
 
-        values = {self._staff_key_accidental_map.get(letter, 0) for letter in self._LETTER_INDEX}
+        values = {accidental_map.get(letter, 0) for letter in self._LETTER_INDEX}
         if values.issubset({0, 1}):
             ordered = self._KEY_SHARP_ORDER
             expected_value = 1
@@ -407,8 +773,38 @@ class SheetMusic:
         return [
             (letter, expected_value)
             for letter in ordered
-            if self._staff_key_accidental_map.get(letter, 0) == expected_value
+            if accidental_map.get(letter, 0) == expected_value
         ]
+
+    def _scale_measure_annotations_for_render(
+        self,
+    ) -> tuple[tuple[Fraction, list[tuple[str, int]], str], ...]:
+        """Return ordered measure-start key signatures and labels for iterable scales."""
+        if not self._measure_scale_annotations:
+            return ()
+
+        by_measure: dict[Fraction, tuple[list[tuple[str, int]], str]] = {}
+        for beat, scale, label in self._measure_scale_annotations:
+            by_measure[beat] = (self._key_signature_accidentals_for_scale(scale), label)
+
+        return tuple(
+            (beat, values[0], values[1])
+            for beat, values in sorted(by_measure.items(), key=lambda item: item[0])
+        )
+
+    def _key_accidental_map_for_beat(self, beat: Duration) -> dict[str, int]:
+        """Resolve active key accidental expectations for one event beat position."""
+        if beat.mode != "beats" or not self._measure_scale_annotations:
+            return self._staff_key_accidental_map
+
+        beat_value = beat.as_beats()
+        active_map = self._staff_key_accidental_map
+        for marker, scale, _label in self._measure_scale_annotations:
+            if marker > beat_value:
+                break
+            active_map = self._key_accidental_map_from_scale(scale)
+
+        return active_map
 
     def _render_key_signature(
         self,
@@ -518,6 +914,7 @@ class SheetMusic:
         *,
         staff_bottom: float,
         staff_spacing: float,
+        key_accidental_map: dict[str, int],
     ) -> list[dict[str, float | int | str | None]]:
         """Collect render metadata per event note (step/y/letter/accidental)."""
         data: list[dict[str, float | int | str | None]] = []
@@ -551,6 +948,7 @@ class SheetMusic:
                     "y": y,
                     "letter": letter_name,
                     "accidental": note_accidental,
+                    "key_accidental_expected": key_accidental_map.get(letter_name, 0),
                 }
             )
         return data
@@ -570,7 +968,9 @@ class SheetMusic:
             if not isinstance(letter, str) or not isinstance(accidental, int):
                 continue
 
-            expected = self._staff_key_accidental_map.get(letter, 0)
+            expected = data.get("key_accidental_expected")
+            if not isinstance(expected, int):
+                expected = self._staff_key_accidental_map.get(letter, 0)
             if accidental == expected:
                 continue
 

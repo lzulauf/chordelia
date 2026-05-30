@@ -15,6 +15,7 @@ from chordelia.scale_context import (
     reset_global_scale_context,
     set_global_scale_context,
 )
+from chordelia.scales import Scale
 from chordelia.sequences import Rest, Sequence
 from chordelia.sheet_music import SheetMusic
 from chordelia.sheetmusic_backends.lilypond import configure_sheet_music_lilypond_backend
@@ -40,7 +41,7 @@ _RENDERING_CONFIG: ContextVar[SheetMusicRenderingConfig] = ContextVar(
     default=_DEFAULT_RENDERING_CONFIG,
 )
 
-_HOOK_TARGET_TYPES = (Note, Chord, Sequence, Rest)
+_HOOK_TARGET_TYPES = (Note, Chord, Sequence, Rest, Scale)
 _ORIGINAL_MIMEBUNDLE_METHODS: dict[type[Any], Any] = {}
 
 
