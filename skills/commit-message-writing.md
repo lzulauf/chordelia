@@ -69,7 +69,7 @@ Companion skills: test-running when you need to report validation commands/resul
 - Keep the summary concise and descriptive.
 - Separate summary and body with exactly one blank line when body exists.
 - Use flat bullet lists (no nested bullets) unless user asks otherwise.
-- Wrap the final commit message in a fenced markdown code block by default.
+- Always wrap the final commit message in a fenced markdown code block unless the user explicitly requests plain text.
 - If the user explicitly asks for plain text output, do not use code fences.
 
 ## Completion Checklist
@@ -78,6 +78,7 @@ Companion skills: test-running when you need to report validation commands/resul
 - Summary line is specific and action-oriented.
 - Body includes important behavior/API/test/docs information.
 - User-requested structure is followed exactly.
+- Final message is wrapped in a fenced code block unless plain text was explicitly requested.
 - No fabricated changes or unsupported claims.
 
 ## Quick Examples
