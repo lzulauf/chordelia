@@ -121,10 +121,7 @@ score = Score.from_sequenceable(progression, tempo=104)
 midi = MidiFile(score)
 midi.to_file("progression.mid")
 
-# Play score through a MIDI output interface via MidiFile.
-# midi.play_to_interface(output_name=None, blocking=True)
-
-# Or use MidiPlayback directly for repeated interactive use.
+# Play score through a MIDI output interface.
 # with MidiPlayback(output_name=None) as playback:
 #     playback.play_score(score, blocking=True)
 

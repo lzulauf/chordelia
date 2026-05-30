@@ -102,9 +102,8 @@ context = ScoreEventContext(
 - Use `MidiFile(score)` when you want file export and wrapper methods.
 - Use `MidiFile.to_file(path)` to write a `.mid` file.
 - Use `score_to_playback_notes(score, ...)` for score-backed audio-note conversion with retrigger policy (`retrigger_all` default, `delta` optional override).
-- Use `MidiFile.play_to_interface(...)` to send score-backed playback to a MIDI output.
 - Use `MidiPlayback` directly for repeated live transport sessions and `play_score(...)`.
-- `MidiPlayback.play_score(...)` and `MidiFile.play_to_interface(...)` accept optional `gate_width`, `gate_offset`, and `retrigger_policy` overrides.
+- `MidiPlayback.play_score(...)` accepts optional `gate_width`, `gate_offset`, and `retrigger_policy` overrides.
 - Install optional dependencies with `pip install chordelia[midi]`.
 
 Example overrides:

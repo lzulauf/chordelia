@@ -175,6 +175,7 @@ class MidiPlayback:
             raise ValueError("MIDI velocity must be between 0 and 127")
 
         midi_note = self._coerce_note_to_midi(note)
+        stop_timer: Optional[threading.Timer] = None
 
         with self._lock:
             self._send_note_on(active_channel, midi_note, active_velocity)
@@ -193,7 +194,11 @@ class MidiPlayback:
 
                 stop_timer = threading.Timer(duration_seconds, _timed_note_off)
                 self._stop_timers.append(stop_timer)
-                stop_timer.start()
+
+        # Start timers outside the playback lock to avoid deadlocks when tests
+        # use immediate/synchronous timer doubles.
+        if stop_timer is not None:
+            stop_timer.start()
 
     def _duration_to_seconds(self, duration: Duration, tempo_bpm: int) -> float:
         if duration.mode == "seconds":

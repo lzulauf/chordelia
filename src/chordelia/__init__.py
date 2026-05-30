@@ -39,7 +39,7 @@ except ImportError:
 try:
     from chordelia.midi_playback import MidiPlayback, get_midi_ports, is_midi_available
     from chordelia.midi_playback import play_chord as midi_play_chord, play_melody as midi_play_melody
-    from chordelia.midifile import MidiFile, MidiTrackInfo, load_midi_file, play_midi_file
+    from chordelia.midifile import MidiFile, MidiTrackInfo
     _MIDI_AVAILABLE = True
 except ImportError:
     _MIDI_AVAILABLE = False
@@ -110,10 +110,8 @@ if _MIDI_AVAILABLE:
         "MidiTrackInfo",
         "get_midi_ports", 
         "is_midi_available",
-        "load_midi_file", 
         "midi_play_chord",
         "midi_play_melody",
-        "play_midi_file",
     ])
 
 

@@ -9,8 +9,6 @@ from fractions import Fraction
 # Import Chordelia components
 from chordelia.rhythm import Tempo, Duration, TimeSignature
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
-from chordelia.audio_playback import Waveform
-from chordelia.playback_notes import midi_tracks_to_playback_notes
 
 
 @dataclass
@@ -24,11 +22,10 @@ class MidiTrackInfo:
 
 class MidiFile:
     """
-    A class to read and process MIDI files for Chordelia playback.
-    
-    This class handles the conversion of MIDI data to Chordelia's
-    musical representation, making it easy to play MIDI files
-    using the audio playback system.
+    A class to read MIDI files and normalize them to Chordelia Score objects.
+
+    This class is responsible for MIDI file parsing/writing and score-backed
+    metadata inspection.
     """
     
     def __init__(
@@ -181,36 +178,6 @@ class MidiFile:
             return output_path
 
         raise ValueError("MidiFile has no score or source MIDI data to write")
-
-    def play_to_interface(
-        self,
-        output_name: Optional[str] = None,
-        *,
-        blocking: bool = True,
-        velocity_scale: float = 1.0,
-        channel_override: Optional[int] = None,
-        gate_width: Optional[float] = None,
-        gate_offset: Optional[float] = None,
-        retrigger_policy: Optional[str] = None,
-    ) -> None:
-        """Play this wrapper's normalized score to a MIDI output interface."""
-        from chordelia.midi_playback import MidiPlayback
-
-        if self.score is None:
-            if self.filepath is None:
-                raise ValueError("MidiFile has no score or file source to play")
-            self.score = self.score_from_file(self.filepath)
-
-        with MidiPlayback(output_name=output_name) as playback:
-            playback.play_score(
-                self.score,
-                blocking=blocking,
-                velocity_scale=velocity_scale,
-                channel_override=channel_override,
-                gate_width=gate_width,
-                gate_offset=gate_offset,
-                retrigger_policy=retrigger_policy,
-            )
 
     def _initialize_from_file(self, filepath: Path) -> None:
         """Initialize wrapper state from an on-disk MIDI file."""
@@ -444,54 +411,3 @@ class MidiFile:
             print(f"    🎺 Instrument: {track.instrument}")
             print(f"    🎵 Notes: {track.note_count}")
             print()
-
-
-def load_midi_file(filepath: Union[str, Path]) -> MidiFile:
-    """
-    Convenience function to load a MIDI file.
-    
-    Args:
-        filepath: Path to the MIDI file
-        
-    Returns:
-        MidiFile object
-    """
-    return MidiFile.load_from_file(filepath)
-
-
-def play_midi_file(filepath: Union[str, Path], 
-                  track_indices: Optional[List[int]] = None,
-                  waveform: Waveform = Waveform.SINE,
-                  blocking: bool = True):
-    """
-    Convenience function to load and play a MIDI file.
-    
-    Args:
-        filepath: Path to the MIDI file
-        track_indices: List of track indices to play (None = all tracks)
-        waveform: Waveform to use for playback
-        blocking: Whether to block until playback is complete
-    """
-    from chordelia.audio_playback import Playback
-    
-    # Load MIDI file
-    midi = MidiFile(filepath)
-    
-    if midi.midi_file is None:
-        raise ValueError("Loaded MIDI file has no source MIDI data")
-
-    # Convert to playback notes through the standalone conversion API.
-    notes = midi_tracks_to_playback_notes(
-        midi.midi_file,
-        tempo_bpm=midi.tempo.bpm,
-        track_indices=track_indices,
-    )
-    
-    if not notes:
-        print("No notes found in MIDI file")
-        return
-    
-    # Play using Chordelia's playback system with specified performance mode
-    print(f"🎵 Playing {midi.filepath.name} ({len(notes)} notes)")
-    with Playback(midi.tempo, default_waveform=waveform) as playback:
-        playback.play_sequence(notes, blocking=blocking)
