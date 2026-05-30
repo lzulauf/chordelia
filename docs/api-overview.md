@@ -63,6 +63,13 @@ Key behaviors:
 - `Sequence.shift(...)` is diatonic (scale steps).
 - `Score.duration` returns normalized timeline span.
 - `Score.with_(...)` returns immutable metadata/source/event updates.
+- `MidiFile(...)` and `SheetMusic(...)` both normalize through the same score-first conversion path.
+
+Compatibility note:
+
+- `score_from_sequenceable(...)` is retained as a compatibility helper.
+- `Score.from_sequenceable(...)` is the canonical constructor-style entry point.
+- Direct conversion sources must be `Score` or `Sequenceable` values (for example `Note`, `Chord`, `Sequence`, `Rest`); `Scale` and `Degree` are not accepted as direct score-wrapper inputs.
 
 Related deep docs:
 

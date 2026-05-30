@@ -1,7 +1,7 @@
 Shared Score implementation and viability plan for chordelia.
 
 ## Status
-Implementing
+Done
 
 ## Goal
 Implement canonical `Score` as the top-level wrapper around `Sequenceable` objects and use it as the shared normalization boundary for MIDI and sheet workflows.
@@ -90,9 +90,14 @@ Expected docs delta classification: both README updates and docs updates.
 - [x] Phase 2: Sequenceable normalization implemented
 - [x] Phase 3A: MidiFile score adapter seam implemented
 - [x] Phase 3B: SheetMusic score adapter seam implemented
-- [ ] Phase 4: Parity and performance evaluation completed
-- [ ] Phase 5: Documentation and migration notes completed
-- [ ] Shared Score contract adopted as canonical
+- [x] Phase 4: Parity and performance evaluation completed
+- [x] Phase 5: Documentation and migration notes completed
+- [x] Shared Score contract adopted as canonical
+
+Completion note:
+1. Completed on 2026-05-30 with explicit wrapper parity tests in `tests/unit/chordelia/test_midifile.py` and `tests/unit/chordelia/test_sheet_music.py`.
+2. Documentation and migration guidance were finalized in `README.md`, `docs/api-overview.md`, and `docs/guides/sequences-and-score.md`.
+3. Validation evidence: focused parity suite (`test_score.py`, `test_midifile.py`, `test_sheet_music.py`) and full pytest suite passing.
 
 ## Phases
 ### Phase 0: Contract lock

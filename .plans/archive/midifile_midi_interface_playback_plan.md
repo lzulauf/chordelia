@@ -190,7 +190,7 @@ flowchart LR
 ## Cross-plan and decision links
 1. .plans/archive/sequence_to_midi_export_plan.md
 2. .plans/common_musical_interfaces_plan.md
-3. .plans/shared_score_ir_implementation_plan.md
+3. .plans/archive/shared_score_ir_implementation_plan.md
 4. decisions/sequence_midi_export_api_decision.md
 
 ## Testing approach

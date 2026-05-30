@@ -2,8 +2,10 @@
 
 import pytest
 
+from chordelia.degrees import Degree
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
+from chordelia.scales import Scale
 from chordelia.scale_context import reset_chordelia_context, with_chordelia_context
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
 from chordelia.sequenceable import (
@@ -402,6 +404,18 @@ class TestScore:
         """Unsupported values should raise TypeError via sequenceable conversion boundary."""
         with pytest.raises(TypeError, match="_register_sequenceable_adapter"):
             Score.from_sequenceable(object())
+
+    @pytest.mark.parametrize(
+        "source",
+        (
+            Scale("C", "major"),
+            Degree(1),
+        ),
+    )
+    def test_from_sequenceable_rejects_non_sequenceable_theory_types(self, source):
+        """Scale and Degree are theory helpers, not direct sequenceable score sources."""
+        with pytest.raises(TypeError, match="not Sequenceable"):
+            Score.from_sequenceable(source)
 
     def test_score_from_sequenceable_helper_delegates_to_classmethod(self):
         """Compatibility helper should delegate behavior to Score.from_sequenceable."""

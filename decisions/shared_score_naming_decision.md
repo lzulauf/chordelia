@@ -240,7 +240,7 @@ Compatibility guidance:
 1. Introduce deprecated alias exports for score_ir-prefixed names where needed.
 2. Update examples and docs to canonical score names immediately once implementation starts.
 
-Linked plan: .plans/shared_score_ir_implementation_plan.md
+Linked plan: .plans/archive/shared_score_ir_implementation_plan.md
 
 ## Confidence and risks
 Confidence: high.
@@ -255,7 +255,7 @@ Risk controls:
 3. Revisit constructor-canonical question only after Score IR stabilization metrics are available.
 
 ## Follow-up actions
-1. Update .plans/shared_score_ir_implementation_plan.md to reference this naming decision explicitly.
+1. Update .plans/archive/shared_score_ir_implementation_plan.md to reference this naming decision explicitly.
 2. Add implementation tasks for alias strategy and retirement timeline.
 3. Ensure future MIDI and sheet plan edits use canonical score naming.
 4. Add migration notes to user-facing docs when Score APIs land.

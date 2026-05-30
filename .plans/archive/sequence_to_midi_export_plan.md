@@ -43,7 +43,7 @@ Make `MidiFile` the canonical MIDI wrapper class around `Score` (and therefore `
    5. `tests/unit/chordelia/test_midifile.py` (new/expanded).
 
 ## Cross-plan references
-1. `.plans/shared_score_ir_implementation_plan.md`.
+1. `.plans/archive/shared_score_ir_implementation_plan.md`.
 2. `.plans/archive/first_class_sequence_support_plan.md`.
 3. `.plans/sheet_music_rendering_plan.md`.
 4. `.plans/common_musical_interfaces_plan.md`.

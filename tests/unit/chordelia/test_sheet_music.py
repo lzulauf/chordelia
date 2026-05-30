@@ -10,6 +10,7 @@ import pytest
 
 import chordelia.sheetmusic_backends.lilypond as lilypond_backend
 from chordelia.chords import Chord
+from chordelia.degrees import Degree
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
 from chordelia.scales import Scale
@@ -57,6 +58,17 @@ class TestSheetMusicConstruction:
     def test_constructor_rejects_non_sequenceable_values(self):
         with pytest.raises(TypeError, match="not Sequenceable"):
             SheetMusic({"bad": "payload"})
+
+    @pytest.mark.parametrize(
+        "source",
+        (
+            Scale("C", "major"),
+            Degree(1),
+        ),
+    )
+    def test_constructor_rejects_non_sequenceable_theory_types(self, source):
+        with pytest.raises(TypeError, match="not Sequenceable"):
+            SheetMusic(source)
 
 
 class TestSheetMusicFileOutput:
@@ -297,6 +309,33 @@ class TestSheetMusicFileOutput:
         from_classmethod = SheetMusic.score_to_file(score, tmp_path / "classmethod.svg")
 
         assert from_instance.read_text(encoding="utf-8") == from_classmethod.read_text(encoding="utf-8")
+
+    def test_sequenceable_and_prebuilt_score_render_identical_svg(self, tmp_path: Path):
+        sequence = Sequence(
+            (
+                (Note("C4"), 1),
+                (Rest(), 1 / 2),
+                (Chord("G4"), 1),
+            )
+        )
+        score = Score.from_sequenceable(
+            sequence,
+            tempo=108,
+            time_signature=(3, 4),
+            key_signature="C",
+            ppq=480,
+        )
+
+        direct_output = SheetMusic(
+            sequence,
+            tempo=108,
+            time_signature=(3, 4),
+            key_signature="C",
+            ppq=480,
+        ).to_file(tmp_path / "direct.svg")
+        score_output = SheetMusic(score).to_file(tmp_path / "score.svg")
+
+        assert direct_output.read_text(encoding="utf-8") == score_output.read_text(encoding="utf-8")
 
     def test_svg_baseline_a3_major_scale_mixed_durations(self, tmp_path: Path):
         scale = Scale("A3", "major")

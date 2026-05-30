@@ -9,9 +9,11 @@ import pytest
 mido = pytest.importorskip("mido")
 
 from chordelia.midifile import MidiFile
+from chordelia.degrees import Degree
 from chordelia.notes import Note
 from chordelia.playback_notes import midi_tracks_to_playback_notes, score_to_playback_notes
 from chordelia.rhythm import Duration
+from chordelia.scales import Scale
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
 
 
@@ -25,6 +27,22 @@ def _collect_absolute_note_messages(midi_file):
             if message.type in {"note_on", "note_off"}:
                 absolute_messages.append((message.type, message.note, message.velocity, message.channel, absolute_tick))
     return absolute_messages
+
+
+def _collect_absolute_score_meta_messages(midi_file):
+    """Collect tempo/time/key meta messages with absolute ticks for parity checks."""
+    absolute_meta = []
+    for track in midi_file.tracks:
+        absolute_tick = 0
+        for message in track:
+            absolute_tick += message.time
+            if message.type == "set_tempo":
+                absolute_meta.append((message.type, message.tempo, absolute_tick))
+            elif message.type == "time_signature":
+                absolute_meta.append((message.type, message.numerator, message.denominator, absolute_tick))
+            elif message.type == "key_signature":
+                absolute_meta.append((message.type, message.key, absolute_tick))
+    return absolute_meta
 
 
 class TestMidiFileScoreBackedConstruction:
@@ -48,9 +66,48 @@ class TestMidiFileScoreBackedConstruction:
         assert midi.time_signature.beats_per_measure == 3
         assert midi.time_signature.beat_unit == 4
 
+    @pytest.mark.parametrize(
+        "source",
+        (
+            Scale("C", "major"),
+            Degree(1),
+        ),
+    )
+    def test_constructor_rejects_non_sequenceable_theory_types(self, source):
+        with pytest.raises(TypeError, match="not Sequenceable"):
+            MidiFile(source)
+
 
 class TestMidiFileWritePath:
     """MIDI file writing behavior from canonical score-backed wrappers."""
+
+    def test_sequenceable_and_prebuilt_score_write_identical_midi(self, tmp_path: Path):
+        direct_path = tmp_path / "direct.mid"
+        score_path = tmp_path / "score.mid"
+
+        score = Score.from_sequenceable(
+            Note("E4"),
+            tempo=104,
+            time_signature=(3, 4),
+            key_signature="E",
+            ppq=960,
+        )
+
+        MidiFile(
+            Note("E4"),
+            tempo=104,
+            time_signature=(3, 4),
+            key_signature="E",
+            ppq=960,
+        ).to_file(direct_path)
+        MidiFile(score).to_file(score_path)
+
+        direct_midi = mido.MidiFile(str(direct_path))
+        score_midi = mido.MidiFile(str(score_path))
+
+        assert direct_midi.ticks_per_beat == score_midi.ticks_per_beat == 960
+        assert _collect_absolute_score_meta_messages(direct_midi) == _collect_absolute_score_meta_messages(score_midi)
+        assert _collect_absolute_note_messages(direct_midi) == _collect_absolute_note_messages(score_midi)
 
     def test_to_file_writes_note_events_from_sequenceable_source(self, tmp_path: Path):
         output_path = tmp_path / "single_note.mid"

@@ -78,6 +78,27 @@ print(len(score.events), score.duration)
 
 `Score` is the shared model used by rendering, audio conversion, and MIDI workflows.
 
+## Score-First Wrapper Parity
+
+Both output wrappers normalize through the same `Score` event model:
+
+- `MidiFile(source)` and `SheetMusic(source)` accept `Score | Sequenceable`.
+- Passing a `Sequenceable` source internally uses `Score.from_sequenceable(...)`.
+
+For multi-output workflows, prefer building one score first and reusing it:
+
+```python
+from chordelia import MidiFile, Score, SheetMusic
+
+score = Score.from_sequenceable(form, tempo=112, time_signature=(4, 4), key_signature="C")
+
+MidiFile(score).to_file("form.mid")
+SheetMusic(score).to_file("form.svg")
+```
+
+Migration note: `score_from_sequenceable(...)` remains as a compatibility helper,
+but `Score.from_sequenceable(...)` is the canonical entry point.
+
 ## Related
 
 - [Quickstart](../quickstart.md)

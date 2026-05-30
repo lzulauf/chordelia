@@ -8,7 +8,10 @@ Implementing
 2. Phase 3 wrapper integration is complete:
    1. `MidiFile` constructor integration is complete through `.plans/archive/sequence_to_midi_export_plan.md`.
    2. `SheetMusic` constructor integration is complete through `.plans/sheet_music_rendering_plan.md`.
-3. Phase 5 is dependency-gated and deferred until Phase 3 wrapper integration and Phase 4 native migration gates are complete.
+3. Phase 4 native migration gates are complete:
+   1. `Sequence` and `Rest` are native on the shared conversion boundary.
+   2. Public wrapper input contract is explicit: direct score-wrapper sources are `Score | Sequenceable`; `Scale` and `Degree` are non-accepted and raise `TypeError`.
+4. Phase 5 remains dependency-gated on adapter decommission execution.
 
 ## Goal
 Define and adopt `Sequenceable` as the canonical capability interface for objects that can be wrapped by `Score` and consumed uniformly by `MidiFile` and `SheetMusic`.
@@ -104,7 +107,7 @@ Define and adopt `Sequenceable` as the canonical capability interface for object
 
 ## Cross-plan references
 1. `.plans/archive/first_class_sequence_support_plan.md`.
-2. `.plans/shared_score_ir_implementation_plan.md`.
+2. `.plans/archive/shared_score_ir_implementation_plan.md`.
 3. `.plans/archive/sequence_to_midi_export_plan.md`.
 4. `.plans/sheet_music_rendering_plan.md`.
 
@@ -133,7 +136,7 @@ Expected docs delta classification: both README updates and docs updates.
 - [x] Phase 1: Note/Chord/Sequence conformance implemented
 - [x] Phase 2: Adapter registry and fallback behavior implemented
 - [x] Phase 3: Score and wrapper integration completed
-- [ ] Phase 4: Required native type migrations completed
+- [x] Phase 4: Required native type migrations completed
 - [ ] Phase 5: Adapter registry removed from runtime and public API (deferred: depends on Phase 3 and Phase 4)
 - [ ] Phase 6: Tests/docs completed
 - [ ] Sequenceable adopted as canonical capability seam without adapter registry
