@@ -708,7 +708,7 @@ class Chord:
             temp_note = Note.from_midi_number(temp_midi)
             return temp_note.with_octave(target_octave)
     
-    def transpose(self, interval: IntervalLike) -> 'Chord':
+    def transpose(self, interval: IntervalLike | int) -> 'Chord':
         """
         Transpose this chord by an interval.
         
@@ -718,7 +718,6 @@ class Chord:
         Returns:
             A new Chord object transposed by the interval
         """
-        interval = Interval.coerce(interval)
         new_root = self.root.transpose(interval)
         new_bass = self.bass_note.transpose(interval) if self.bass_note else None
         

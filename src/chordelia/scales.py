@@ -411,7 +411,7 @@ class Scale:
         # Create a custom scale with this pattern
         return CustomScale(new_root, normalized_pattern)
     
-    def transpose(self, interval: IntervalLike) -> 'Scale':
+    def transpose(self, interval: IntervalLike | int) -> 'Scale':
         """
         Transpose this scale by an interval.
         
@@ -421,7 +421,6 @@ class Scale:
         Returns:
             A new Scale object transposed by the interval
         """
-        interval = Interval.coerce(interval)
         new_root = self.root.transpose(interval)
         return Scale(new_root, self.scale_type)
     

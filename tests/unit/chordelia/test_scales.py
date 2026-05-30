@@ -385,10 +385,19 @@ class TestScaleTransposition:
         """String interval representations should be coerced for transposition."""
         c_major = Scale("C", ScaleType.MAJOR)
 
-        g_major = c_major.transpose("5")
+        g_major = c_major.transpose("P5")
 
         assert str(g_major.root) == "G"
         assert g_major.scale_type == ScaleType.MAJOR
+
+    def test_transpose_numeric_string_uses_semitones(self):
+        """Numeric transpose strings are interpreted as semitone displacements."""
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        c_sharp_major = c_major.transpose("1")
+
+        assert str(c_sharp_major.root) == "C#"
+        assert c_sharp_major.scale_type == ScaleType.MAJOR
 
 
 class TestScaleImmutability:

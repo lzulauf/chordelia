@@ -11,7 +11,11 @@ from typing import TYPE_CHECKING, Optional, Union
 import re
 from functools import lru_cache
 from chordelia.accidentals import Accidental
-from chordelia.intervals import Interval, IntervalLike, IntervalQuality
+from chordelia.intervals import (
+    ChromaticTransposeLike,
+    Interval,
+    coerce_chromatic_semitones,
+)
 
 if TYPE_CHECKING:
     from chordelia.score import ScoreEventContext
@@ -322,7 +326,7 @@ class Note:
                 accidental = Accidental.FLAT
         return cls(note_name, accidental, octave)
     
-    def transpose(self, interval: IntervalLike) -> 'Note':
+    def transpose(self, interval: ChromaticTransposeLike) -> 'Note':
         """
         Transpose this note by an interval.
         
@@ -332,10 +336,7 @@ class Note:
         Returns:
             A new Note object representing the transposed note
         """
-        interval = Interval.coerce(interval)
-
-        # Get the actual semitones to transpose (could be negative)
-        semitones = getattr(interval, '_original_semitones', interval.semitones)
+        semitones = coerce_chromatic_semitones(interval)
         
         # Calculate the new pitch class
         if self.octave is not None:
@@ -357,8 +358,7 @@ class Note:
             base_note = Note.from_midi_number(temp_midi, prefer_sharps)
             base_note = base_note.with_octave(None)  # Remove octave
         
-        # Adjust enharmonic spelling based on the interval
-        return self._get_enharmonic_for_interval(base_note, interval)
+        return base_note
 
     def render_for_context(self, context: 'ScoreEventContext') -> 'SequenceRender':
         """Render a single score event and consumed span for this note."""

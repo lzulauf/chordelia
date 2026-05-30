@@ -12,6 +12,7 @@ from functools import lru_cache
 from chordelia.degrees import Degree
 
 _INTERVAL_REGEX = re.compile(r'^(?P<quality>[a-zA-Z#]*)(?P<number>\d+)$')
+_SEMITONE_STEP_REGEX = re.compile(r'^[+-]?\d+$')
 
 # Pre-computed base semitones for fast lookup
 _BASE_SEMITONES = {
@@ -398,3 +399,25 @@ MAJOR_THIRTEENTH = Interval(IntervalQuality.MAJOR, 13)
 
 
 IntervalLike: TypeAlias = Interval | str
+ChromaticTransposeLike: TypeAlias = Interval | int | str
+
+
+def coerce_chromatic_semitones(value: ChromaticTransposeLike) -> int:
+    """Coerce transpose input into a chromatic semitone displacement."""
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, str):
+        normalized = value.strip()
+        if _SEMITONE_STEP_REGEX.match(normalized):
+            return int(normalized)
+        interval = Interval.from_string(normalized)
+        return getattr(interval, '_original_semitones', interval.semitones)
+
+    if isinstance(value, Interval):
+        return getattr(value, '_original_semitones', value.semitones)
+
+    raise ValueError(
+        "Transpose value must be Interval, int, or str. "
+        "Accepted examples: Interval(IntervalQuality.MAJOR, 3), 'P5', 1, '-2'."
+    )

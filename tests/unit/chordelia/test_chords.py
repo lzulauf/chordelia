@@ -905,21 +905,31 @@ class TestChordTransposition:
         cmaj7 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH)
         minor_third = Interval(IntervalQuality.MINOR, 3)
         
-        eb_maj7 = cmaj7.transpose(minor_third)
+        d_sharp_maj7 = cmaj7.transpose(minor_third)
         
-        assert eb_maj7.root.name == NoteName.E
-        assert eb_maj7.root.accidental == Accidental.FLAT
-        assert eb_maj7.quality == ChordQuality.MAJOR
-        assert eb_maj7.extension == ChordExtension.MAJOR_SEVENTH
+        assert d_sharp_maj7.root.name == NoteName.D
+        assert d_sharp_maj7.root.accidental == Accidental.SHARP
+        assert d_sharp_maj7.quality == ChordQuality.MAJOR
+        assert d_sharp_maj7.extension == ChordExtension.MAJOR_SEVENTH
 
     def test_transpose_accepts_interval_like_string(self):
         """String interval representations should be coerced for transposition."""
         c_major = Chord("C", ChordQuality.MAJOR)
 
-        g_major = c_major.transpose("5")
+        g_major = c_major.transpose("P5")
 
         assert g_major.root.name == NoteName.G
         assert g_major.quality == ChordQuality.MAJOR
+
+    def test_transpose_numeric_string_uses_semitones(self):
+        """Numeric transpose strings are interpreted as semitone displacements."""
+        c_major = Chord("C", ChordQuality.MAJOR)
+
+        c_sharp_major = c_major.transpose("1")
+
+        assert c_sharp_major.root.name == NoteName.C
+        assert c_sharp_major.root.accidental == Accidental.SHARP
+        assert c_sharp_major.quality == ChordQuality.MAJOR
 
 
 class TestChordDegreeHelpers:
