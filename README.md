@@ -57,7 +57,7 @@ Movement contract quick check:
 with with_global_scale_context(scale):
 	print(Note("E4").shift(2))   # G4 (diatonic)
 
-print(Note("E4").transpose("1"))  # F4 (one semitone)
+print(Note("E4").transpose(1))  # F4 (one semitone)
 ```
 
 Use `shift(...)` for diatonic scale-step movement and `transpose(...)` for chromatic semitone movement.

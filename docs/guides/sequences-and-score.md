@@ -61,7 +61,7 @@ print([event.pitches for event in rendered.events])
 from chordelia import ScoreEventContext, Sequence, with_global_scale_context
 
 motif = Sequence((("C4", 1), ("E4", 1)))
-print([event.pitches for event in motif.transpose("1").render_for_context(ScoreEventContext()).events])
+print([event.pitches for event in motif.transpose(1).render_for_context(ScoreEventContext()).events])
 
 with with_global_scale_context("C"):
     print([event.pitches for event in motif.shift(1).render_for_context(ScoreEventContext()).events])

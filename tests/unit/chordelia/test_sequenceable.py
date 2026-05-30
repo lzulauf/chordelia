@@ -575,10 +575,10 @@ class TestSequenceTransforms:
         assert [event.pitches for event in render.events] == [(62, 66, 69), (69,)]
         assert [event.beat for event in render.events] == [Duration.from_beats(0), Duration.from_beats(0)]
 
-    def test_sequence_transpose_numeric_string_uses_semitones(self):
+    def test_sequence_transpose_int_uses_semitones(self):
         seq = Sequence(((Note("C4"), 1),))
 
-        transposed = seq.transpose("1")
+        transposed = seq.transpose(1)
         render = transposed.render_for_context(ScoreEventContext())
 
         assert [event.pitches for event in render.events] == [(61,)]

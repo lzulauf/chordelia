@@ -23,7 +23,7 @@ print(c_major.degree(Degree(7)))  # B
 d_dorian = c_major.shift(1)     # diatonic shift by one degree
 e_phrygian = c_major.shift(2)   # diatonic shift by two degrees
 g_major = c_major.transpose("P5")  # chromatic transpose by perfect fifth
-c_sharp_major = c_major.transpose("1")  # chromatic transpose by one semitone
+c_sharp_major = c_major.transpose(1)  # chromatic transpose by one semitone
 
 print(c_major.contains_note(Note("E")))   # True
 print(c_major.contains_note(Note("F#")))  # False

@@ -12,8 +12,6 @@ from functools import lru_cache
 from chordelia.degrees import Degree
 
 _INTERVAL_REGEX = re.compile(r'^(?P<quality>[a-zA-Z#]*)(?P<number>\d+)$')
-_SEMITONE_STEP_REGEX = re.compile(r'^[+-]?\d+$')
-
 # Pre-computed base semitones for fast lookup
 _BASE_SEMITONES = {
     1: 0,   # Unison
@@ -409,8 +407,6 @@ def coerce_chromatic_semitones(value: ChromaticTransposeLike) -> int:
 
     if isinstance(value, str):
         normalized = value.strip()
-        if _SEMITONE_STEP_REGEX.match(normalized):
-            return int(normalized)
         interval = Interval.from_string(normalized)
         return getattr(interval, '_original_semitones', interval.semitones)
 
@@ -419,5 +415,5 @@ def coerce_chromatic_semitones(value: ChromaticTransposeLike) -> int:
 
     raise ValueError(
         "Transpose value must be Interval, int, or str. "
-        "Accepted examples: Interval(IntervalQuality.MAJOR, 3), 'P5', 1, '-2'."
+        "Accepted examples: Interval(IntervalQuality.MAJOR, 3), 'P5', '#11', 1, -2."
     )

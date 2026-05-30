@@ -390,11 +390,11 @@ class TestScaleTransposition:
         assert str(g_major.root) == "G"
         assert g_major.scale_type == ScaleType.MAJOR
 
-    def test_transpose_numeric_string_uses_semitones(self):
-        """Numeric transpose strings are interpreted as semitone displacements."""
+    def test_transpose_int_uses_semitones(self):
+        """Integer transpose inputs are interpreted as semitone displacements."""
         c_major = Scale("C", ScaleType.MAJOR)
 
-        c_sharp_major = c_major.transpose("1")
+        c_sharp_major = c_major.transpose(1)
 
         assert str(c_sharp_major.root) == "C#"
         assert c_sharp_major.scale_type == ScaleType.MAJOR

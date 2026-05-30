@@ -923,11 +923,11 @@ class TestChordTransposition:
         assert g_major.root.name == NoteName.G
         assert g_major.quality == ChordQuality.MAJOR
 
-    def test_transpose_numeric_string_uses_semitones(self):
-        """Numeric transpose strings are interpreted as semitone displacements."""
+    def test_transpose_int_uses_semitones(self):
+        """Integer transpose inputs are interpreted as semitone displacements."""
         c_major = Chord("C", ChordQuality.MAJOR)
 
-        c_sharp_major = c_major.transpose("1")
+        c_sharp_major = c_major.transpose(1)
 
         assert c_sharp_major.root.name == NoteName.C
         assert c_sharp_major.root.accidental == Accidental.SHARP

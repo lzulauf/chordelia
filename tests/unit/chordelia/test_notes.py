@@ -437,13 +437,13 @@ class TestNoteTransposition:
         assert f3.pitch_class == 5  # F
         assert f3.octave == 3
 
-    def test_transposition_numeric_string_uses_semitones(self):
-        """Numeric string transpose inputs are interpreted as semitone displacements."""
+    def test_transposition_numeric_string_uses_interval_notation(self):
+        """Numeric transpose strings are parsed as interval notation, not semitone steps."""
         c = Note(NoteName.C)
 
-        d_sharp = c.transpose("3")
+        e = c.transpose("3")
 
-        assert d_sharp.pitch_class == 3
+        assert e.pitch_class == 4
 
     def test_transposition_accepts_explicit_interval_notation(self):
         """Quality-bearing interval strings remain supported for transpose calls."""
@@ -453,11 +453,11 @@ class TestNoteTransposition:
 
         assert e.pitch_class == 4
 
-    def test_transposition_by_one_semitone_from_numeric_input(self):
-        """Transposing by numeric 1 should raise pitch by one semitone."""
+    def test_transposition_by_one_semitone_from_int(self):
+        """Transposing by integer 1 should raise pitch by one semitone."""
         c4 = Note("C4")
 
-        assert str(c4.transpose("1")) == "C#4"
+        assert str(c4.transpose(1)) == "C#4"
         assert str(c4.transpose(1)) == "C#4"
 
 
