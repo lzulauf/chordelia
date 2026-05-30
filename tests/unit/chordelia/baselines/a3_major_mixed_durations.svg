@@ -17,7 +17,6 @@
 <line class="ledger-line" x1="60.00" y1="140.00" x2="76.00" y2="140.00" stroke="#111" stroke-width="1"/>
 <ellipse class="notehead notehead-filled" cx="68.00" cy="152.00" rx="5" ry="3.6" fill="#111"/>
 <line class="note-stem" x1="72.80" y1="152.00" x2="72.80" y2="124.00" stroke="#111" stroke-width="1"/>
-<line class="note-flag" x1="72.80" y1="124.00" x2="80.80" y2="127.80" stroke="#111" stroke-width="1"/>
 <line class="ledger-line" x1="78.59" y1="140.00" x2="94.59" y2="140.00" stroke="#111" stroke-width="1"/>
 <ellipse class="notehead notehead-filled" cx="86.59" cy="146.00" rx="5" ry="3.6" fill="#111"/>
 <line class="note-stem" x1="91.39" y1="146.00" x2="91.39" y2="118.00" stroke="#111" stroke-width="1"/>
@@ -37,4 +36,5 @@
 <ellipse class="notehead notehead-open" cx="867.23" cy="116.00" rx="5" ry="3.6" fill="#fffdf8" stroke="#111" stroke-width="1.1"/>
 <polygon class="note-beam" points="72.80,124.00 128.56,112.00 128.56,114.80 72.80,126.80" fill="#111"/>
 <polygon class="note-beam" points="72.80,119.00 91.39,113.00 91.39,115.80 72.80,121.80" fill="#111"/>
+<polygon class="note-beam note-beam-hook" points="72.80,114.00 81.80,114.00 81.80,116.80 72.80,116.80" fill="#111"/>
 </svg>

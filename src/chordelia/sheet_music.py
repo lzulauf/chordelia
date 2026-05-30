@@ -912,6 +912,16 @@ class SheetMusic:
                     lines.extend(segment_lines)
                     for event_index, event_level in segment_levels.items():
                         beamed_levels[event_index] = max(beamed_levels.get(event_index, 0), event_level)
+                elif len(level_run) == 1 and level >= 2:
+                    hook_lines, hook_levels = self._render_beam_hook(
+                        rendered_events,
+                        run_indices,
+                        note_index=level_run[0],
+                        level=level,
+                    )
+                    lines.extend(hook_lines)
+                    for event_index, event_level in hook_levels.items():
+                        beamed_levels[event_index] = max(beamed_levels.get(event_index, 0), event_level)
                 level_run = []
 
             if len(level_run) >= 2:
@@ -922,6 +932,16 @@ class SheetMusic:
                 )
                 lines.extend(segment_lines)
                 for event_index, event_level in segment_levels.items():
+                    beamed_levels[event_index] = max(beamed_levels.get(event_index, 0), event_level)
+            elif len(level_run) == 1 and level >= 2:
+                hook_lines, hook_levels = self._render_beam_hook(
+                    rendered_events,
+                    run_indices,
+                    note_index=level_run[0],
+                    level=level,
+                )
+                lines.extend(hook_lines)
+                for event_index, event_level in hook_levels.items():
                     beamed_levels[event_index] = max(beamed_levels.get(event_index, 0), event_level)
 
         return lines, beamed_levels
@@ -959,6 +979,92 @@ class SheetMusic:
 
         beamed_levels = {index: level for index in run_indices}
         return [polygon], beamed_levels
+
+    @staticmethod
+    def _render_beam_hook(
+        rendered_events: list[dict[str, Any]],
+        run_indices: list[int],
+        *,
+        note_index: int,
+        level: int,
+    ) -> tuple[list[str], dict[int, int]]:
+        """Render a short beam hook for an isolated higher-level beam note."""
+        layout = rendered_events[note_index]
+        stem = layout["stem_geometry"]
+        if stem is None:
+            return [], {}
+
+        try:
+            position = run_indices.index(note_index)
+        except ValueError:
+            return [], {}
+
+        x = float(stem["x"])
+        y_base = float(stem["end_y"])
+        stem_up = bool(stem["stem_up"])
+        level_offset = (-(level - 1) * 5.0) if stem_up else ((level - 1) * 5.0)
+        y = y_base + level_offset
+
+        level_indices = [
+            index
+            for index in run_indices
+            if int(rendered_events[index]["flag_count"]) >= level
+        ]
+        previous_level_index = None
+        next_level_index = None
+        for candidate in reversed(level_indices):
+            if candidate < note_index:
+                previous_level_index = candidate
+                break
+        for candidate in level_indices:
+            if candidate > note_index:
+                next_level_index = candidate
+                break
+
+        if previous_level_index is None and next_level_index is not None:
+            hook_right = True
+        elif next_level_index is None and previous_level_index is not None:
+            hook_right = False
+        elif previous_level_index is not None and next_level_index is not None:
+            current_beat = layout["beat_beats"]
+            previous_beat = rendered_events[previous_level_index]["beat_beats"]
+            next_beat = rendered_events[next_level_index]["beat_beats"]
+            if current_beat is None or previous_beat is None or next_beat is None:
+                hook_right = (next_level_index - note_index) <= (note_index - previous_level_index)
+            else:
+                previous_gap = current_beat - previous_beat
+                next_gap = next_beat - current_beat
+                if next_gap < previous_gap:
+                    hook_right = True
+                elif previous_gap < next_gap:
+                    hook_right = False
+                else:
+                    hook_right = (next_level_index - note_index) <= (note_index - previous_level_index)
+        elif position == len(run_indices) - 1:
+            hook_right = False
+        elif position == 0:
+            hook_right = True
+        else:
+            prev_index = run_indices[position - 1]
+            next_index = run_indices[position + 1]
+            prev_stem = rendered_events[prev_index]["stem_geometry"]
+            next_stem = rendered_events[next_index]["stem_geometry"]
+            if prev_stem is None or next_stem is None:
+                hook_right = True
+            else:
+                prev_gap = abs(x - float(prev_stem["x"]))
+                next_gap = abs(float(next_stem["x"]) - x)
+                hook_right = next_gap <= prev_gap
+
+        hook_length = 9.0
+        x2 = x + hook_length if hook_right else x - hook_length
+        y2 = y
+        thickness = 2.8 if stem_up else -2.8
+        polygon = (
+            f'<polygon class="note-beam note-beam-hook" points="{x:.2f},{y:.2f} {x2:.2f},{y2:.2f} '
+            f'{x2:.2f},{y2 + thickness:.2f} {x:.2f},{y + thickness:.2f}" fill="#111"/>'
+        )
+        return [polygon], {note_index: level}
 
     @staticmethod
     def _render_dots(

@@ -2,6 +2,7 @@
 
 from importlib import resources
 from pathlib import Path
+import re
 
 import pytest
 
@@ -10,7 +11,7 @@ from chordelia.notes import Note
 from chordelia.rhythm import Duration
 from chordelia.scales import Scale
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
-from chordelia.sequences import Sequence
+from chordelia.sequences import Rest, Sequence
 from chordelia.sheet_music import SheetMusic
 
 
@@ -284,6 +285,82 @@ class TestSheetMusicFileOutput:
         assert 'class="note-beam"' in content
         assert 'class="note-flag"' not in content
 
+    def test_mixed_short_run_renders_partial_beam_hook(self, tmp_path: Path):
+        sequence = Sequence(((Note("A3"), 1 / 2), (Note("B3"), 1 / 4), (Note("C4"), 1 / 2)))
+
+        output_path = SheetMusic(sequence).to_file(tmp_path / "partial_beam_hook.svg")
+
+        content = output_path.read_text(encoding="utf-8")
+        assert 'class="note-beam note-beam-hook"' in content
+        assert 'class="note-flag"' not in content
+
+    def test_mid_run_isolated_hooks_choose_contextual_direction(self, tmp_path: Path):
+        sequence = Sequence(
+            (
+                (Note("A3"), 1 / 2),
+                (Note("B3"), 1 / 4),
+                (Note("C4"), 1 / 2),
+                (Note("D4"), 1 / 4),
+                (Note("E4"), 1 / 2),
+            )
+        )
+
+        output_path = SheetMusic(sequence).to_file(tmp_path / "contextual_hook_direction.svg")
+
+        content = output_path.read_text(encoding="utf-8")
+        hook_lines = [
+            line for line in content.splitlines() if 'class="note-beam note-beam-hook"' in line
+        ]
+        assert len(hook_lines) >= 2
+
+        directions: set[str] = set()
+        for line in hook_lines:
+            match = re.search(r'points="([^"]+)"', line)
+            assert match is not None
+            points = match.group(1).split()
+            first_x = float(points[0].split(",", 1)[0])
+            second_x = float(points[1].split(",", 1)[0])
+            directions.add("right" if second_x > first_x else "left")
+
+        assert "right" in directions
+        assert "left" in directions
+
+    def test_svg_baseline_contextual_hook_direction(self, tmp_path: Path):
+        sequence = Sequence(
+            (
+                (Note("A3"), 1 / 2),
+                (Note("B3"), 1 / 4),
+                (Note("C4"), 1 / 2),
+                (Note("D4"), 1 / 4),
+                (Note("E4"), 1 / 2),
+            )
+        )
+
+        output_path = SheetMusic(sequence).to_file(tmp_path / "contextual_hook_direction.svg")
+
+        rendered = _normalize_newlines(output_path.read_text(encoding="utf-8"))
+        expected = _read_baseline("contextual_hook_direction.svg")
+        assert rendered == expected
+
+    def test_svg_baseline_internal_rests_various_lengths(self, tmp_path: Path):
+        sequence = Sequence(
+            (
+                (Note("C4"), 1 / 2),
+                (Rest(), 1 / 4),
+                (Note("D4"), 1 / 2),
+                (Rest(), 3 / 4),
+                (Note("E4"), 1),
+                (Rest(), 2),
+                (Note("F4"), 1 / 2),
+            )
+        )
+
+        output_path = SheetMusic(sequence).to_file(tmp_path / "internal_rests_various_lengths.svg")
+
+        rendered = _normalize_newlines(output_path.read_text(encoding="utf-8"))
+        expected = _read_baseline("internal_rests_various_lengths.svg")
+        assert rendered == expected
+
     def test_svg_baseline_connected_eighth_sixteenth_chords(self, tmp_path: Path):
         chords = (
             Chord.from_string("Am").with_octave(3),
@@ -321,7 +398,7 @@ class TestSheetMusicFileOutput:
         assert 'class="notehead notehead-open"' in content
         assert 'class="notehead notehead-filled"' in content
         assert 'class="note-dot"' in content
-        assert 'class="note-flag"' in content
+        assert ('class="note-flag"' in content) or ('class="note-beam"' in content)
 
 
 class TestSheetMusicNotebookDisplay:
