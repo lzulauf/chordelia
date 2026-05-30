@@ -15,6 +15,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `SequenceEntry`: One payload plus duration/offset timing metadata.
 - `Rest`: Explicit silent payload marker for sequence timelines.
 - `Score`: Canonical wrapper around a source and ordered normalized events; includes `score.duration` for normalized timeline span.
+- `SheetMusic`: Canonical sheet wrapper for score-backed SVG output and notebook MIME display.
 - `MidiPlayback`: Live MIDI output transport for chord, note, and score playback.
 - `MidiFile`: MIDI wrapper for score conversion, file IO, and interface playback.
 - `Duration`: Fractional note duration utilities.
@@ -120,6 +121,26 @@ score = score.with_(gate_width=1.0, retrigger_policy="delta")
 with MidiPlayback() as playback:
 	playback.play_score(score, gate_width=1.0, retrigger_policy="delta")
 ```
+
+## Sheet Music Workflow
+
+- Use `SheetMusic(source, scale=None)` where `source` is `Score` or any `Sequenceable` input accepted by `Score.from_sequenceable(...)`.
+- Use `SheetMusic.to_file(path, format="svg")` to write deterministic SVG output.
+- Use `SheetMusic.score_to_file(score, path, format="svg")` for direct score-based export.
+- Use notebook display via `_repr_mimebundle_` (returns `image/svg+xml` plus plain-text fallback).
+- v1 boundary: write-only output; no parse/load APIs are exposed.
+
+Example:
+
+```python
+from chordelia import Note, Sequence, SheetMusic
+
+phrase = Sequence(((Note("C4"), 1), (Note("D4"), 1), (Note("E4"), 2)))
+sheet = SheetMusic(phrase, scale="C")
+sheet.to_file("phrase.svg")
+```
+
+- `SheetMusic` is part of the core package (`pip install chordelia`), with no dependency on MIDI extras.
 
 ## Real-World Applications
 

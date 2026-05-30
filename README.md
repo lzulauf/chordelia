@@ -13,6 +13,7 @@ Chordelia is a Python library for music theory and timing workflows. It emphasiz
 - Sequenceable conversion boundary for score-producing musical objects
 - Sequence timelines with `Sequence`, `SequenceEntry`, and `Rest`
 - Canonical score model with normalized events for downstream rendering/export
+- Canonical sheet rendering with `SheetMusic` SVG export and notebook display
 - Optional MIDI interface/file workflow with `MidiPlayback` and `MidiFile`
 
 ## Installation
@@ -37,6 +38,7 @@ For full install details, see [docs/installation.md](docs/installation.md).
 
 ```python
 from chordelia import Note, Scale, ScaleType, Chord, Score, ScoreEventContext
+from chordelia import SheetMusic, Sequence
 
 c_major = Scale("C", ScaleType.MAJOR)
 print([str(n) for n in c_major.notes])
@@ -52,6 +54,10 @@ print(middle_c.midi_number, middle_c.frequency)
 
 score = Score.from_sequenceable(Chord("C4"))
 print(len(score.events), score.events[0].pitches)
+
+melody = Sequence((("C4", 1), ("D4", 1), ("E4", 2)))
+sheet = SheetMusic(melody, scale="C")
+sheet.to_file("melody.svg")
 
 from chordelia import Sequence, SequenceEntry
 
@@ -85,6 +91,7 @@ Deep documentation is in [docs/README.md](docs/README.md).
 - [Rhythm and Timing](docs/guides/rhythm-and-timing.md)
 - [Immutability](docs/immutability.md)
 - [API Overview](docs/api-overview.md)
+- [Sheet Rendering Quickstart](docs/quickstart.md#sheet-music-rendering)
 - [Development Guide](docs/development.md)
 
 ## Design Philosophy

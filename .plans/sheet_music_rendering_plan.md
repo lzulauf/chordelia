@@ -83,9 +83,9 @@ Expected docs delta classification: both README/docs updates and API updates.
 - [x] Phase 0: Canonical SheetMusic API finalized
 - [x] Phase 1: Score-backed write path implemented
 - [ ] Phase 2: Backend adapter integration completed
-- [ ] Phase 3: Notebook hooks implemented
-- [ ] Phase 4: Tests and visual regression completed
-- [ ] Phase 5: Docs/examples completed
+- [x] Phase 3: Notebook hooks implemented
+- [x] Phase 4: Tests and visual regression completed
+- [x] Phase 5: Docs/examples completed
 - [ ] Canonical SheetMusic workflow adopted
 
 ## Phases
@@ -105,14 +105,17 @@ Expected docs delta classification: both README/docs updates and API updates.
 
 ### Phase 3: Notebook rendering
 1. Implement rich-display hooks and fallbacks.
+2. Current state: complete with `_repr_mimebundle_` SVG + plain-text fallback.
 
 ### Phase 4: Verification
 1. Add unit/integration/visual regression tests.
 2. Add dependency-isolation validation.
+3. Current state: complete with snapshot baselines and dependency-isolation tests.
 
 ### Phase 5: Documentation
 1. Update docs and examples.
 2. Clarify boundaries and optional extras.
+3. Current state: complete across README/docs quickstart, API overview, docs index, and installation matrix.
 
 ## Execution order recommendation
 1. Lock API before backend expansion.

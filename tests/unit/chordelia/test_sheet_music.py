@@ -1,5 +1,6 @@
 """Tests for the SheetMusic score-backed rendering wrapper."""
 
+import builtins
 from importlib import resources
 from pathlib import Path
 import re
@@ -417,3 +418,30 @@ class TestSheetMusicNotebookDisplay:
     def test_v1_surface_excludes_parse_load_apis(self):
         assert not hasattr(SheetMusic, "load_from_file")
         assert not hasattr(SheetMusic, "score_from_file")
+
+
+class TestSheetMusicDependencyIsolation:
+    """Dependency-isolation boundaries for sheet core and notebook display helpers."""
+
+    def test_repr_mimebundle_does_not_import_optional_notebook_or_midi_modules(self, monkeypatch):
+        blocked_prefixes = (
+            "chordelia.midi_playback",
+            "IPython",
+            "matplotlib",
+            "music21",
+            "pretty_midi",
+            "mido",
+        )
+        original_import = builtins.__import__
+
+        def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if any(name == prefix or name.startswith(f"{prefix}.") for prefix in blocked_prefixes):
+                raise AssertionError(f"Unexpected optional dependency import attempted: {name}")
+            return original_import(name, globals, locals, fromlist, level)
+
+        monkeypatch.setattr(builtins, "__import__", guarded_import)
+
+        mimebundle = SheetMusic(Note("C4"))._repr_mimebundle_()
+
+        assert "image/svg+xml" in mimebundle
+        assert "text/plain" in mimebundle
