@@ -121,16 +121,37 @@ sheet.to_file("phrase.svg")
 
 `SheetMusic` is write-only in v1: use `to_file(...)` and notebook display, but no parse/load API.
 
-To route all `SheetMusic` SVG rendering through LilyPond, configure the backend once:
+To route all `SheetMusic` SVG rendering through LilyPond, set runtime rendering config once:
 
 ```python
-from chordelia.sheetmusic_backends import configure_sheet_music_lilypond_backend
+from chordelia.sheetmusic_backends import configure_sheetmusic_rendering
 
-configure_sheet_music_lilypond_backend("C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe")
+configure_sheetmusic_rendering(
+	backend_name="lilypond",
+	lilypond_executable="C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe",
+	crop=True,
+)
 
-# Crop to the rendered music bounds (default behavior).
 # To keep full-page output instead, pass crop=False.
-# configure_sheet_music_lilypond_backend(".../lilypond.exe", crop=False)
+```
+
+To make `Sequenceable` values render as sheet music directly in notebooks (without explicit `SheetMusic(...)` wrapping), install display hooks at startup:
+
+```python
+from chordelia.sheetmusic_backends import configure_sheetmusic_rendering
+
+configure_sheetmusic_rendering(
+	backend_name="lilypond",
+	lilypond_executable="C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe",
+	scale="D",
+	enable_notebook_hooks=True,
+)
+
+# Now evaluating Note/Chord/Sequence values renders via SheetMusic mime output.
+
+# Later, update only the scale while keeping backend and options unchanged.
+from chordelia.sheetmusic_backends import configure_sheetmusic_rendering
+configure_sheetmusic_rendering(scale="Eb")
 ```
 
 ## MIDI Interface Playback (Optional)

@@ -144,16 +144,42 @@ sheet.to_file("phrase.svg")
 
 ### Optional LilyPond Backend
 
-- Use `chordelia.sheetmusic_backends.configure_sheet_music_lilypond_backend(executable_path, crop=True)` to route `SheetMusic` SVG output through LilyPond.
+- Use `chordelia.sheetmusic_backends.configure_sheetmusic_rendering(...)` with `backend_name="lilypond"` to route `SheetMusic` SVG output through LilyPond.
 - This backend includes score-to-LilyPond conversion and subprocess rendering; calling code only provides the executable path.
 - With `crop=True` (default), LilyPond's cropped SVG output is preferred over full-page SVG.
 
 Example:
 
 ```python
-from chordelia.sheetmusic_backends import configure_sheet_music_lilypond_backend
+from chordelia.sheetmusic_backends import configure_sheetmusic_rendering
 
-configure_sheet_music_lilypond_backend("C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe")
+configure_sheetmusic_rendering(
+	backend_name="lilypond",
+	lilypond_executable="C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe",
+	crop=True,
+)
+```
+
+### Runtime Rendering Context and Notebook Hooks
+
+- Use `configure_sheetmusic_rendering(...)` to set global rendering options such as backend and default scale.
+- Set `enable_notebook_hooks=True` on `configure_sheetmusic_rendering(...)` to install notebook mimebundle hooks for Sequenceable concrete types.
+- Use `with_sheetmusic_rendering(...)` for temporary scoped configuration overrides.
+- Use `install_sequenceable_sheetmusic_display_hooks()` to attach notebook mime rendering hooks to Sequenceable concrete types.
+- Use `reset_sheetmusic_rendering_config()` and `uninstall_sequenceable_sheetmusic_display_hooks()` to reset runtime integration.
+- To change only the default scale while keeping backend and backend options unchanged, call `configure_sheetmusic_rendering(scale="Eb")`.
+
+Example startup wiring:
+
+```python
+from chordelia.sheetmusic_backends import configure_sheetmusic_rendering
+
+configure_sheetmusic_rendering(
+	backend_name="lilypond",
+	lilypond_executable="C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe",
+	scale="D",
+	enable_notebook_hooks=True,
+)
 ```
 
 ## Real-World Applications
