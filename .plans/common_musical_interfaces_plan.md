@@ -5,9 +5,9 @@ Implementing
 
 ## Dependency state
 1. Core `Sequenceable` contract, context model, and adapter fallback behavior are implemented in the common boundary.
-2. Phase 3 is dependency-gated and deferred to wrapper plans:
-   1. `.plans/sequence_to_midi_export_plan.md`
-   2. `.plans/sheet_music_rendering_plan.md`
+2. Phase 3 wrapper integration is partially complete:
+   1. `MidiFile` constructor integration is complete through `.plans/sequence_to_midi_export_plan.md`.
+   2. `SheetMusic` constructor integration remains deferred to `.plans/sheet_music_rendering_plan.md`.
 3. Phase 5 is dependency-gated and deferred until Phase 3 wrapper integration and Phase 4 native migration gates are complete.
 
 ## Goal
@@ -132,7 +132,7 @@ Expected docs delta classification: both README updates and docs updates.
 - [x] Phase 0: Sequenceable contract and context finalized
 - [x] Phase 1: Note/Chord/Sequence conformance implemented
 - [x] Phase 2: Adapter registry and fallback behavior implemented
-- [ ] Phase 3: Score and wrapper integration completed (deferred: wrapper plans)
+- [ ] Phase 3: Score and wrapper integration completed (MidiFile done; SheetMusic pending)
 - [ ] Phase 4: Required native type migrations completed
 - [ ] Phase 5: Adapter registry removed from runtime and public API (deferred: depends on Phase 3 and Phase 4)
 - [ ] Phase 6: Tests/docs completed
