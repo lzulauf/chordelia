@@ -1,7 +1,7 @@
 Duration model unification plan for chordelia.
 
 ## Status
-Implementing
+Done
 
 ## Goal
 Unify and simplify timing inputs so users can reason about durations with one consistent model across Sequence, Score, and playback workflows.
@@ -197,7 +197,10 @@ Expected docs delta classification: both README and docs updates.
 - [x] DurationLike aliases unified across modules
 - [x] Focused timing tests added/updated and passing
 - [x] Full test suite passing
-- [ ] Docs and examples updated to canonical model
+- [x] Docs and examples updated to canonical model
+
+Completion note:
+1. Completed on 2026-05-30 after finalizing docs/examples alignment and converging the public rhythm API on `Duration(...)` constructors with shared timeline coercion.
 
 ## Phases
 ### 1. Contract and coercion foundation
