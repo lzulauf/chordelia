@@ -4,6 +4,12 @@ import pytest
 
 import chordelia.sheetmusic_backends.runtime as runtime
 from chordelia.notes import Note
+from chordelia.scale_context import (
+    get_global_scale_context,
+    reset_global_scale_context,
+    set_global_scale_context,
+)
+from chordelia.scales import Scale
 from chordelia.sheet_music import SheetMusic
 
 
@@ -16,10 +22,12 @@ def _restore_runtime_state():
 
     runtime.uninstall_sequenceable_sheetmusic_display_hooks()
     runtime.reset_sheetmusic_rendering_config()
+    reset_global_scale_context()
     yield
 
     runtime.uninstall_sequenceable_sheetmusic_display_hooks()
     runtime._RENDERING_CONFIG.set(previous_config)  # type: ignore[attr-defined]
+    set_global_scale_context(previous_config.scale)
     SheetMusic._RENDER_BACKEND_ADAPTERS.clear()
     SheetMusic._RENDER_BACKEND_ADAPTERS.update(previous_adapters)
 
@@ -30,16 +38,26 @@ class TestSheetMusicRuntimeConfig:
     def test_configure_sheetmusic_rendering_updates_scale(self):
         config = runtime.configure_sheetmusic_rendering(scale="D")
 
-        assert config.scale == "D"
-        assert runtime.get_sheetmusic_rendering_config().scale == "D"
+        assert isinstance(config.scale, Scale)
+        assert str(config.scale.root) == "D"
+        assert str(get_global_scale_context().root) == "D"
+        assert str(runtime.get_sheetmusic_rendering_config().scale.root) == "D"
+
+    def test_runtime_config_reads_global_scale_context(self):
+        set_global_scale_context("F")
+
+        config = runtime.get_sheetmusic_rendering_config()
+
+        assert isinstance(config.scale, Scale)
+        assert str(config.scale.root) == "F"
 
     def test_with_sheetmusic_rendering_restores_previous_state(self):
         runtime.configure_sheetmusic_rendering(scale="C")
 
         with runtime.with_sheetmusic_rendering(scale="F"):
-            assert runtime.get_sheetmusic_rendering_config().scale == "F"
+            assert str(runtime.get_sheetmusic_rendering_config().scale.root) == "F"
 
-        assert runtime.get_sheetmusic_rendering_config().scale == "C"
+        assert str(runtime.get_sheetmusic_rendering_config().scale.root) == "C"
 
     def test_configure_sheetmusic_rendering_lilypond_delegates_backend_setup(self, monkeypatch):
         captured = {}
@@ -87,7 +105,8 @@ class TestSequenceableDisplayHooks:
 
         mimebundle = Note("Bb4")._repr_mimebundle_()
 
-        assert config.scale == "Bb"
+        assert isinstance(config.scale, Scale)
+        assert str(config.scale.root) == "Bb"
         assert "image/svg+xml" in mimebundle
         assert mimebundle["image/svg+xml"].count('class="key-accidental"') == 2
 

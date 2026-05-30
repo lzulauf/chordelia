@@ -10,6 +10,11 @@ from typing import Any, Iterator
 
 from chordelia.chords import Chord
 from chordelia.notes import Note
+from chordelia.scale_context import (
+    get_global_scale_context,
+    reset_global_scale_context,
+    set_global_scale_context,
+)
 from chordelia.sequences import Rest, Sequence
 from chordelia.sheet_music import SheetMusic
 from chordelia.sheetmusic_backends.lilypond import configure_sheet_music_lilypond_backend
@@ -41,8 +46,16 @@ _ORIGINAL_MIMEBUNDLE_METHODS: dict[type[Any], Any] = {}
 
 def get_sheetmusic_rendering_config() -> SheetMusicRenderingConfig:
     """Return the active sheet music rendering configuration."""
-
-    return _RENDERING_CONFIG.get()
+    current = _RENDERING_CONFIG.get()
+    global_scale = get_global_scale_context()
+    if current.scale is global_scale:
+        return current
+    return SheetMusicRenderingConfig(
+        backend_name=current.backend_name,
+        format_name=current.format_name,
+        scale=global_scale,
+        backend_options=dict(current.backend_options),
+    )
 
 
 def configure_sheetmusic_rendering(
@@ -65,7 +78,10 @@ def configure_sheetmusic_rendering(
         if format_name is None
         else SheetMusic._normalize_format(format_name)
     )
-    next_scale = current.scale if scale is _UNSET else scale
+    if scale is _UNSET:
+        next_scale = get_global_scale_context()
+    else:
+        next_scale = set_global_scale_context(scale)
 
     next_options = dict(current.backend_options)
     if lilypond_executable is not None:
@@ -95,7 +111,8 @@ def configure_sheetmusic_rendering(
 def reset_sheetmusic_rendering_config() -> SheetMusicRenderingConfig:
     """Reset runtime rendering configuration and backend wiring to defaults."""
 
-    default_config = SheetMusicRenderingConfig()
+    reset_global_scale_context()
+    default_config = SheetMusicRenderingConfig(scale=get_global_scale_context())
     _apply_backend(default_config)
     _RENDERING_CONFIG.set(default_config)
     return default_config
@@ -126,6 +143,7 @@ def with_sheetmusic_rendering(
     try:
         yield applied
     finally:
+        set_global_scale_context(previous_config.scale)
         _RENDERING_CONFIG.set(previous_config)
         SheetMusic._RENDER_BACKEND_ADAPTERS.clear()
         SheetMusic._RENDER_BACKEND_ADAPTERS.update(previous_adapters)
