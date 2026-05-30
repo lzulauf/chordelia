@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any, Iterable, TypeAlias
+from typing import TYPE_CHECKING, Any, Iterable, TypeAlias
 
 from chordelia.chords import Chord
 from chordelia.intervals import IntervalLike, coerce_chromatic_semitones
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
+from chordelia.scale_context import coerce_scale_context_value
 from chordelia.score import ScoreEvent, ScoreEventContext
 from chordelia.sequenceable import NotesLike, SequenceRender, Sequenceable, _sequence_render_for
+
+if TYPE_CHECKING:
+    from chordelia.scales import Scale
 
 
 DurationLike = Duration | int | float
@@ -105,6 +109,12 @@ class _SimultaneousPayload:
             tuple(_transpose_payload(layer, interval) for layer in self.layers)
         )
 
+    def shift(self, steps: int, *, scale: 'Scale | str | None' = None) -> "_SimultaneousPayload":
+        """Return a diatonically shifted copy while preserving simultaneous boundaries."""
+        return _SimultaneousPayload(
+            tuple(_shift_payload(layer, steps, scale=scale) for layer in self.layers)
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class Rest:
@@ -121,6 +131,14 @@ class Rest:
     def transpose(self, interval: IntervalLike | int) -> "Rest":
         """Transpose is a no-op for rests but accepted for recursive sequence transforms."""
         coerce_chromatic_semitones(interval)
+        return self
+
+    def shift(self, steps: int, *, scale: 'Scale | str | None' = None) -> "Rest":
+        """Shift is a no-op for rests but accepted for recursive sequence transforms."""
+        if not isinstance(steps, int) or isinstance(steps, bool):
+            raise TypeError(f"steps must be an int, got {type(steps).__name__}")
+        if scale is not None:
+            coerce_scale_context_value(scale)
         return self
 
 
@@ -209,6 +227,22 @@ class Sequence:
         )
         return Sequence(transposed_entries)
 
+    def shift(self, steps: int, *, scale: 'Scale | str | None' = None) -> "Sequence":
+        """Return a recursively shifted sequence with unchanged timing metadata."""
+        if not isinstance(steps, int) or isinstance(steps, bool):
+            raise TypeError(f"steps must be an int, got {type(steps).__name__}")
+
+        scale_obj = coerce_scale_context_value(scale) if scale is not None else None
+        shifted_entries = tuple(
+            SequenceEntry(
+                payload=_shift_payload(entry.payload, steps, scale=scale_obj),
+                duration=entry.duration,
+                offset=entry.offset,
+            )
+            for entry in self.entries
+        )
+        return Sequence(shifted_entries)
+
     def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
         """Render sequence entries into score events using deterministic span scheduling."""
         events: list[ScoreEvent] = []
@@ -278,5 +312,24 @@ def _transpose_payload(payload: Any, interval: IntervalLike | int) -> Any:
 
     raise ValueError(
         "Sequence.transpose requires Sequenceable payloads that implement transpose(interval). "
+        f"Unsupported payload type: {type(payload).__name__}."
+    )
+
+
+def _shift_payload(payload: Any, steps: int, *, scale: 'Scale | str | None' = None) -> Any:
+    """Diatonically shift one payload value or raise an actionable capability error."""
+    if isinstance(payload, Sequenceable):
+        shift_method = getattr(payload, "shift", None)
+        if shift_method is None:
+            raise ValueError(
+                "Sequence.shift requires Sequenceable payloads that implement shift(steps). "
+                f"Unsupported payload type: {type(payload).__name__}."
+            )
+        if scale is None:
+            return shift_method(steps)
+        return shift_method(steps, scale=scale)
+
+    raise ValueError(
+        "Sequence.shift requires Sequenceable payloads that implement shift(steps). "
         f"Unsupported payload type: {type(payload).__name__}."
     )
