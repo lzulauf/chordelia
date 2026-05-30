@@ -1,7 +1,7 @@
 Sheet-music rendering plan for chordelia.
 
 ## Status
-Implementing
+Complete
 
 ## Goal
 Make `SheetMusic` the canonical sheet-rendering wrapper around `Score` (and therefore `Sequenceable` inputs), supporting file output (SVG/image) and notebook rendering, without file parsing/read support in v1.
@@ -82,11 +82,11 @@ Expected docs delta classification: both README/docs updates and API updates.
 ## Progress checklist
 - [x] Phase 0: Canonical SheetMusic API finalized
 - [x] Phase 1: Score-backed write path implemented
-- [ ] Phase 2: Backend adapter integration completed
+- [x] Phase 2: Backend adapter integration completed
 - [x] Phase 3: Notebook hooks implemented
 - [x] Phase 4: Tests and visual regression completed
 - [x] Phase 5: Docs/examples completed
-- [ ] Canonical SheetMusic workflow adopted
+- [x] Canonical SheetMusic workflow adopted
 
 ## Phases
 ### Phase 0: API lock
@@ -102,6 +102,7 @@ Expected docs delta classification: both README/docs updates and API updates.
 ### Phase 2: Backend adapters
 1. Connect canonical output to selected rendering backend(s).
 2. Validate format support and deterministic output.
+3. Current state: complete with format-to-renderer adapter dispatch and backend-misconfiguration test coverage.
 
 ### Phase 3: Notebook rendering
 1. Implement rich-display hooks and fallbacks.

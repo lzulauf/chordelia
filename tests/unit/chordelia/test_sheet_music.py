@@ -4,9 +4,11 @@ import builtins
 from importlib import resources
 from pathlib import Path
 import re
+import subprocess
 
 import pytest
 
+import chordelia.sheetmusic_backends.lilypond as lilypond_backend
 from chordelia.chords import Chord
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
@@ -194,6 +196,95 @@ class TestSheetMusicFileOutput:
 
         with pytest.raises(ValueError, match="Supported formats: svg"):
             sheet.to_file(tmp_path / "rendered.pdf", format="pdf")
+
+    def test_to_file_dispatches_through_backend_adapter_map(self, tmp_path: Path, monkeypatch):
+        sheet = SheetMusic(Note("C4"))
+
+        def fake_svg_renderer(_sheet):
+            return "<svg data-renderer=\"fake\"></svg>"
+
+        monkeypatch.setattr(SheetMusic, "_RENDER_BACKEND_ADAPTERS", {"svg": fake_svg_renderer})
+
+        output_path = sheet.to_file(tmp_path / "adapter.svg")
+
+        content = output_path.read_text(encoding="utf-8")
+        assert "data-renderer=\"fake\"" in content
+
+    def test_to_file_raises_for_misconfigured_backend_adapter(self, tmp_path: Path, monkeypatch):
+        sheet = SheetMusic(Note("C4"))
+        monkeypatch.setattr(SheetMusic, "_RENDER_BACKEND_ADAPTERS", {"svg": "_missing_renderer"})
+
+        with pytest.raises(RuntimeError, match="not callable"):
+            sheet.to_file(tmp_path / "broken.svg")
+
+    def test_configure_lilypond_backend_sets_svg_adapter(self, monkeypatch):
+        def fake_renderer_factory(_path, *, crop):
+            assert crop is True
+            return lambda _sheet: "<svg data-renderer=\"lilypond\"></svg>"
+
+        monkeypatch.setattr(
+            lilypond_backend,
+            "make_lilypond_svg_renderer",
+            fake_renderer_factory,
+        )
+
+        original_adapter = SheetMusic._RENDER_BACKEND_ADAPTERS.get("svg")
+        try:
+            lilypond_backend.configure_sheet_music_lilypond_backend("C:/tools/lilypond.exe")
+            configured = SheetMusic._RENDER_BACKEND_ADAPTERS["svg"]
+            assert callable(configured)
+            assert configured(SheetMusic(Note("C4"))).startswith("<svg")
+        finally:
+            SheetMusic._RENDER_BACKEND_ADAPTERS["svg"] = original_adapter
+
+    def test_lilypond_renderer_invokes_executable_and_reads_cropped_svg(self, monkeypatch):
+        sheet = SheetMusic(Note("C4"))
+
+        monkeypatch.setattr(lilypond_backend.shutil, "which", lambda _name: None)
+
+        def fake_run(command, **kwargs):
+            assert kwargs["capture_output"] is True
+            assert kwargs["text"] is True
+            assert kwargs["check"] is False
+            assert "-dcrop" in command
+            out_index = command.index("-o") + 1
+            output_prefix = Path(command[out_index])
+            normal_svg = output_prefix.parent / f"{output_prefix.name}.svg"
+            normal_svg.write_text("<svg id=\"lilypond-normal\"/>", encoding="utf-8")
+            cropped_svg = output_prefix.parent / f"{output_prefix.name}.cropped.svg"
+            cropped_svg.write_text("<svg id=\"lilypond-cropped\"/>", encoding="utf-8")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        monkeypatch.setattr(lilypond_backend.subprocess, "run", fake_run)
+
+        renderer = lilypond_backend.make_lilypond_svg_renderer("C:/tools/lilypond.exe")
+        rendered = renderer(sheet)
+        assert "lilypond-cropped" in rendered
+
+    def test_lilypond_renderer_can_disable_cropping(self, monkeypatch):
+        sheet = SheetMusic(Note("C4"))
+
+        monkeypatch.setattr(lilypond_backend.shutil, "which", lambda _name: None)
+
+        def fake_run(command, **kwargs):
+            assert kwargs["capture_output"] is True
+            assert kwargs["text"] is True
+            assert kwargs["check"] is False
+            assert "-dcrop" not in command
+            out_index = command.index("-o") + 1
+            output_prefix = Path(command[out_index])
+            svg_path = output_prefix.parent / f"{output_prefix.name}.svg"
+            svg_path.write_text("<svg id=\"lilypond-uncropped\"/>", encoding="utf-8")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        monkeypatch.setattr(lilypond_backend.subprocess, "run", fake_run)
+
+        renderer = lilypond_backend.make_lilypond_svg_renderer(
+            "C:/tools/lilypond.exe",
+            crop=False,
+        )
+        rendered = renderer(sheet)
+        assert "lilypond-uncropped" in rendered
 
     def test_score_to_file_requires_score_instance(self, tmp_path: Path):
         with pytest.raises(TypeError, match="Score instance"):
@@ -418,6 +509,21 @@ class TestSheetMusicNotebookDisplay:
     def test_v1_surface_excludes_parse_load_apis(self):
         assert not hasattr(SheetMusic, "load_from_file")
         assert not hasattr(SheetMusic, "score_from_file")
+
+    def test_repr_mimebundle_uses_backend_adapter_dispatch(self, monkeypatch):
+        original_adapter = SheetMusic._RENDER_BACKEND_ADAPTERS.get("svg")
+        try:
+            monkeypatch.setattr(
+                SheetMusic,
+                "_RENDER_BACKEND_ADAPTERS",
+                {
+                    "svg": lambda _sheet: "<svg data-renderer=\"notebook-adapter\"></svg>",
+                },
+            )
+            mimebundle = SheetMusic(Note("C4"))._repr_mimebundle_()
+            assert "notebook-adapter" in mimebundle["image/svg+xml"]
+        finally:
+            SheetMusic._RENDER_BACKEND_ADAPTERS["svg"] = original_adapter
 
 
 class TestSheetMusicDependencyIsolation:

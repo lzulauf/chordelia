@@ -5,7 +5,7 @@ from __future__ import annotations
 from fractions import Fraction
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Callable
 
 from chordelia.score import Score
 from chordelia.scales import Scale
@@ -13,6 +13,10 @@ from chordelia.scales import Scale
 
 class SheetMusic:
     """Canonical sheet-rendering wrapper around a normalized Score."""
+
+    _RENDER_BACKEND_ADAPTERS: dict[str, str | Callable[["SheetMusic"], str]] = {
+        "svg": "_render_svg",
+    }
 
     _LETTER_INDEX = {"C": 0, "D": 1, "E": 2, "F": 3, "G": 4, "A": 5, "B": 6}
     _MIDI_TO_LETTER_INDEX = {
@@ -99,13 +103,35 @@ class SheetMusic:
         output_path = Path(file_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if normalized_format == "svg":
-            output_path.write_text(self._render_svg(), encoding="utf-8")
-            return output_path
-
-        raise ValueError(
-            f"Unsupported sheet output format {format!r}. Supported formats: svg"
+        rendered_output = self._render_with_backend(
+            normalized_format,
+            original_format=format,
         )
+        output_path.write_text(rendered_output, encoding="utf-8")
+        return output_path
+
+    def _render_with_backend(self, normalized_format: str, *, original_format: str) -> str:
+        """Dispatch rendering through the configured backend adapter map."""
+        renderer_entry = self._RENDER_BACKEND_ADAPTERS.get(normalized_format)
+        if renderer_entry is None:
+            supported_formats = ", ".join(sorted(self._RENDER_BACKEND_ADAPTERS))
+            raise ValueError(
+                f"Unsupported sheet output format {original_format!r}. Supported formats: {supported_formats}"
+            )
+
+        if isinstance(renderer_entry, str):
+            renderer = getattr(self, renderer_entry, None)
+            if not callable(renderer):
+                raise RuntimeError(
+                    f"Configured sheet renderer {renderer_entry!r} for format {normalized_format!r} is not callable"
+                )
+            return renderer()
+
+        if not callable(renderer_entry):
+            raise RuntimeError(
+                f"Configured sheet renderer {renderer_entry!r} for format {normalized_format!r} is not callable"
+            )
+        return renderer_entry(self)
 
     def _repr_mimebundle_(self, include=None, exclude=None):
         """Return a notebook-friendly mime bundle with SVG and plain-text fallback."""
@@ -118,7 +144,10 @@ class SheetMusic:
             ")"
         )
         return {
-            "image/svg+xml": self._render_svg(),
+            "image/svg+xml": self._render_with_backend(
+                "svg",
+                original_format="image/svg+xml",
+            ),
             "text/plain": summary,
         }
 

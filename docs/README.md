@@ -23,6 +23,7 @@ Back links: [Project README](../README.md)
 ## Sheet Rendering Workflow
 
 - [Quickstart](quickstart.md#sheet-music-rendering): score-backed `SheetMusic` SVG export and notebook display.
+- [Quickstart](quickstart.md#sheet-music-rendering): includes optional LilyPond backend configuration with executable-path injection.
 - [API Overview](api-overview.md#sheet-music-workflow): canonical `SheetMusic` API and v1 write-only boundary.
 
 ## Optional MIDI Workflow

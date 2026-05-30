@@ -142,6 +142,20 @@ sheet.to_file("phrase.svg")
 
 - `SheetMusic` is part of the core package (`pip install chordelia`), with no dependency on MIDI extras.
 
+### Optional LilyPond Backend
+
+- Use `chordelia.sheetmusic_backends.configure_sheet_music_lilypond_backend(executable_path, crop=True)` to route `SheetMusic` SVG output through LilyPond.
+- This backend includes score-to-LilyPond conversion and subprocess rendering; calling code only provides the executable path.
+- With `crop=True` (default), LilyPond's cropped SVG output is preferred over full-page SVG.
+
+Example:
+
+```python
+from chordelia.sheetmusic_backends import configure_sheet_music_lilypond_backend
+
+configure_sheet_music_lilypond_backend("C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe")
+```
+
 ## Real-World Applications
 
 - Music education and theory tooling
