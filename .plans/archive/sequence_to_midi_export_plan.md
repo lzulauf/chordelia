@@ -1,7 +1,7 @@
 Sequence-to-MIDI export plan for chordelia.
 
 ## Status
-Implementing
+Done
 
 ## Goal
 Make `MidiFile` the canonical MIDI wrapper class around `Score` (and therefore `Sequenceable` inputs), with explicit read/write APIs.
@@ -78,8 +78,11 @@ Expected docs delta classification: both README/docs updates and API updates.
 - [x] Phase 2: File-read to Score path implemented
 - [x] Phase 3: Class-only API surface adopted (legacy helper delegates removed)
 - [x] Phase 4: Notebook rendering scope moved to dedicated plan
-- [ ] Phase 5: Tests/docs completed for read/write scope
-- [ ] Canonical MidiFile workflow adopted
+- [x] Phase 5: Tests/docs completed for read/write scope
+- [x] Canonical MidiFile workflow adopted
+
+Completion note:
+1. Completed on 2026-05-30 with expanded round-trip and overlap-read coverage in `tests/unit/chordelia/test_midifile.py` and canonical workflow documentation updates in `docs/api-overview.md` and `docs/tutorials/playback-and-midi.md`.
 
 ## Phases
 ### Phase 0: API lock

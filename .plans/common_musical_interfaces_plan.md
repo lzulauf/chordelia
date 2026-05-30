@@ -6,7 +6,7 @@ Implementing
 ## Dependency state
 1. Core `Sequenceable` contract, context model, and adapter fallback behavior are implemented in the common boundary.
 2. Phase 3 wrapper integration is complete:
-   1. `MidiFile` constructor integration is complete through `.plans/sequence_to_midi_export_plan.md`.
+   1. `MidiFile` constructor integration is complete through `.plans/archive/sequence_to_midi_export_plan.md`.
    2. `SheetMusic` constructor integration is complete through `.plans/sheet_music_rendering_plan.md`.
 3. Phase 5 is dependency-gated and deferred until Phase 3 wrapper integration and Phase 4 native migration gates are complete.
 
@@ -105,7 +105,7 @@ Define and adopt `Sequenceable` as the canonical capability interface for object
 ## Cross-plan references
 1. `.plans/archive/first_class_sequence_support_plan.md`.
 2. `.plans/shared_score_ir_implementation_plan.md`.
-3. `.plans/sequence_to_midi_export_plan.md`.
+3. `.plans/archive/sequence_to_midi_export_plan.md`.
 4. `.plans/sheet_music_rendering_plan.md`.
 
 ## Testing approach
@@ -153,7 +153,7 @@ Expected docs delta classification: both README updates and docs updates.
 
 ### Phase 3: Pipeline integration (dependency-gated)
 1. Keep `Score` on the canonical interface path in this plan.
-2. Defer `MidiFile` constructor integration to `.plans/sequence_to_midi_export_plan.md`.
+2. Defer `MidiFile` constructor integration to `.plans/archive/sequence_to_midi_export_plan.md`.
 3. Defer `SheetMusic` constructor integration to `.plans/sheet_music_rendering_plan.md`.
 4. Current state: wrapper constructor integration for both `MidiFile` and `SheetMusic` is complete.
 

@@ -90,7 +90,7 @@ Implement `Sequence` as the primary composition building block for ordering and 
 ## Cross-plan references and dependency alignment
 1. `.plans/shared_score_ir_implementation_plan.md`:
    1. `Score`/event model boundary consumed by this plan.
-2. `.plans/sequence_to_midi_export_plan.md`:
+2. `.plans/archive/sequence_to_midi_export_plan.md`:
    1. `MidiFile` should consume `Score` produced from `Sequence`.
 3. `.plans/sheet_music_rendering_plan.md`:
    1. `SheetMusic` should consume `Score` produced from `Sequence`.
