@@ -51,6 +51,17 @@ song = Sequence((a, b, c, a))
 score = Score.from_sequenceable(song, tempo=120, time_signature=(4, 4), key_signature="E minor")
 ```
 
+Movement contract quick check:
+
+```python
+with with_global_scale_context(scale):
+	print(Note("E4").shift(2))   # G4 (diatonic)
+
+print(Note("E4").transpose("1"))  # F4 (one semitone)
+```
+
+Use `shift(...)` for diatonic scale-step movement and `transpose(...)` for chromatic semitone movement.
+
 The resulting `Score` is the canonical shared boundary for both rendering and MIDI export.
 
 ### 2) Render that same song as sheet music

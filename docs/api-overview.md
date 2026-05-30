@@ -61,6 +61,7 @@ Key behaviors:
 - `Sequence.appended(...)` composes forms immutably.
 - `Sequence.transpose(...)` is chromatic (semitones).
 - `Sequence.shift(...)` is diatonic (scale steps).
+- `Note.shift(...)` and `Chord.shift(...)` use `scale=...` when provided and otherwise use global scale context helpers.
 - `Score.duration` returns normalized timeline span.
 - `Score.with_(...)` returns immutable metadata/source/event updates.
 - `MidiFile(...)` and `SheetMusic(...)` both normalize through the same score-first conversion path.

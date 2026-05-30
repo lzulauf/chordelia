@@ -30,6 +30,23 @@ print(g)  # G
 print(c.interval_to(g))  # P5
 ```
 
+## Shift vs Transpose
+
+```python
+from chordelia import Note, Scale, ScaleType, with_global_scale_context
+
+c_major = Scale("C", ScaleType.MAJOR)
+note = Note("E4")
+
+print(note.shift(2, scale=c_major))  # G4 (diatonic shift)
+
+with with_global_scale_context(c_major):
+	print(note.shift(2))  # G4 (same result via global fallback)
+
+print(note.transpose("1"))   # F4 (one semitone)
+print(note.transpose("P5"))  # B4 (explicit interval quality)
+```
+
 ## Enharmonic Equivalents
 
 ```python
