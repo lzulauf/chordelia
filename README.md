@@ -76,6 +76,17 @@ print(len(stacked_layers.render_for_context(ScoreEventContext()).events))  # 2
 motif = Sequence((("C4", 1), ("E4", 1)))
 transposed = motif.transpose("2")
 print([event.pitches for event in transposed.render_for_context(ScoreEventContext()).events])
+
+# Recursive sequence shift uses diatonic movement in a scale context.
+shifted = motif.shift(1, scale="C")
+print([event.pitches for event in shifted.render_for_context(ScoreEventContext()).events])
+
+# Global scale context lets you omit scale=... across related shift calls.
+from chordelia import with_global_scale_context
+with with_global_scale_context("C"):
+	print(Note("E4").shift(2))
+	print(Chord("C4").shift(1).name)
+	print([event.pitches for event in motif.shift(1).render_for_context(ScoreEventContext()).events])
 ```
 
 For a fuller walkthrough, see [docs/quickstart.md](docs/quickstart.md).

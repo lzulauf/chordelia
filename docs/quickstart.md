@@ -13,6 +13,10 @@ c4 = Note("C4")
 g4 = c4.transpose(Interval(IntervalQuality.PERFECT, 5))
 print(c4, g4)  # C4 G4
 print(c4.interval_to(g4))  # P5
+
+# Diatonic movement (scale-aware):
+e4 = Note("E4")
+print(e4.shift(2, scale="C"))  # G4
 ```
 
 ## Scales
@@ -45,6 +49,9 @@ print(first_inversion.name)
 
 print(c_maj7.tone_at("III"))          # G
 print(c_maj7.degree_for_tone(c_maj7.tone_at(2)))  # 2
+
+# Diatonic chord movement keeps quality/extensions and shifts chord tones in-scale.
+print(c_maj7.shift(1, scale="C").name)  # Dmaj7
 ```
 
 ## Rhythm and Timing
@@ -103,6 +110,29 @@ print([event.pitches for event in stacked_events])  # [(60, 64), (67, 71)]
 motif = Sequence(((Chord("Am4"), 1), (Chord("Dm4"), 1)))
 arrangement = Sequence([motif] * 2)
 print(len(arrangement.entries))  # 2
+
+# Transpose = chromatic (semitones), shift = diatonic (scale steps).
+print([event.pitches for event in motif.transpose("2").render_for_context(ScoreEventContext()).events])
+print([event.pitches for event in motif.shift(1, scale="C").render_for_context(ScoreEventContext()).events])
+
+# Or set global scale context once and omit scale=... at call sites.
+from chordelia import with_global_scale_context
+with with_global_scale_context("C"):
+	print([event.pitches for event in motif.shift(1).render_for_context(ScoreEventContext()).events])
+```
+
+## Global Scale Context
+
+```python
+from chordelia import Chord, Note, Sequence, ScoreEventContext, with_global_scale_context
+
+motif = Sequence((("C4", 1), ("E4", 1)))
+
+# Set scale context once for a block of diatonic operations.
+with with_global_scale_context("C"):
+	print(Note("E4").shift(2))
+	print(Chord("C4").shift(1).name)
+	print([event.pitches for event in motif.shift(1).render_for_context(ScoreEventContext()).events])
 ```
 
 ## Sheet Music Rendering

@@ -9,7 +9,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `Degree`: Degree value object with numeric and Roman coercion helpers.
 - `Scale`: Scale generation with theory-aware note spelling.
 - `Chord`: Chord quality, extensions, inversions, and slash chords.
-- `Sequenceable`: Protocol for objects that render normalized score events/consumed span and support transpose transforms.
+- `Sequenceable`: Protocol for objects that render normalized score events/consumed span and support transform APIs (`transpose`, and optionally `shift` for diatonic workflows).
 - `NotesLike`: Protocol for values that can represent zero or more notes.
 - `Sequence`: Immutable ordered timeline of sequence entries.
 - `SequenceEntry`: One payload plus duration/offset timing metadata.
@@ -65,6 +65,8 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - Constructor input can include bare `Sequenceable` values, which coerce to default 1-beat entries.
 - Constructor input can include child `Sequence` values, which are treated as sequenceable payloads and consume their rendered span.
 - `Sequence.transpose(interval)` recursively transposes payloads while preserving entry duration and offset timing metadata.
+- `Sequence.shift(steps, scale=None)` recursively applies diatonic shifting while preserving entry duration and offset timing metadata.
+- `Sequence.shift(..., scale="C")` uses explicit scale context; omit `scale` to use global context from `set_global_scale_context(...)` or `with_global_scale_context(...)`.
 - Empty iterables coerce to `Rest`.
 
 Example:
