@@ -132,6 +132,75 @@ class TestRandomSequenceDispatchAndDeterminism:
         assert motif._motif_template is not None
         assert seq_a == seq_b
 
+    def test_motif_algorithm_accepts_explicit_motif_sequence_constructor_arg(self):
+        rng = Random(seed=77)
+        motif_sequence = Sequence(
+            (
+                (Note("C4"), 1),
+                (Note("D4"), 1),
+            )
+        )
+        motif = MotifVariationSequenceAlgorithm(
+            motif_beats=2,
+            motif_sequence=motif_sequence,
+        )
+
+        sequence = rng.sequence(
+            4,
+            algorithm=motif,
+            mutation_probability=0,
+        )
+
+        expected = Sequence(
+            (
+                (Note("C4"), 1),
+                (Note("D4"), 1),
+                (Note("C4"), 1),
+                (Note("D4"), 1),
+            )
+        )
+        assert sequence == expected
+
+    def test_motif_algorithm_constructor_rejects_non_sequence_motif_sequence(self):
+        with pytest.raises(TypeError, match="motif_sequence must be a chordelia.sequences.Sequence"):
+            MotifVariationSequenceAlgorithm(
+                motif_sequence=[(Note("C4"), 1)],
+            )
+
+    def test_motif_algorithm_constructor_rejects_empty_motif_sequence(self):
+        with pytest.raises(ValueError, match="motif_sequence must contain at least one entry"):
+            MotifVariationSequenceAlgorithm(
+                motif_sequence=Sequence(()),
+            )
+
+    def test_motif_algorithm_rejects_call_time_motif_sequence_arg(self):
+        rng = Random(seed=77)
+        motif = MotifVariationSequenceAlgorithm(motif_beats=2)
+
+        with pytest.raises(TypeError, match="motif_sequence must be provided to"):
+            rng.sequence(
+                4,
+                algorithm=motif,
+                motif_sequence=Sequence(((Note("C4"), 1),)),
+            )
+
+    def test_motif_algorithm_mutation_handles_out_of_scale_motif_note(self):
+        rng = Random(seed=77)
+        motif = MotifVariationSequenceAlgorithm(
+            motif_sequence=Sequence(((Note("C#4"), 1),))
+        )
+
+        sequence = rng.sequence(
+            4,
+            algorithm=motif,
+            scale="C major",
+            mutation_probability=1.0,
+        )
+
+        assert _consumed_beats(sequence) == Fraction(4, 1)
+        assert len(sequence.entries) == 4
+        assert all(isinstance(entry.payload, Note) for entry in sequence.entries)
+
 
 class TestBuiltInSequenceAlgorithms:
     """Behavior checks for built-in sequence randomization algorithms."""

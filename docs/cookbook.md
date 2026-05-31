@@ -252,7 +252,25 @@ phrase_b = rng.sequence(
 print(phrase_a == phrase_b)
 ```
 
-## 17) Use weighted random algorithm selection
+## 17) Seed motif variation from an explicit motif sequence
+
+```python
+from chordelia import MotifVariationSequenceAlgorithm, Note, Random, Sequence
+
+rng = Random(seed=77)
+motif_sequence = Sequence(((Note("C4"), 1), (Note("D4"), 1)))
+motif = MotifVariationSequenceAlgorithm(motif_sequence=motif_sequence)
+
+phrase = rng.sequence(
+    4,
+    algorithm=motif,
+    mutation_probability=0,
+)
+
+print([entry.payload for entry in phrase.entries])
+```
+
+## 18) Use weighted random algorithm selection
 
 ```python
 from chordelia import Random
@@ -273,7 +291,7 @@ phrase = rng.sequence(
 print(len(phrase.entries))
 ```
 
-## 18) Sequence argument placement cheat sheet
+## 19) Sequence argument placement cheat sheet
 
 ```python
 from chordelia import MotifVariationSequenceAlgorithm, Random

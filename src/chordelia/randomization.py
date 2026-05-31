@@ -541,6 +541,9 @@ class MotifVariationSequenceAlgorithm(SequenceRandomizationAlgorithm):
             Optional default motif span used when generate(..., motif_beats=...) is
             not provided. If omitted entirely, motif span defaults to 4 beats or
             beat_length, whichever is smaller.
+        - motif_sequence: Sequence | None
+            Optional initial motif template. When provided, this sequence becomes
+            the active motif template used until reset or rebuilt.
 
         Accepted generate kwargs:
         - motif_beats: TimelineLike
@@ -551,6 +554,8 @@ class MotifVariationSequenceAlgorithm(SequenceRandomizationAlgorithm):
         - mutation_probability: float in [0, 1]
             Probability that each repeated motif payload mutates.
             Default is 0.25.
+            Notes outside the active scale mutate chromatically by one semitone
+            to preserve directional motion without requiring diatonic membership.
         - motif_event_type_weights: WeightInput[str]
             Relative action weights used only when initially building the motif via
             PureRandomSequenceAlgorithm.
@@ -565,9 +570,18 @@ class MotifVariationSequenceAlgorithm(SequenceRandomizationAlgorithm):
     name: ClassVar[str] = "motif_variation"
     default_selection_weight: ClassVar[float] = 40.0
 
-    def __init__(self, *, motif_beats: TimelineLike | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        motif_beats: TimelineLike | None = None,
+        motif_sequence: Sequence | None = None,
+    ) -> None:
         self._motif_beats = motif_beats
-        self._motif_template: tuple[tuple[Any, Fraction], ...] | None = None
+        self._motif_template = (
+            self._template_from_motif_sequence(motif_sequence)
+            if motif_sequence is not None
+            else None
+        )
 
     def generate(
         self,
@@ -595,6 +609,9 @@ class MotifVariationSequenceAlgorithm(SequenceRandomizationAlgorithm):
             mutation_probability: float in [0, 1]
                 Probability that each repeated motif payload mutates.
                 Default is 0.25.
+                Notes outside the active scale mutate chromatically by one
+                semitone to preserve directional motion without requiring
+                diatonic membership.
             motif_event_type_weights: WeightInput[str]
                 Relative action weights used only when initially building the motif
                 via PureRandomSequenceAlgorithm.
@@ -607,6 +624,12 @@ class MotifVariationSequenceAlgorithm(SequenceRandomizationAlgorithm):
         """
         scale_obj = _resolve_optional_scale(scale)
         chord_obj = _resolve_optional_chord(chord)
+
+        if "motif_sequence" in params:
+            raise TypeError(
+                "motif_sequence must be provided to "
+                "MotifVariationSequenceAlgorithm(...) constructor"
+            )
 
         motif_span = self._resolve_motif_span(
             beat_length,
@@ -700,6 +723,27 @@ class MotifVariationSequenceAlgorithm(SequenceRandomizationAlgorithm):
             for entry in motif_source.entries
         )
 
+    def _template_from_motif_sequence(
+        self,
+        motif_sequence: Sequence,
+    ) -> tuple[tuple[Any, Fraction], ...]:
+        if not isinstance(motif_sequence, Sequence):
+            raise TypeError(
+                "motif_sequence must be a chordelia.sequences.Sequence instance"
+            )
+
+        template = tuple(
+            (entry.payload, entry.duration.as_beats())
+            for entry in motif_sequence.entries
+        )
+        if not template:
+            raise ValueError("motif_sequence must contain at least one entry")
+
+        if any(duration <= 0 for _, duration in template):
+            raise ValueError("motif_sequence entries must have positive durations")
+
+        return template
+
     def _mutate_payload(
         self,
         payload: Any,
@@ -714,10 +758,19 @@ class MotifVariationSequenceAlgorithm(SequenceRandomizationAlgorithm):
             return payload
 
         if isinstance(payload, Note):
+            direction = rng.engine.choice((-1, 1))
+            payload_note = _ensure_note_has_octave(payload, fallback_octave=4)
+
             if scale is not None:
-                direction = rng.engine.choice((-1, 1))
-                return payload.shift(direction, scale=scale)
-            return payload.transpose(rng.engine.choice((-1, 1)))
+                normalized_scale = _scale_with_octave_for_sequence(
+                    scale,
+                    fallback_octave=payload_note.octave or 4,
+                )
+                if normalized_scale.degree_for_chord_root(payload_note) is not None:
+                    return payload_note.shift(direction, scale=normalized_scale)
+                return payload_note.transpose(direction)
+
+            return payload_note.transpose(direction)
 
         return payload
 
