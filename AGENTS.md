@@ -56,6 +56,16 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 	- Reducing duplicated documentation content and improving cross-links
 	- Updating README/docs for public API, behavior, or usage changes
 
+### docstring-writing
+
+- Path: skills/docstring-writing.md
+- Use when:
+	- Writing or updating Python docstrings
+	- Standardizing docstring structure across modules/classes/functions
+	- Clarifying parameter constraints, return behavior, and raised exceptions
+	- Adding concise examples for non-obvious public APIs
+	- Refreshing stale docstrings after API or behavior changes
+
 ### skill-writing
 
 - Path: skills/skill-writing.md
@@ -111,8 +121,10 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 - If a task is primarily about creating, updating, or restructuring execution plans, load plan-use.
 - If a task is primarily about selecting or ranking the next plan in .plans, load next-work-selection.
 - If a task changes public APIs, parsing/validation behavior, or user-facing workflows/examples, load readme-writing to update docs/README or record a no-docs-delta rationale.
+- If a task is primarily about adding, updating, or standardizing docstrings, load docstring-writing.
 - If a task is primarily about choosing between implementation approaches, load decision-writing.
 - If a task is primarily about README/docs structure or documentation ownership boundaries, load readme-writing.
+- If code changes alter public API behavior or contracts, load docstring-writing with test-writing and/or readme-writing as needed.
 - If a task is primarily about creating or reviewing skill files, load skill-writing.
 - If a task is primarily about naming strategy, load function-naming.
 - If a task is primarily about immutable model design, load immutable-types.
@@ -134,6 +146,7 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 - Keep plan authoring and execution standards in skills/plan-use.md.
 - Keep next-work prioritization and ranking standards in skills/next-work-selection.md.
 - Keep README/docs structuring conventions in skills/readme-writing.md.
+- Keep docstring conventions in skills/docstring-writing.md.
 - Keep skill authoring/review conventions in skills/skill-writing.md.
 - Keep decision-document conventions in skills/decision-writing.md.
 - Keep global naming conventions in skills/function-naming.md.
