@@ -67,10 +67,14 @@ Seeded random workflow quick check:
 ```python
 rng = Random(seed=202606)
 scale = rng.scale()
+motif = MotifVariationSequenceAlgorithm(motif_beats=2)
+phrase = rng.sequence(8, algorithm=motif, scale=scale)
 progression = [rng.chord(scale=scale).name for _ in range(4)]
+
+print(len(phrase.entries))
 ```
 
-For weighted and global-singleton randomization recipes, see [Cookbook](docs/cookbook.md).
+For weighted algorithm selection, stateful motif reuse, and global-singleton randomization recipes, see [Cookbook](docs/cookbook.md).
 
 The resulting `Score` is the canonical shared boundary for both rendering and MIDI export.
 

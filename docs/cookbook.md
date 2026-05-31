@@ -216,6 +216,53 @@ print(get_global_random().chromatic_note())
 reset_global_random()
 ```
 
+## 15) Generate a seeded phrase-length sequence
+
+```python
+from chordelia import Random
+
+rng = Random(seed=202606)
+phrase = rng.sequence(8, scale="A minor")
+
+print(len(phrase.entries))
+print(sum(entry.duration.as_beats() for entry in phrase.entries))
+```
+
+## 16) Reuse motif algorithm state across phrases
+
+```python
+from chordelia import MotifVariationSequenceAlgorithm, Random
+
+rng = Random(seed=77)
+motif = MotifVariationSequenceAlgorithm(motif_beats=2)
+
+phrase_a = rng.sequence(8, algorithm=motif, scale="D minor", mutation_probability=0)
+phrase_b = rng.sequence(8, algorithm=motif, scale="D minor", mutation_probability=0)
+
+print(phrase_a == phrase_b)
+```
+
+## 17) Use weighted random algorithm selection
+
+```python
+from chordelia import Random
+
+rng = Random(seed=202606)
+phrase = rng.sequence(
+    16,
+    algorithm_weights={
+        "motif_variation": 40,
+        "scale_walk": 30,
+        "chord_anchor_walk": 20,
+        "pure_random": 10,
+    },
+    scale="A minor",
+    chord="Am",
+)
+
+print(len(phrase.entries))
+```
+
 ## Related
 
 - [Quickstart](quickstart.md)

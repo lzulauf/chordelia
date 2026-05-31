@@ -44,6 +44,9 @@ Main APIs:
 - `Random.choice(...)`, `Random.weighted_choice(...)`, `Random.weighted_choice_map(...)`
 - `Random.scale(...)`, `Random.degree(...)`, `Random.note(...)`, `Random.chord(...)`
 - `Random.chromatic_note(...)`, `Random.chromatic_chord(...)`, `Random.interval(...)`
+- `Random.sequence(...)`
+- `SequenceRandomizationAlgorithm`
+- `PureRandomSequenceAlgorithm`, `MotifVariationSequenceAlgorithm`, `ScaleWalkSequenceAlgorithm`, `ChordAnchorWalkSequenceAlgorithm`
 - `get_global_random()`, `configure_global_random(...)`, `reset_global_random()`
 
 Key behaviors:
@@ -54,6 +57,11 @@ Key behaviors:
 - Chromatic selectors ignore scale context by design.
 - `Random.engine` exposes the wrapped stdlib engine so direct engine calls share state with Random selectors.
 - Selector methods support both instance and class calls; class calls route through the lazy global singleton.
+- `Random.sequence(...)` requires a positive beat-length timeline value and returns a `Sequence` that consumes exactly that beat span.
+- Sequence algorithm resolution order is: explicit algorithm instance, algorithm name token, then weighted random selection (only when `algorithm` is omitted).
+- Built-in sequence algorithms accept optional tuning parameters, but each works with no required algorithm-specific arguments.
+- Reusing the same algorithm object instance allows stateful continuity across calls (for example motif carry-forward).
+- Sequence continuation behavior is playback-equivalent duration extension of the previous pitched entry, not notation-specific tie modeling.
 
 Usage note:
 

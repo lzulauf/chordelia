@@ -8,20 +8,23 @@ from __future__ import annotations
 
 import math
 import random as std_random
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence as SequenceABC
+from fractions import Fraction
 from functools import wraps
-from typing import Any, Callable, TypeAlias, TypeVar
+from typing import Any, Callable, ClassVar, Protocol, TypeAlias, TypeVar, runtime_checkable
 
 from chordelia.chords import Chord, ChordQuality
 from chordelia.degrees import Degree, DegreeLike
 from chordelia.intervals import Interval, IntervalLike
 from chordelia.notes import Note
+from chordelia.rhythm import TimelineLike, coerce_timeline_duration
 from chordelia.scale_context import coerce_scale_context_value, get_global_scale_context
 from chordelia.scales import Scale, ScaleType
+from chordelia.sequences import Rest, Sequence
 
 T = TypeVar("T")
 WeightNumber: TypeAlias = int | float
-WeightInput: TypeAlias = Mapping[T, WeightNumber] | Sequence[tuple[T, WeightNumber]]
+WeightInput: TypeAlias = Mapping[T, WeightNumber] | SequenceABC[tuple[T, WeightNumber]]
 
 _CHROMATIC_ROOT_CANDIDATES: tuple[str, ...] = (
     "C",
@@ -84,6 +87,39 @@ _DEFAULT_INTERVAL_WEIGHTS: dict[str, WeightNumber] = {
     "P8": 3,
 }
 
+_DEFAULT_SEQUENCE_DURATION_WEIGHTS: dict[Fraction, WeightNumber] = {
+    Fraction(1, 4): 20,
+    Fraction(1, 2): 30,
+    Fraction(1, 1): 30,
+    Fraction(2, 1): 15,
+    Fraction(4, 1): 5,
+}
+
+_DEFAULT_SEQUENCE_ALGORITHM_WEIGHTS: dict[str, WeightNumber] = {
+    "motif_variation": 40,
+    "scale_walk": 30,
+    "chord_anchor_walk": 20,
+    "pure_random": 10,
+}
+
+
+@runtime_checkable
+class SequenceRandomizationAlgorithm(Protocol):
+    """Object-based contract for sequence randomization algorithms."""
+
+    name: ClassVar[str]
+    default_selection_weight: ClassVar[float]
+
+    def generate(
+        self,
+        *,
+        rng: "Random",
+        beat_length: Fraction,
+        scale: Scale | str | None = None,
+        chord: Chord | str | None = None,
+        **params: Any,
+    ) -> Sequence: ...
+
 
 class dualmethod:
     """Descriptor that supports instance and class-style invocation."""
@@ -128,7 +164,7 @@ class Random:
         return self._engine
 
     @dualmethod
-    def choice(self_or_cls: "Random | type[Random]", values: Sequence[T]) -> T:
+    def choice(self_or_cls: "Random | type[Random]", values: SequenceABC[T]) -> T:
         """Select one item uniformly from a non-empty sequence."""
         rng = _resolve_random_receiver(self_or_cls)
         candidates = tuple(values)
@@ -139,8 +175,8 @@ class Random:
     @dualmethod
     def weighted_choice(
         self_or_cls: "Random | type[Random]",
-        values: Sequence[T],
-        weights: Sequence[WeightNumber],
+        values: SequenceABC[T],
+        weights: SequenceABC[WeightNumber],
     ) -> T:
         """Select one item from values using relative numeric weights."""
         rng = _resolve_random_receiver(self_or_cls)
@@ -329,6 +365,639 @@ class Random:
             k=1,
         )[0]
 
+    @dualmethod
+    def sequence(
+        self_or_cls: "Random | type[Random]",
+        beat_length: TimelineLike,
+        *,
+        algorithm: SequenceRandomizationAlgorithm | str | None = None,
+        algorithm_weights: WeightInput[str] | None = None,
+        scale: Scale | str | None = None,
+        chord: Chord | str | None = None,
+        **algorithm_params: Any,
+    ) -> Sequence:
+        """Generate a randomized Sequence with exact consumed beat length."""
+        rng = _resolve_random_receiver(self_or_cls)
+        total_beats = _coerce_positive_beat_length(
+            beat_length,
+            field_name="beat_length",
+        )
+
+        algorithm_instance = _resolve_algorithm_instance(
+            rng=rng,
+            algorithm=algorithm,
+            algorithm_weights=algorithm_weights,
+        )
+
+        generated = algorithm_instance.generate(
+            rng=rng,
+            beat_length=total_beats,
+            scale=scale,
+            chord=chord,
+            **algorithm_params,
+        )
+
+        _validate_sequence_consumes_exact_beats(generated, total_beats)
+        return generated
+
+
+class PureRandomSequenceAlgorithm:
+    """Random selector over notes, rests, chords, and continuation actions."""
+
+    name: ClassVar[str] = "pure_random"
+    default_selection_weight: ClassVar[float] = 10.0
+
+    def generate(
+        self,
+        *,
+        rng: Random,
+        beat_length: Fraction,
+        scale: Scale | str | None = None,
+        chord: Chord | str | None = None,
+        **params: Any,
+    ) -> Sequence:
+        scale_obj = _resolve_optional_scale(scale)
+        chord_obj = _resolve_optional_chord(chord)
+
+        duration_weights = _coerce_duration_weight_map(params.get("duration_weights"))
+        event_type_weights = _coerce_event_type_weights(params.get("event_type_weights"))
+        pitch_change_probability = _coerce_probability(
+            params.get("pitch_change_probability", 0.65),
+            label="pitch_change_probability",
+        )
+
+        entries: list[list[Any]] = []
+        last_pitched_index: int | None = None
+        last_note: Note | None = None
+
+        remaining = beat_length
+        while remaining > 0:
+            duration = _choose_duration_for_remaining(
+                rng,
+                remaining,
+                duration_weights,
+            )
+
+            selection_weights = dict(event_type_weights)
+            if last_pitched_index is None:
+                selection_weights["continue"] = 0.0
+
+            action = rng.weighted_choice_map(selection_weights)
+            if action == "continue" and last_pitched_index is not None:
+                entries[last_pitched_index][1] += duration
+                remaining -= duration
+                continue
+
+            if action == "rest":
+                payload: Any = Rest()
+            elif action == "chord":
+                payload = _sample_chord_for_context(
+                    rng,
+                    scale=scale_obj,
+                    chord=chord_obj,
+                )
+            else:
+                if last_note is not None and rng.engine.random() > pitch_change_probability:
+                    payload = last_note
+                else:
+                    payload = _sample_note_for_context(
+                        rng,
+                        scale=scale_obj,
+                        chord=chord_obj,
+                    )
+
+            entries.append([payload, duration])
+            if not isinstance(payload, Rest):
+                last_pitched_index = len(entries) - 1
+                if isinstance(payload, Note):
+                    last_note = payload
+
+            remaining -= duration
+
+        return Sequence((payload, duration) for payload, duration in entries)
+
+
+class MotifVariationSequenceAlgorithm:
+    """Motif-first generator that reuses motif state across calls."""
+
+    name: ClassVar[str] = "motif_variation"
+    default_selection_weight: ClassVar[float] = 40.0
+
+    def __init__(self, *, motif_beats: TimelineLike | None = None) -> None:
+        self._motif_beats = motif_beats
+        self._motif_template: tuple[tuple[Any, Fraction], ...] | None = None
+
+    def generate(
+        self,
+        *,
+        rng: Random,
+        beat_length: Fraction,
+        scale: Scale | str | None = None,
+        chord: Chord | str | None = None,
+        **params: Any,
+    ) -> Sequence:
+        scale_obj = _resolve_optional_scale(scale)
+        chord_obj = _resolve_optional_chord(chord)
+
+        motif_span = self._resolve_motif_span(
+            beat_length,
+            params.get("motif_beats"),
+        )
+        if params.get("reset_motif", False) or self._motif_template is None:
+            self._motif_template = self._build_motif(
+                rng,
+                motif_span,
+                scale=scale_obj,
+                chord=chord_obj,
+                params=params,
+            )
+
+        mutation_probability = _coerce_probability(
+            params.get("mutation_probability", 0.25),
+            label="mutation_probability",
+        )
+
+        entries: list[tuple[Any, Fraction]] = []
+        remaining = beat_length
+        motif = self._motif_template
+        assert motif is not None
+
+        while remaining > 0:
+            for payload, duration in motif:
+                if remaining <= 0:
+                    break
+
+                clipped_duration = min(duration, remaining)
+                mutated_payload = self._mutate_payload(
+                    payload,
+                    rng=rng,
+                    scale=scale_obj,
+                    probability=mutation_probability,
+                )
+                entries.append((mutated_payload, clipped_duration))
+                remaining -= clipped_duration
+
+        return Sequence(entries)
+
+    def _resolve_motif_span(
+        self,
+        beat_length: Fraction,
+        motif_override: TimelineLike | None,
+    ) -> Fraction:
+        if motif_override is not None:
+            span = _coerce_positive_beat_length(
+                motif_override,
+                field_name="motif_beats",
+            )
+            return min(span, beat_length)
+
+        if self._motif_beats is not None:
+            span = _coerce_positive_beat_length(
+                self._motif_beats,
+                field_name="motif_beats",
+            )
+            return min(span, beat_length)
+
+        return min(Fraction(4, 1), beat_length)
+
+    def _build_motif(
+        self,
+        rng: Random,
+        motif_span: Fraction,
+        *,
+        scale: Scale | None,
+        chord: Chord | None,
+        params: dict[str, Any],
+    ) -> tuple[tuple[Any, Fraction], ...]:
+        motif_source = PureRandomSequenceAlgorithm().generate(
+            rng=rng,
+            beat_length=motif_span,
+            scale=scale,
+            chord=chord,
+            event_type_weights=params.get(
+                "motif_event_type_weights",
+                {
+                    "note": 7,
+                    "rest": 1,
+                    "chord": 2,
+                    "continue": 1,
+                },
+            ),
+            duration_weights=params.get("duration_weights"),
+            pitch_change_probability=params.get("pitch_change_probability", 0.7),
+        )
+        return tuple(
+            (entry.payload, entry.duration.as_beats())
+            for entry in motif_source.entries
+        )
+
+    def _mutate_payload(
+        self,
+        payload: Any,
+        *,
+        rng: Random,
+        scale: Scale | None,
+        probability: float,
+    ) -> Any:
+        if isinstance(payload, Rest):
+            return payload
+        if rng.engine.random() > probability:
+            return payload
+
+        if isinstance(payload, Note):
+            if scale is not None:
+                direction = rng.engine.choice((-1, 1))
+                return payload.shift(direction, scale=scale)
+            return payload.transpose(rng.engine.choice((-1, 1)))
+
+        return payload
+
+
+class ScaleWalkSequenceAlgorithm:
+    """Directional scale walk with stateful direction/index carry-forward."""
+
+    name: ClassVar[str] = "scale_walk"
+    default_selection_weight: ClassVar[float] = 30.0
+
+    def __init__(self) -> None:
+        self._last_index: int | None = None
+        self._last_direction: int | None = None
+
+    def generate(
+        self,
+        *,
+        rng: Random,
+        beat_length: Fraction,
+        scale: Scale | str | None = None,
+        chord: Chord | str | None = None,
+        **params: Any,
+    ) -> Sequence:
+        del chord
+
+        scale_obj = _resolve_optional_scale(scale) or Scale("C", ScaleType.MAJOR)
+        duration_weights = _coerce_duration_weight_map(params.get("duration_weights"))
+        direction_change_probability = _coerce_probability(
+            params.get("direction_change_probability", 0.2),
+            label="direction_change_probability",
+        )
+        run_step_probability = _coerce_probability(
+            params.get("run_step_probability", 0.2),
+            label="run_step_probability",
+        )
+
+        scale_notes = tuple(note.with_octave(None) for note in scale_obj.notes)
+        index = (
+            self._last_index
+            if self._last_index is not None
+            else rng.engine.randrange(len(scale_notes))
+        )
+        direction = (
+            self._last_direction
+            if self._last_direction in {-1, 1}
+            else rng.engine.choice((-1, 1))
+        )
+
+        entries: list[tuple[Any, Fraction]] = []
+        remaining = beat_length
+        while remaining > 0:
+            duration = _choose_duration_for_remaining(rng, remaining, duration_weights)
+            entries.append((scale_notes[index], duration))
+
+            if rng.engine.random() < direction_change_probability:
+                direction *= -1
+
+            step = 2 if rng.engine.random() < run_step_probability else 1
+            index = (index + (direction * step)) % len(scale_notes)
+            remaining -= duration
+
+        self._last_index = index
+        self._last_direction = direction
+        return Sequence(entries)
+
+
+class ChordAnchorWalkSequenceAlgorithm:
+    """Scale walk constrained to chord-tone starts/ends."""
+
+    name: ClassVar[str] = "chord_anchor_walk"
+    default_selection_weight: ClassVar[float] = 20.0
+
+    def generate(
+        self,
+        *,
+        rng: Random,
+        beat_length: Fraction,
+        scale: Scale | str | None = None,
+        chord: Chord | str | None = None,
+        **params: Any,
+    ) -> Sequence:
+        scale_obj = _resolve_optional_scale(scale) or Scale("C", ScaleType.MAJOR)
+        chord_obj = _resolve_optional_chord(chord)
+
+        if chord_obj is None:
+            chord_obj = _fallback_anchor_chord(rng, scale_obj)
+
+        duration_weights = _coerce_duration_weight_map(params.get("duration_weights"))
+        jump_probability = _coerce_probability(
+            params.get("jump_probability", 0.35),
+            label="jump_probability",
+        )
+
+        chord_tones = tuple(note.with_octave(None) for note in chord_obj.notes)
+        scale_notes = tuple(note.with_octave(None) for note in scale_obj.notes)
+
+        durations: list[Fraction] = []
+        remaining = beat_length
+        while remaining > 0:
+            duration = _choose_duration_for_remaining(rng, remaining, duration_weights)
+            durations.append(duration)
+            remaining -= duration
+
+        if not durations:
+            return Sequence(())
+
+        entries: list[tuple[Any, Fraction]] = []
+        previous_index = 0
+        for i, duration in enumerate(durations):
+            if i == 0 or i == len(durations) - 1:
+                payload = rng.engine.choice(chord_tones)
+                previous_index = _closest_scale_note_index(scale_notes, payload)
+            else:
+                if rng.engine.random() < jump_probability:
+                    payload = rng.engine.choice(chord_tones)
+                    previous_index = _closest_scale_note_index(scale_notes, payload)
+                else:
+                    previous_index = (previous_index + rng.engine.choice((-1, 1))) % len(scale_notes)
+                    payload = scale_notes[previous_index]
+
+            entries.append((payload, duration))
+
+        return Sequence(entries)
+
+
+def _resolve_algorithm_instance(
+    *,
+    rng: Random,
+    algorithm: SequenceRandomizationAlgorithm | str | None,
+    algorithm_weights: WeightInput[str] | None,
+) -> SequenceRandomizationAlgorithm:
+    if algorithm is not None and algorithm_weights is not None:
+        raise ValueError("algorithm_weights cannot be used with an explicit algorithm")
+
+    if algorithm is None:
+        weighted_names = _resolve_algorithm_weight_map(algorithm_weights)
+        selected_name = rng.weighted_choice_map(weighted_names)
+        return _instantiate_registered_algorithm(selected_name)
+
+    if isinstance(algorithm, str):
+        return _instantiate_registered_algorithm(algorithm)
+
+    if _is_sequence_algorithm_instance(algorithm):
+        return algorithm
+
+    raise TypeError(
+        "algorithm must be a SequenceRandomizationAlgorithm instance, algorithm name, or None"
+    )
+
+
+def _resolve_algorithm_weight_map(
+    algorithm_weights: WeightInput[str] | None,
+) -> dict[str, float]:
+    if algorithm_weights is None:
+        return {
+            _coerce_registered_algorithm_name(name): _coerce_weight_number(weight, label="algorithm_weights")
+            for name, weight in _DEFAULT_SEQUENCE_ALGORITHM_WEIGHTS.items()
+        }
+
+    candidates, weights = _coerce_weight_input(
+        algorithm_weights,
+        coerce_value=_coerce_registered_algorithm_name,
+        label="algorithm_weights",
+    )
+    return {name: weight for name, weight in zip(candidates, weights, strict=False)}
+
+
+def _instantiate_registered_algorithm(name: str) -> SequenceRandomizationAlgorithm:
+    normalized_name = _coerce_registered_algorithm_name(name)
+    return _SEQUENCE_ALGORITHM_REGISTRY[normalized_name]()
+
+
+def _coerce_registered_algorithm_name(value: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(
+            f"algorithm names must be str, got {type(value).__name__}"
+        )
+
+    normalized_name = value.strip().lower().replace("-", "_")
+    if normalized_name not in _SEQUENCE_ALGORITHM_REGISTRY:
+        known = ", ".join(sorted(_SEQUENCE_ALGORITHM_REGISTRY))
+        raise ValueError(
+            f"Unknown sequence algorithm {value!r}. Valid options: {known}."
+        )
+    return normalized_name
+
+
+def _is_sequence_algorithm_instance(value: Any) -> bool:
+    return callable(getattr(value, "generate", None))
+
+
+def _coerce_positive_beat_length(value: TimelineLike, *, field_name: str) -> Fraction:
+    duration = coerce_timeline_duration(value, field_name=field_name)
+    if duration.mode != "beats":
+        raise ValueError(f"{field_name} must use beat-mode timing")
+
+    beats = duration.as_beats()
+    if beats <= 0:
+        raise ValueError(f"{field_name} must be > 0 beats")
+    return beats
+
+
+def _coerce_duration_weight_map(
+    duration_weights: WeightInput[TimelineLike] | None,
+) -> tuple[tuple[Fraction, ...], tuple[float, ...]]:
+    if duration_weights is None:
+        return (
+            tuple(_DEFAULT_SEQUENCE_DURATION_WEIGHTS.keys()),
+            tuple(float(weight) for weight in _DEFAULT_SEQUENCE_DURATION_WEIGHTS.values()),
+        )
+
+    return _coerce_weight_input(
+        duration_weights,
+        coerce_value=lambda value: _coerce_positive_beat_length(
+            value,
+            field_name="duration_weights",
+        ),
+        label="duration_weights",
+    )
+
+
+def _coerce_event_type_weights(
+    event_type_weights: WeightInput[str] | None,
+) -> dict[str, float]:
+    default = {
+        "note": 6.0,
+        "rest": 1.0,
+        "chord": 2.0,
+        "continue": 1.0,
+    }
+    if event_type_weights is None:
+        return default
+
+    candidates, weights = _coerce_weight_input(
+        event_type_weights,
+        coerce_value=lambda value: _coerce_event_type_name(value),
+        label="event_type_weights",
+    )
+    resolved = {name: weight for name, weight in zip(candidates, weights, strict=False)}
+    for key in ("note", "rest", "chord", "continue"):
+        resolved.setdefault(key, 0.0)
+    return resolved
+
+
+def _coerce_event_type_name(value: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(
+            f"event_type_weights keys must be str, got {type(value).__name__}"
+        )
+
+    normalized = value.strip().lower()
+    if normalized not in {"note", "rest", "chord", "continue"}:
+        raise ValueError(
+            "event_type_weights keys must be one of: note, rest, chord, continue"
+        )
+    return normalized
+
+
+def _choose_duration_for_remaining(
+    rng: Random,
+    remaining: Fraction,
+    duration_weight_map: tuple[tuple[Fraction, ...], tuple[float, ...]],
+) -> Fraction:
+    durations, weights = duration_weight_map
+    valid: list[Fraction] = []
+    valid_weights: list[float] = []
+
+    for duration, weight in zip(durations, weights, strict=False):
+        if duration <= remaining:
+            valid.append(duration)
+            valid_weights.append(weight)
+
+    if not valid:
+        return remaining
+
+    if sum(valid_weights) == 0:
+        return min(valid)
+
+    return rng.engine.choices(valid, weights=valid_weights, k=1)[0]
+
+
+def _sample_note_for_context(
+    rng: Random,
+    *,
+    scale: Scale | None,
+    chord: Chord | None,
+) -> Note:
+    if scale is not None:
+        return rng.note(scale=scale).with_octave(None)
+    if chord is not None:
+        return rng.engine.choice(tuple(note.with_octave(None) for note in chord.notes))
+    return rng.chromatic_note().with_octave(None)
+
+
+def _sample_chord_for_context(
+    rng: Random,
+    *,
+    scale: Scale | None,
+    chord: Chord | None,
+) -> Chord:
+    if chord is not None:
+        return chord
+
+    if scale is not None:
+        try:
+            return rng.chord(scale=scale)
+        except ValueError:
+            pass
+
+    return rng.chromatic_chord()
+
+
+def _resolve_optional_scale(scale: Scale | str | None) -> Scale | None:
+    if scale is None:
+        return None
+    return coerce_scale_context_value(scale)
+
+
+def _resolve_optional_chord(chord: Chord | str | None) -> Chord | None:
+    if chord is None:
+        return None
+    if isinstance(chord, Chord):
+        return chord
+    if isinstance(chord, str):
+        return Chord.from_string(chord)
+    raise TypeError(f"chord must be Chord, str, or None; got {type(chord).__name__}")
+
+
+def _fallback_anchor_chord(rng: Random, scale: Scale) -> Chord:
+    try:
+        return rng.chord(scale=scale)
+    except ValueError:
+        scale_notes = scale.notes
+        if len(scale_notes) >= 3:
+            return Chord.from_notes((scale_notes[0], scale_notes[2], scale_notes[-1]))
+        return Chord.from_notes((scale_notes[0], scale_notes[0], scale_notes[0]))
+
+
+def _closest_scale_note_index(scale_notes: tuple[Note, ...], target: Note) -> int:
+    for index, note in enumerate(scale_notes):
+        if note.pitch_class == target.pitch_class:
+            return index
+    return 0
+
+
+def _coerce_probability(value: Any, *, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{label} must be a numeric probability")
+
+    probability = float(value)
+    if probability < 0.0 or probability > 1.0:
+        raise ValueError(f"{label} must be in range [0, 1]")
+    return probability
+
+
+def _validate_sequence_consumes_exact_beats(sequence: Sequence, expected_beats: Fraction) -> None:
+    cursor = Fraction(0, 1)
+    for entry in sequence.entries:
+        if entry.duration.mode != "beats":
+            raise ValueError("Generated sequence must use beat-mode timing")
+
+        duration = entry.duration.as_beats()
+        if entry.offset is None:
+            start = cursor
+        else:
+            if entry.offset.mode != "beats":
+                raise ValueError("Generated sequence offsets must use beat-mode timing")
+            start = entry.offset.as_beats()
+
+        end = start + duration
+        if entry.offset is None:
+            cursor = end
+        elif end > cursor:
+            cursor = end
+
+    consumed = cursor
+    if consumed != expected_beats:
+        raise ValueError(
+            f"Generated sequence consumed {consumed} beats; expected {expected_beats}."
+        )
+
+
+_SEQUENCE_ALGORITHM_REGISTRY: dict[str, Callable[[], SequenceRandomizationAlgorithm]] = {
+    PureRandomSequenceAlgorithm.name: PureRandomSequenceAlgorithm,
+    MotifVariationSequenceAlgorithm.name: MotifVariationSequenceAlgorithm,
+    ScaleWalkSequenceAlgorithm.name: ScaleWalkSequenceAlgorithm,
+    ChordAnchorWalkSequenceAlgorithm.name: ChordAnchorWalkSequenceAlgorithm,
+}
+
 
 _GLOBAL_RANDOM: Random | None = None
 
@@ -369,7 +1038,7 @@ def _resolve_random_receiver(receiver: Any) -> Random:
 
 
 def _coerce_relative_weights(
-    weights: Sequence[WeightNumber],
+    weights: SequenceABC[WeightNumber],
     *,
     length: int,
 ) -> tuple[float, ...]:
@@ -399,13 +1068,13 @@ def _coerce_weight_input(
 
     if isinstance(weighted_values, Mapping):
         pairs = list(weighted_values.items())
-    elif isinstance(weighted_values, Sequence) and not isinstance(
+    elif isinstance(weighted_values, SequenceABC) and not isinstance(
         weighted_values,
         (str, bytes, bytearray),
     ):
         for pair in weighted_values:
             if (
-                not isinstance(pair, Sequence)
+                not isinstance(pair, SequenceABC)
                 or isinstance(pair, (str, bytes, bytearray))
                 or len(pair) != 2
             ):
@@ -509,6 +1178,11 @@ def _coerce_chord_quality(value: ChordQuality | str) -> ChordQuality:
 
 __all__ = [
     "Random",
+    "SequenceRandomizationAlgorithm",
+    "PureRandomSequenceAlgorithm",
+    "MotifVariationSequenceAlgorithm",
+    "ScaleWalkSequenceAlgorithm",
+    "ChordAnchorWalkSequenceAlgorithm",
     "WeightInput",
     "dualmethod",
     "get_global_random",

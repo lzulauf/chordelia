@@ -1,7 +1,7 @@
 Sequence randomization plan for chordelia.
 
 ## Status
-Drafting
+Done
 
 ## Goal
 Add a musical sequence randomization API that generates `Sequence` values to a requested beat length, supports optional algorithm selection, supports weighted random algorithm selection when unspecified, and uses object-based algorithm instances so callers can reuse stateful generators (for example motif carry-forward across successive calls).
@@ -246,12 +246,12 @@ Expected docs delta classification: both README updates and docs updates.
    3. Verify docs note that phase-one tie behavior is playback-equivalent continuation, not notation-specific tie rendering.
 
 ## Progress checklist
-- [ ] Phase 0 complete: algorithm object contract and registry semantics locked
-- [ ] Phase 1 complete: `Random.sequence(...)` dispatch and validation implemented
-- [ ] Phase 2 complete: built-in algorithms implemented with default self-configuration
-- [ ] Phase 3 complete: deterministic/stateful tests passing
-- [ ] Phase 4 complete: docs and README updates merged
-- [ ] Acceptance criteria met
+- [x] Phase 0 complete: algorithm object contract and registry semantics locked
+- [x] Phase 1 complete: `Random.sequence(...)` dispatch and validation implemented
+- [x] Phase 2 complete: built-in algorithms implemented with default self-configuration
+- [x] Phase 3 complete: deterministic/stateful tests passing
+- [x] Phase 4 complete: docs and README updates merged
+- [x] Acceptance criteria met
 
 ## Phases
 ### Phase 0: Contract lock
