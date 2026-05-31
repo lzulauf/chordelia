@@ -12,6 +12,7 @@ from chordelia import (
     PureRandomSequenceAlgorithm,
     Random,
     ScaleWalkSequenceAlgorithm,
+    SequenceRandomizationAlgorithm,
 )
 from chordelia.chords import Chord
 from chordelia.notes import Note
@@ -57,6 +58,40 @@ class TestRandomSequenceValidation:
                 algorithm=PureRandomSequenceAlgorithm(),
                 algorithm_weights={"pure_random": 1.0},
             )
+
+    def test_sequence_rejects_algorithm_params_wrapper_keyword(self):
+        with pytest.raises(TypeError, match="algorithm_params wrapper is not supported"):
+            Random(seed=1).sequence(
+                4,
+                algorithm="pure_random",
+                scale="C major",
+                algorithm_params={"mutation_probability": 0},
+            )
+
+    def test_sequence_rejects_duck_typed_non_subclass_algorithm_instance(self):
+        class DuckAlgorithm:
+            name = "duck"
+            default_selection_weight = 1.0
+
+            def generate(self, **kwargs):
+                return Sequence(())
+
+        with pytest.raises(TypeError, match="SequenceRandomizationAlgorithm instance"):
+            Random(seed=1).sequence(4, algorithm=DuckAlgorithm())
+
+
+class TestSequenceAlgorithmDiscovery:
+    """Runtime discovery behavior for sequence algorithm subclasses."""
+
+    def test_builtin_algorithms_are_direct_subclasses(self):
+        direct = sorted(
+            SequenceRandomizationAlgorithm.__subclasses__(),
+            key=lambda subclass: subclass.__name__,
+        )
+        assert PureRandomSequenceAlgorithm in direct
+        assert MotifVariationSequenceAlgorithm in direct
+        assert ScaleWalkSequenceAlgorithm in direct
+        assert ChordAnchorWalkSequenceAlgorithm in direct
 
 
 class TestRandomSequenceDispatchAndDeterminism:
@@ -149,15 +184,51 @@ class TestBuiltInSequenceAlgorithms:
         assert first.pitch_class in chord_tones
         assert last.pitch_class in chord_tones
 
-    def test_pure_random_can_extend_prior_pitched_entry_via_continue(self):
+    def test_pure_random_can_extend_prior_pitched_entry_via_tie(self):
         sequence = Random(seed=1).sequence(
             4,
             algorithm=PureRandomSequenceAlgorithm(),
             scale="C major",
-            event_type_weights={"note": 1.0, "continue": 100.0, "rest": 0.0, "chord": 0.0},
+            event_type_weights={"note": 1.0, "tie": 100.0, "rest": 0.0, "chord": 0.0},
             duration_weights={1: 1.0},
         )
 
-        # At least one continuation should collapse events into fewer entries than durations.
+        # At least one tie should collapse events into fewer entries than durations.
         assert len(sequence.entries) < 4
         assert _consumed_beats(sequence) == Fraction(4, 1)
+
+    def test_pure_random_note_events_include_octave_for_octaveless_scale(self):
+        sequence = Random(seed=17).sequence(
+            4,
+            algorithm="pure_random",
+            scale=Scale("C", ScaleType.MAJOR),
+            event_type_weights={"note": 1.0, "tie": 0.0, "rest": 0.0, "chord": 0.0},
+            duration_weights={1: 1.0},
+        )
+
+        for entry in sequence.entries:
+            assert isinstance(entry.payload, Note)
+            assert entry.payload.octave == 4
+
+    def test_scale_walk_assigns_octave_when_scale_context_has_none(self):
+        sequence = Random(seed=9).sequence(
+            8,
+            algorithm="scale_walk",
+            scale=Scale("E", ScaleType.NATURAL_MINOR),
+        )
+
+        for entry in sequence.entries:
+            assert isinstance(entry.payload, Note)
+            assert entry.payload.octave is not None
+
+    def test_chord_anchor_assigns_octave_when_scale_context_has_none(self):
+        sequence = Random(seed=13).sequence(
+            8,
+            algorithm="chord_anchor_walk",
+            scale=Scale("C", ScaleType.MAJOR),
+            chord="Am",
+        )
+
+        for entry in sequence.entries:
+            assert isinstance(entry.payload, Note)
+            assert entry.payload.octave is not None

@@ -59,6 +59,11 @@ Key behaviors:
 - Selector methods support both instance and class calls; class calls route through the lazy global singleton.
 - `Random.sequence(...)` requires a positive beat-length timeline value and returns a `Sequence` that consumes exactly that beat span.
 - Sequence algorithm resolution order is: explicit algorithm instance, algorithm name token, then weighted random selection (only when `algorithm` is omitted).
+- `Random.sequence(...)` argument placement is explicit:
+	- Random constructor args (`seed`, `engine`) belong to `Random(...)`.
+	- Sequence-call standard args are `beat_length`, `algorithm`, `algorithm_weights`, `scale`, and `chord`.
+	- Algorithm constructor args belong on algorithm object creation (for example `MotifVariationSequenceAlgorithm(motif_beats=2)`).
+	- Algorithm call-time tuning args are passed as direct `Random.sequence(...)` keyword arguments and forwarded to `algorithm.generate(...)`.
 - Built-in sequence algorithms accept optional tuning parameters, but each works with no required algorithm-specific arguments.
 - Reusing the same algorithm object instance allows stateful continuity across calls (for example motif carry-forward).
 - Sequence continuation behavior is playback-equivalent duration extension of the previous pitched entry, not notation-specific tie modeling.

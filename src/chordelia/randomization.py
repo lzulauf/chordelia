@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import math
 import random as std_random
+from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence as SequenceABC
 from fractions import Fraction
 from functools import wraps
-from typing import Any, Callable, ClassVar, Protocol, TypeAlias, TypeVar, runtime_checkable
+from typing import Any, Callable, ClassVar, TypeAlias, TypeVar
 
 from chordelia.chords import Chord, ChordQuality
 from chordelia.degrees import Degree, DegreeLike
@@ -103,13 +104,13 @@ _DEFAULT_SEQUENCE_ALGORITHM_WEIGHTS: dict[str, WeightNumber] = {
 }
 
 
-@runtime_checkable
-class SequenceRandomizationAlgorithm(Protocol):
+class SequenceRandomizationAlgorithm(ABC):
     """Object-based contract for sequence randomization algorithms."""
 
     name: ClassVar[str]
     default_selection_weight: ClassVar[float]
 
+    @abstractmethod
     def generate(
         self,
         *,
@@ -118,7 +119,8 @@ class SequenceRandomizationAlgorithm(Protocol):
         scale: Scale | str | None = None,
         chord: Chord | str | None = None,
         **params: Any,
-    ) -> Sequence: ...
+    ) -> Sequence:
+        """Generate a sequence with consumed span equal to beat_length."""
 
 
 class dualmethod:
@@ -376,12 +378,31 @@ class Random:
         chord: Chord | str | None = None,
         **algorithm_params: Any,
     ) -> Sequence:
-        """Generate a randomized Sequence with exact consumed beat length."""
+        """Generate a randomized Sequence with exact consumed beat length.
+
+        Argument layers:
+        - Random constructor args:
+          seed/engine belong to Random(...) creation, not this call.
+        - Random.sequence standard args:
+          beat_length, algorithm, algorithm_weights, scale, chord.
+        - Algorithm constructor args:
+          pass when instantiating an algorithm object before this call.
+          Example: MotifVariationSequenceAlgorithm(motif_beats=2)
+        - Algorithm call-time args:
+          pass directly as kwargs on Random.sequence(...).
+          These names and values are forwarded to algorithm.generate(...).
+        """
         rng = _resolve_random_receiver(self_or_cls)
         total_beats = _coerce_positive_beat_length(
             beat_length,
             field_name="beat_length",
         )
+
+        if "algorithm_params" in algorithm_params:
+            raise TypeError(
+                "algorithm_params wrapper is not supported; pass algorithm tuning "
+                "values as direct keyword arguments"
+            )
 
         algorithm_instance = _resolve_algorithm_instance(
             rng=rng,
@@ -401,8 +422,22 @@ class Random:
         return generated
 
 
-class PureRandomSequenceAlgorithm:
-    """Random selector over notes, rests, chords, and continuation actions."""
+class PureRandomSequenceAlgorithm(SequenceRandomizationAlgorithm):
+    """Random selector over notes, rests, chords, and continuation actions.
+
+        Accepted generate kwargs:
+        - duration_weights: WeightInput[TimelineLike]
+            Relative weights for candidate event durations in beats.
+            Defaults to quarter/half/whole/multi-beat mix.
+        - event_type_weights: WeightInput[str]
+            Relative weights for action names: "note", "rest", "chord", "tie".
+            "tie" extends the most recent pitched entry duration.
+            Defaults to note-heavy behavior.
+        - pitch_change_probability: float in [0, 1]
+            Probability of selecting a new note when action is "note" and a previous
+            note exists; otherwise the prior note is reused.
+            Default is 0.65.
+    """
 
     name: ClassVar[str] = "pure_random"
     default_selection_weight: ClassVar[float] = 10.0
@@ -416,6 +451,27 @@ class PureRandomSequenceAlgorithm:
         chord: Chord | str | None = None,
         **params: Any,
     ) -> Sequence:
+        """Generate a sequence using random action and duration sampling.
+
+        Args:
+            rng: Random selector instance used for all deterministic sampling.
+            beat_length: Exact target beat span this sequence must consume.
+            scale: Optional scale context for note/chord sampling.
+            chord: Optional chord context for note/chord sampling.
+
+        Accepted **params kwargs:
+            duration_weights: WeightInput[TimelineLike]
+                Relative weights for candidate event durations in beats.
+                Defaults to quarter/half/whole/multi-beat mix.
+            event_type_weights: WeightInput[str]
+                Relative weights for action names: "note", "rest", "chord", "tie".
+                "tie" extends the most recent pitched entry duration.
+                Defaults to note-heavy behavior.
+            pitch_change_probability: float in [0, 1]
+                Probability of selecting a new note when action is "note" and a
+                previous note exists; otherwise the prior note is reused.
+                Default is 0.65.
+        """
         scale_obj = _resolve_optional_scale(scale)
         chord_obj = _resolve_optional_chord(chord)
 
@@ -440,10 +496,10 @@ class PureRandomSequenceAlgorithm:
 
             selection_weights = dict(event_type_weights)
             if last_pitched_index is None:
-                selection_weights["continue"] = 0.0
+                selection_weights["tie"] = 0.0
 
             action = rng.weighted_choice_map(selection_weights)
-            if action == "continue" and last_pitched_index is not None:
+            if action == "tie" and last_pitched_index is not None:
                 entries[last_pitched_index][1] += duration
                 remaining -= duration
                 continue
@@ -477,8 +533,34 @@ class PureRandomSequenceAlgorithm:
         return Sequence((payload, duration) for payload, duration in entries)
 
 
-class MotifVariationSequenceAlgorithm:
-    """Motif-first generator that reuses motif state across calls."""
+class MotifVariationSequenceAlgorithm(SequenceRandomizationAlgorithm):
+    """Motif-first generator that reuses motif state across calls.
+
+        Constructor args:
+        - motif_beats: TimelineLike | None
+            Optional default motif span used when generate(..., motif_beats=...) is
+            not provided. If omitted entirely, motif span defaults to 4 beats or
+            beat_length, whichever is smaller.
+
+        Accepted generate kwargs:
+        - motif_beats: TimelineLike
+            Per-call motif span override.
+        - reset_motif: bool
+            If true, rebuild motif template before generation.
+            Default is false.
+        - mutation_probability: float in [0, 1]
+            Probability that each repeated motif payload mutates.
+            Default is 0.25.
+        - motif_event_type_weights: WeightInput[str]
+            Relative action weights used only when initially building the motif via
+            PureRandomSequenceAlgorithm.
+            Defaults to {"note": 7, "rest": 1, "chord": 2, "tie": 1}.
+        - duration_weights: WeightInput[TimelineLike]
+            Duration weights used during initial motif creation.
+        - pitch_change_probability: float in [0, 1]
+            Passed to PureRandomSequenceAlgorithm for motif construction.
+            Default is 0.7 during motif creation.
+    """
 
     name: ClassVar[str] = "motif_variation"
     default_selection_weight: ClassVar[float] = 40.0
@@ -496,6 +578,33 @@ class MotifVariationSequenceAlgorithm:
         chord: Chord | str | None = None,
         **params: Any,
     ) -> Sequence:
+        """Generate a sequence by repeating and mutating a cached motif template.
+
+        Args:
+            rng: Random selector instance used for all deterministic sampling.
+            beat_length: Exact target beat span this sequence must consume.
+            scale: Optional scale context used for motif creation and mutation.
+            chord: Optional chord context used during motif creation.
+
+        Accepted **params kwargs:
+            motif_beats: TimelineLike
+                Per-call motif span override.
+            reset_motif: bool
+                If true, rebuild motif template before generation.
+                Default is false.
+            mutation_probability: float in [0, 1]
+                Probability that each repeated motif payload mutates.
+                Default is 0.25.
+            motif_event_type_weights: WeightInput[str]
+                Relative action weights used only when initially building the motif
+                via PureRandomSequenceAlgorithm.
+                Defaults to {"note": 7, "rest": 1, "chord": 2, "tie": 1}.
+            duration_weights: WeightInput[TimelineLike]
+                Duration weights used during initial motif creation.
+            pitch_change_probability: float in [0, 1]
+                Passed to PureRandomSequenceAlgorithm for motif construction.
+                Default is 0.7 during motif creation.
+        """
         scale_obj = _resolve_optional_scale(scale)
         chord_obj = _resolve_optional_chord(chord)
 
@@ -580,7 +689,7 @@ class MotifVariationSequenceAlgorithm:
                     "note": 7,
                     "rest": 1,
                     "chord": 2,
-                    "continue": 1,
+                    "tie": 1,
                 },
             ),
             duration_weights=params.get("duration_weights"),
@@ -613,8 +722,23 @@ class MotifVariationSequenceAlgorithm:
         return payload
 
 
-class ScaleWalkSequenceAlgorithm:
-    """Directional scale walk with stateful direction/index carry-forward."""
+class ScaleWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
+    """Directional scale walk with stateful direction/index carry-forward.
+
+        Accepted generate kwargs:
+        - duration_weights: WeightInput[TimelineLike]
+            Relative duration weights for each emitted note event.
+        - direction_change_probability: float in [0, 1]
+            Probability to flip movement direction after each emitted event.
+            Default is 0.2.
+        - run_step_probability: float in [0, 1]
+            Probability to advance by 2 scale steps instead of 1.
+            Default is 0.2.
+
+        Notes:
+        - chord argument is accepted for interface compatibility but ignored.
+        - If no scale is provided, this algorithm defaults to C major.
+    """
 
     name: ClassVar[str] = "scale_walk"
     default_selection_weight: ClassVar[float] = 30.0
@@ -632,9 +756,28 @@ class ScaleWalkSequenceAlgorithm:
         chord: Chord | str | None = None,
         **params: Any,
     ) -> Sequence:
+        """Generate a scale-constrained walk sequence.
+
+        Args:
+            rng: Random selector instance used for all deterministic sampling.
+            beat_length: Exact target beat span this sequence must consume.
+            scale: Optional scale context for note pool; defaults to C major.
+            chord: Ignored (accepted for shared algorithm call signature).
+
+        Accepted **params kwargs:
+            duration_weights: WeightInput[TimelineLike]
+                Relative duration weights for each emitted note event.
+            direction_change_probability: float in [0, 1]
+                Probability to flip movement direction after each emitted event.
+                Default is 0.2.
+            run_step_probability: float in [0, 1]
+                Probability to advance by 2 scale steps instead of 1.
+                Default is 0.2.
+        """
         del chord
 
         scale_obj = _resolve_optional_scale(scale) or Scale("C", ScaleType.MAJOR)
+        normalized_scale = _scale_with_octave_for_sequence(scale_obj)
         duration_weights = _coerce_duration_weight_map(params.get("duration_weights"))
         direction_change_probability = _coerce_probability(
             params.get("direction_change_probability", 0.2),
@@ -645,7 +788,7 @@ class ScaleWalkSequenceAlgorithm:
             label="run_step_probability",
         )
 
-        scale_notes = tuple(note.with_octave(None) for note in scale_obj.notes)
+        scale_notes = tuple(normalized_scale.notes)
         index = (
             self._last_index
             if self._last_index is not None
@@ -675,8 +818,21 @@ class ScaleWalkSequenceAlgorithm:
         return Sequence(entries)
 
 
-class ChordAnchorWalkSequenceAlgorithm:
-    """Scale walk constrained to chord-tone starts/ends."""
+class ChordAnchorWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
+    """Scale walk constrained to chord-tone starts/ends.
+
+        Accepted generate kwargs:
+        - duration_weights: WeightInput[TimelineLike]
+            Relative duration weights for each emitted event.
+        - jump_probability: float in [0, 1]
+            Probability for interior events to jump directly to a chord tone instead
+            of moving one scale step.
+            Default is 0.35.
+
+        Notes:
+        - If scale is omitted, this algorithm defaults to C major.
+        - If chord is omitted, a fallback chord is sampled/derived from the scale.
+    """
 
     name: ClassVar[str] = "chord_anchor_walk"
     default_selection_weight: ClassVar[float] = 20.0
@@ -690,11 +846,33 @@ class ChordAnchorWalkSequenceAlgorithm:
         chord: Chord | str | None = None,
         **params: Any,
     ) -> Sequence:
+        """Generate a chord-anchored walk sequence.
+
+        Args:
+            rng: Random selector instance used for all deterministic sampling.
+            beat_length: Exact target beat span this sequence must consume.
+            scale: Optional scale context for walk notes; defaults to C major.
+            chord: Optional chord context for anchor tones.
+
+        Accepted **params kwargs:
+            duration_weights: WeightInput[TimelineLike]
+                Relative duration weights for each emitted event.
+            jump_probability: float in [0, 1]
+                Probability for interior events to jump directly to a chord tone
+                instead of moving one scale step.
+                Default is 0.35.
+        """
         scale_obj = _resolve_optional_scale(scale) or Scale("C", ScaleType.MAJOR)
+        normalized_scale = _scale_with_octave_for_sequence(scale_obj)
         chord_obj = _resolve_optional_chord(chord)
 
         if chord_obj is None:
-            chord_obj = _fallback_anchor_chord(rng, scale_obj)
+            chord_obj = _fallback_anchor_chord(rng, normalized_scale)
+
+        normalized_chord = _chord_with_octave_for_sequence(
+            chord_obj,
+            fallback_octave=normalized_scale.root.octave or 4,
+        )
 
         duration_weights = _coerce_duration_weight_map(params.get("duration_weights"))
         jump_probability = _coerce_probability(
@@ -702,8 +880,8 @@ class ChordAnchorWalkSequenceAlgorithm:
             label="jump_probability",
         )
 
-        chord_tones = tuple(note.with_octave(None) for note in chord_obj.notes)
-        scale_notes = tuple(note.with_octave(None) for note in scale_obj.notes)
+        chord_tones = tuple(normalized_chord.notes)
+        scale_notes = tuple(normalized_scale.notes)
 
         durations: list[Fraction] = []
         remaining = beat_length
@@ -778,18 +956,21 @@ def _resolve_algorithm_weight_map(
 
 def _instantiate_registered_algorithm(name: str) -> SequenceRandomizationAlgorithm:
     normalized_name = _coerce_registered_algorithm_name(name)
-    return _SEQUENCE_ALGORITHM_REGISTRY[normalized_name]()
+    algorithm_type = _sequence_algorithm_registry()[normalized_name]
+    try:
+        return algorithm_type()
+    except TypeError as exc:
+        raise TypeError(
+            "Registered sequence algorithm must have a zero-argument constructor for "
+            "name-based instantiation."
+        ) from exc
 
 
 def _coerce_registered_algorithm_name(value: str) -> str:
-    if not isinstance(value, str):
-        raise TypeError(
-            f"algorithm names must be str, got {type(value).__name__}"
-        )
-
-    normalized_name = value.strip().lower().replace("-", "_")
-    if normalized_name not in _SEQUENCE_ALGORITHM_REGISTRY:
-        known = ", ".join(sorted(_SEQUENCE_ALGORITHM_REGISTRY))
+    normalized_name = _normalize_algorithm_name(value)
+    registry = _sequence_algorithm_registry()
+    if normalized_name not in registry:
+        known = ", ".join(sorted(registry))
         raise ValueError(
             f"Unknown sequence algorithm {value!r}. Valid options: {known}."
         )
@@ -797,7 +978,38 @@ def _coerce_registered_algorithm_name(value: str) -> str:
 
 
 def _is_sequence_algorithm_instance(value: Any) -> bool:
-    return callable(getattr(value, "generate", None))
+    return isinstance(value, SequenceRandomizationAlgorithm)
+
+
+def _normalize_algorithm_name(value: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(
+            f"algorithm names must be str, got {type(value).__name__}"
+        )
+    return value.strip().lower().replace("-", "_")
+
+
+def _sequence_algorithm_registry() -> dict[str, type[SequenceRandomizationAlgorithm]]:
+    registry: dict[str, type[SequenceRandomizationAlgorithm]] = {}
+    subclasses = sorted(
+        SequenceRandomizationAlgorithm.__subclasses__(),
+        key=lambda subclass: subclass.__name__,
+    )
+    for algorithm_type in subclasses:
+        name = getattr(algorithm_type, "name", None)
+        if not isinstance(name, str) or not name.strip():
+            continue
+
+        normalized_name = _normalize_algorithm_name(name)
+        existing = registry.get(normalized_name)
+        if existing is not None and existing is not algorithm_type:
+            raise ValueError(
+                "Duplicate sequence algorithm name "
+                f"{normalized_name!r} for {existing.__name__} and {algorithm_type.__name__}."
+            )
+        registry[normalized_name] = algorithm_type
+
+    return registry
 
 
 def _coerce_positive_beat_length(value: TimelineLike, *, field_name: str) -> Fraction:
@@ -837,7 +1049,7 @@ def _coerce_event_type_weights(
         "note": 6.0,
         "rest": 1.0,
         "chord": 2.0,
-        "continue": 1.0,
+        "tie": 1.0,
     }
     if event_type_weights is None:
         return default
@@ -848,7 +1060,7 @@ def _coerce_event_type_weights(
         label="event_type_weights",
     )
     resolved = {name: weight for name, weight in zip(candidates, weights, strict=False)}
-    for key in ("note", "rest", "chord", "continue"):
+    for key in ("note", "rest", "chord", "tie"):
         resolved.setdefault(key, 0.0)
     return resolved
 
@@ -860,9 +1072,9 @@ def _coerce_event_type_name(value: str) -> str:
         )
 
     normalized = value.strip().lower()
-    if normalized not in {"note", "rest", "chord", "continue"}:
+    if normalized not in {"note", "rest", "chord", "tie"}:
         raise ValueError(
-            "event_type_weights keys must be one of: note, rest, chord, continue"
+            "event_type_weights keys must be one of: note, rest, chord, tie"
         )
     return normalized
 
@@ -897,10 +1109,15 @@ def _sample_note_for_context(
     chord: Chord | None,
 ) -> Note:
     if scale is not None:
-        return rng.note(scale=scale).with_octave(None)
+        normalized_scale = _scale_with_octave_for_sequence(scale)
+        return _ensure_note_has_octave(
+            rng.note(scale=normalized_scale),
+            fallback_octave=normalized_scale.root.octave or 4,
+        )
     if chord is not None:
-        return rng.engine.choice(tuple(note.with_octave(None) for note in chord.notes))
-    return rng.chromatic_note().with_octave(None)
+        normalized_chord = _chord_with_octave_for_sequence(chord)
+        return rng.engine.choice(tuple(normalized_chord.notes))
+    return _ensure_note_has_octave(rng.chromatic_note(), fallback_octave=4)
 
 
 def _sample_chord_for_context(
@@ -910,15 +1127,40 @@ def _sample_chord_for_context(
     chord: Chord | None,
 ) -> Chord:
     if chord is not None:
-        return chord
+        return _chord_with_octave_for_sequence(chord)
 
     if scale is not None:
+        normalized_scale = _scale_with_octave_for_sequence(scale)
         try:
-            return rng.chord(scale=scale)
+            sampled = rng.chord(scale=normalized_scale)
+            return _chord_with_octave_for_sequence(
+                sampled,
+                fallback_octave=normalized_scale.root.octave or 4,
+            )
         except ValueError:
             pass
 
-    return rng.chromatic_chord()
+    return _chord_with_octave_for_sequence(rng.chromatic_chord(), fallback_octave=4)
+
+
+def _scale_with_octave_for_sequence(scale: Scale, *, fallback_octave: int = 4) -> Scale:
+    root_octave = scale.root.octave if scale.root.octave is not None else fallback_octave
+    if any(note.octave is None for note in scale.notes):
+        return scale.with_octave(root_octave)
+    return scale
+
+
+def _chord_with_octave_for_sequence(chord: Chord, *, fallback_octave: int = 4) -> Chord:
+    root_octave = chord.root.octave if chord.root.octave is not None else fallback_octave
+    if any(note.octave is None for note in chord.notes):
+        return chord.with_octave(root_octave)
+    return chord
+
+
+def _ensure_note_has_octave(note: Note, *, fallback_octave: int = 4) -> Note:
+    if note.octave is not None:
+        return note
+    return note.with_octave(fallback_octave)
 
 
 def _resolve_optional_scale(scale: Scale | str | None) -> Scale | None:
@@ -989,14 +1231,6 @@ def _validate_sequence_consumes_exact_beats(sequence: Sequence, expected_beats: 
         raise ValueError(
             f"Generated sequence consumed {consumed} beats; expected {expected_beats}."
         )
-
-
-_SEQUENCE_ALGORITHM_REGISTRY: dict[str, Callable[[], SequenceRandomizationAlgorithm]] = {
-    PureRandomSequenceAlgorithm.name: PureRandomSequenceAlgorithm,
-    MotifVariationSequenceAlgorithm.name: MotifVariationSequenceAlgorithm,
-    ScaleWalkSequenceAlgorithm.name: ScaleWalkSequenceAlgorithm,
-    ChordAnchorWalkSequenceAlgorithm.name: ChordAnchorWalkSequenceAlgorithm,
-}
 
 
 _GLOBAL_RANDOM: Random | None = None
@@ -1189,3 +1423,5 @@ __all__ = [
     "configure_global_random",
     "reset_global_random",
 ]
+
+

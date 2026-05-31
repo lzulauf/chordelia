@@ -236,8 +236,18 @@ from chordelia import MotifVariationSequenceAlgorithm, Random
 rng = Random(seed=77)
 motif = MotifVariationSequenceAlgorithm(motif_beats=2)
 
-phrase_a = rng.sequence(8, algorithm=motif, scale="D minor", mutation_probability=0)
-phrase_b = rng.sequence(8, algorithm=motif, scale="D minor", mutation_probability=0)
+phrase_a = rng.sequence(
+    8,
+    algorithm=motif,
+    scale="D minor",
+    mutation_probability=0,
+)
+phrase_b = rng.sequence(
+    8,
+    algorithm=motif,
+    scale="D minor",
+    mutation_probability=0,
+)
 
 print(phrase_a == phrase_b)
 ```
@@ -261,6 +271,27 @@ phrase = rng.sequence(
 )
 
 print(len(phrase.entries))
+```
+
+## 18) Sequence argument placement cheat sheet
+
+```python
+from chordelia import MotifVariationSequenceAlgorithm, Random
+
+# 1) Random constructor args
+rng = Random(seed=202606)
+
+# 2) Algorithm constructor args
+motif = MotifVariationSequenceAlgorithm(motif_beats=2)
+
+# 3) Random.sequence standard args + 4) algorithm call-time args
+phrase = rng.sequence(
+    8,
+    algorithm=motif,
+    scale="D minor",
+    mutation_probability=0,
+    duration_weights={0.5: 3, 1: 2},
+)
 ```
 
 ## Related
