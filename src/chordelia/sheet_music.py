@@ -6,12 +6,22 @@ from collections.abc import Iterable as IterableABC
 from fractions import Fraction
 from pathlib import Path
 import re
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, TypeAlias, Union
 
 from chordelia.rhythm import Duration
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
 from chordelia.scales import Scale
-from chordelia.sequenceable import Sequenceable
+from chordelia.sequenceable import (
+    Sequenceable,
+    SheetMusicScaleResolver,
+    TempoMetadataSource,
+    VisualRenderableSource,
+)
+
+
+SheetMusicAtomSource: TypeAlias = Score | VisualRenderableSource
+SheetMusicGalleryItem: TypeAlias = Union[SheetMusicAtomSource, "SheetMusic"]
+SheetMusicSource: TypeAlias = Union[SheetMusicAtomSource, Iterable[SheetMusicGalleryItem]]
 
 
 class SheetMusic:
@@ -60,7 +70,7 @@ class SheetMusic:
 
     def __init__(
         self,
-        source: Score | Any,
+        source: SheetMusicSource,
         *,
         tempo: int = 120,
         time_signature: tuple[int, int] = (4, 4),
@@ -98,26 +108,29 @@ class SheetMusic:
         self._staff_key_accidental_map = self._key_accidental_map_from_scale(self._staff_scale)
 
     @staticmethod
-    def _is_song_or_score_source(source: Any) -> bool:
+    def _is_song_or_score_source(source: SheetMusicSource) -> bool:
         """Return True when source opts in to tempo metadata rendering."""
+        if isinstance(source, TempoMetadataSource):
+            return bool(source.sheet_music_should_render_tempo_metadata())
+
         render_tempo = getattr(source, "sheet_music_should_render_tempo_metadata", None)
         if callable(render_tempo):
             return bool(render_tempo())
         return False
 
     @staticmethod
-    def _is_renderable_iterable_source(source: Any) -> bool:
+    def _is_renderable_iterable_source(source: SheetMusicSource) -> bool:
         """Return True when source should be treated as a gallery-style iterable."""
         if isinstance(source, (str, bytes, bytearray)):
             return False
-        if isinstance(source, Sequenceable):
+        if isinstance(source, VisualRenderableSource):
             return False
         return isinstance(source, IterableABC)
 
     @classmethod
     def _score_from_renderable_iterable(
         cls,
-        source: Iterable[Any],
+        source: Iterable[SheetMusicGalleryItem],
         *,
         tempo: int,
         time_signature: tuple[int, int],
@@ -204,7 +217,7 @@ class SheetMusic:
 
     @staticmethod
     def _coerce_gallery_value_to_score(
-        value: Any,
+        value: SheetMusicGalleryItem,
         *,
         tempo: int,
         time_signature: tuple[int, int],
@@ -214,6 +227,8 @@ class SheetMusic:
         """Coerce one gallery value into a Score instance."""
         if isinstance(value, SheetMusic):
             return value.score
+        if isinstance(value, Score):
+            return value
 
         return Score.from_sequenceable(
             value,
@@ -625,7 +640,7 @@ class SheetMusic:
     def _resolve_staff_scale(
         self,
         *,
-        source: Any,
+        source: SheetMusicSource,
         scale: Scale | str | None,
         metadata_key: str | None,
     ) -> Scale | None:
@@ -640,8 +655,19 @@ class SheetMusic:
         return None
 
     @staticmethod
-    def _scale_from_wrapped_source(source: Any) -> Scale | None:
+    def _scale_from_wrapped_source(source: SheetMusicSource) -> Scale | None:
         """Ask wrapped source types for their preferred staff scale when available."""
+        if isinstance(source, SheetMusicScaleResolver):
+            resolved = source.sheet_music_global_scale()
+            if resolved is None:
+                return None
+            if isinstance(resolved, (Scale, str)):
+                return SheetMusic._coerce_scale_value_static(resolved)
+            raise TypeError(
+                "sheet_music_global_scale() must return Scale, str, or None; "
+                f"got {type(resolved).__name__}."
+            )
+
         resolve_scale = getattr(source, "sheet_music_global_scale", None)
         if callable(resolve_scale):
             resolved = resolve_scale()
@@ -653,6 +679,7 @@ class SheetMusic:
                 "sheet_music_global_scale() must return Scale, str, or None; "
                 f"got {type(resolved).__name__}."
             )
+
         return None
 
     @staticmethod

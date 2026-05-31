@@ -78,6 +78,8 @@ Timeline and conversion types:
 
 - `Sequence`, `SequenceEntry`, `SequenceEntryLike`, `Rest`
 - `Sequenceable`, `NotesLike`
+- `PlayableSource`, `VisualRenderableSource`
+- `SheetMusicScaleResolver`, `TempoMetadataSource`
 - `Score`, `ScoreEvent`, `ScoreEventContext`, `ScoreMetadata`
 
 Score conversion entry points:
@@ -106,7 +108,7 @@ Compatibility note:
 
 - `score_from_sequenceable(...)` is retained as a compatibility helper.
 - `Score.from_sequenceable(...)` is the canonical constructor-style entry point.
-- Direct conversion sources must be `Score` or `Sequenceable` values (for example `Note`, `Chord`, `Sequence`, `Rest`); `Scale` and `Degree` are not accepted as direct score-wrapper inputs.
+- Direct conversion sources must be `Score` or `Sequenceable` values (for example `Note`, `Chord`, `Sequence`, `Rest`, `Scale`); `Degree` is not accepted as a direct score-wrapper input.
 
 Related deep docs:
 

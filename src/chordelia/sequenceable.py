@@ -11,6 +11,7 @@ from chordelia.rhythm import Duration, TimelineLike, coerce_timeline_duration
 if TYPE_CHECKING:
     from chordelia.intervals import IntervalLike
     from chordelia.notes import Note
+    from chordelia.scales import Scale
 
 
 DurationLike: TypeAlias = TimelineLike
@@ -51,6 +52,38 @@ class Sequenceable(Protocol):
 
     def transpose(self, interval: 'IntervalLike | int') -> 'Sequenceable':
         """Return a transposed value that preserves sequenceable behavior."""
+
+
+@runtime_checkable
+class PlayableSource(Protocol):
+    """Protocol for values that can be normalized into timed score events."""
+
+    def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
+        """Emit normalized score events and consumed span for playback/export."""
+
+
+@runtime_checkable
+class VisualRenderableSource(Protocol):
+    """Protocol for values that can be rendered in visual score workflows."""
+
+    def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
+        """Emit normalized score events and consumed span for notation rendering."""
+
+
+@runtime_checkable
+class SheetMusicScaleResolver(Protocol):
+    """Optional sheet-music capability for supplying an explicit staff scale."""
+
+    def sheet_music_global_scale(self) -> 'Scale | str | None':
+        """Return preferred global scale context for sheet rendering."""
+
+
+@runtime_checkable
+class TempoMetadataSource(Protocol):
+    """Optional capability for indicating tempo metadata rendering intent."""
+
+    def sheet_music_should_render_tempo_metadata(self) -> bool:
+        """Return whether tempo metadata should be emitted in sheet rendering."""
 
 
 @runtime_checkable

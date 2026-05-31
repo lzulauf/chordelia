@@ -450,7 +450,8 @@ class Scale:
         return Scale(new_root, self.scale_type)
 
     def render_for_context(self, context: 'ScoreEventContext') -> 'SequenceRender':
-        """Render this scale as a quarter-note sequence over its scale tones."""
+        """Render this scale as a one-beat sequence over its scale tones."""
+        from chordelia.rhythm import Duration
         from chordelia.sequences import Sequence
 
         notes = self.notes
@@ -461,7 +462,8 @@ class Scale:
             tonic = notes[0]
             notes = tuple(notes) + (tonic.with_octave(tonic.octave + 1),)
 
-        return Sequence(notes).render_for_context(context)
+        one_beat = Duration.from_beats(1, None)
+        return Sequence(tuple((note, one_beat) for note in notes)).render_for_context(context)
 
     def sheet_music_global_scale(self) -> 'Scale':
         """Signal SheetMusic to use this scale as the global rendering scale."""
