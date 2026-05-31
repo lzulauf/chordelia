@@ -291,7 +291,31 @@ phrase = rng.sequence(
 print(len(phrase.entries))
 ```
 
-## 19) Sequence argument placement cheat sheet
+## 19) Understand scale walk movement rules
+
+```python
+from chordelia import Random
+
+rng = Random(seed=202606)
+phrase = rng.sequence(
+        16,
+        algorithm="scale_walk",
+        scale="C major",
+        chord="G",
+)
+```
+
+What to expect from this generated phrase:
+
+- It starts and ends on chord tones for the selected chord context (`G` here).
+- Each note-to-note move follows one direction at a time:
+    - either by scale walk (1-2 degrees in that direction),
+    - or by one chromatic semitone in that same direction.
+- Direction changes are only introduced when the current note is in-scale.
+    If the walk is currently out-of-scale, it keeps moving in the same direction
+    until it returns to an in-scale step.
+
+## 20) Sequence argument placement cheat sheet
 
 ```python
 from chordelia import MotifVariationSequenceAlgorithm, Random

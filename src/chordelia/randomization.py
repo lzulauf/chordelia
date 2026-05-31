@@ -11,7 +11,7 @@ import random as std_random
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence as SequenceABC
 from fractions import Fraction
-from functools import wraps
+from functools import lru_cache, wraps
 from typing import Any, Callable, ClassVar, TypeAlias, TypeVar
 
 from chordelia.chords import Chord, ChordQuality
@@ -789,7 +789,12 @@ class ScaleWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
             Default is 0.2.
 
         Notes:
-        - chord argument is accepted for interface compatibility but ignored.
+                - When chord context is provided, generated walks begin and end on chord
+                    tones.
+                - Out-of-scale notes (when present) move chromatically one semitone per
+                    step.
+                - Direction changes are only allowed on steps that originate from
+                    in-scale notes.
         - If no scale is provided, this algorithm defaults to C major.
     """
 
@@ -797,7 +802,7 @@ class ScaleWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
     default_selection_weight: ClassVar[float] = 30.0
 
     def __init__(self) -> None:
-        self._last_index: int | None = None
+        self._last_pitch_class: int | None = None
         self._last_direction: int | None = None
 
     def generate(
@@ -815,7 +820,7 @@ class ScaleWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
             rng: Random selector instance used for all deterministic sampling.
             beat_length: Exact target beat span this sequence must consume.
             scale: Optional scale context for note pool; defaults to C major.
-            chord: Ignored (accepted for shared algorithm call signature).
+            chord: Optional chord context used to constrain the final note.
 
         Accepted **params kwargs:
             duration_weights: WeightInput[TimelineLike]
@@ -827,10 +832,17 @@ class ScaleWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
                 Probability to advance by 2 scale steps instead of 1.
                 Default is 0.2.
         """
-        del chord
-
         scale_obj = _resolve_optional_scale(scale) or Scale("C", ScaleType.MAJOR)
         normalized_scale = _scale_with_octave_for_sequence(scale_obj)
+        chord_obj = _resolve_optional_chord(chord)
+        if chord_obj is None:
+            chord_obj = _fallback_anchor_chord(rng, normalized_scale)
+
+        normalized_chord = _chord_with_octave_for_sequence(
+            chord_obj,
+            fallback_octave=normalized_scale.root.octave or 4,
+        )
+
         duration_weights = _coerce_duration_weight_map(params.get("duration_weights"))
         direction_change_probability = _coerce_probability(
             params.get("direction_change_probability", 0.2),
@@ -842,32 +854,80 @@ class ScaleWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
         )
 
         scale_notes = tuple(normalized_scale.notes)
-        index = (
-            self._last_index
-            if self._last_index is not None
-            else rng.engine.randrange(len(scale_notes))
+        scale_pitch_classes = tuple(note.pitch_class for note in scale_notes)
+        chord_notes = tuple(normalized_chord.notes)
+        chord_pitch_classes = tuple(
+            dict.fromkeys(note.pitch_class for note in chord_notes)
         )
-        direction = (
+
+        if not chord_pitch_classes:
+            chord_pitch_classes = (scale_pitch_classes[0],)
+
+        start_pitch_class = _choose_scale_walk_start_pitch_class(
+            rng,
+            chord_pitch_classes=chord_pitch_classes,
+            last_pitch_class=self._last_pitch_class,
+        )
+        initial_direction = (
             self._last_direction
             if self._last_direction in {-1, 1}
             else rng.engine.choice((-1, 1))
         )
 
-        entries: list[tuple[Any, Fraction]] = []
+        durations: list[Fraction] = []
         remaining = beat_length
         while remaining > 0:
             duration = _choose_duration_for_remaining(rng, remaining, duration_weights)
-            entries.append((scale_notes[index], duration))
-
-            if rng.engine.random() < direction_change_probability:
-                direction *= -1
-
-            step = 2 if rng.engine.random() < run_step_probability else 1
-            index = (index + (direction * step)) % len(scale_notes)
+            durations.append(duration)
             remaining -= duration
 
-        self._last_index = index
-        self._last_direction = direction
+        walk_pitch_classes, _ = _generate_scale_walk_pitch_classes(
+            rng,
+            length=len(durations),
+            start_pitch_class=start_pitch_class,
+            initial_direction=initial_direction,
+            scale_pitch_classes=scale_pitch_classes,
+            direction_change_probability=direction_change_probability,
+            run_step_probability=run_step_probability,
+        )
+        repaired_pitch_classes = _repair_scale_walk_pitch_classes(
+            walk_pitch_classes,
+            initial_direction=initial_direction,
+            scale_pitch_classes=scale_pitch_classes,
+            chord_pitch_classes=chord_pitch_classes,
+        )
+
+        scale_note_by_pitch_class = {
+            note.pitch_class: note for note in scale_notes
+        }
+        chord_note_by_pitch_class = {
+            note.pitch_class: note for note in chord_notes
+        }
+        fallback_octave = normalized_scale.root.octave or 4
+
+        entries = [
+            (
+                _scale_walk_note_from_pitch_class(
+                    pitch_class,
+                    scale_note_by_pitch_class=scale_note_by_pitch_class,
+                    chord_note_by_pitch_class=chord_note_by_pitch_class,
+                    fallback_octave=fallback_octave,
+                ),
+                duration,
+            )
+            for pitch_class, duration in zip(repaired_pitch_classes, durations, strict=False)
+        ]
+
+        self._last_pitch_class = repaired_pitch_classes[-1]
+        if len(repaired_pitch_classes) > 1:
+            self._last_direction = _infer_scale_walk_direction(
+                previous_pitch_class=repaired_pitch_classes[-2],
+                current_pitch_class=repaired_pitch_classes[-1],
+                scale_pitch_classes=scale_pitch_classes,
+            )
+        else:
+            self._last_direction = initial_direction
+
         return Sequence(entries)
 
 
@@ -1247,6 +1307,215 @@ def _closest_scale_note_index(scale_notes: tuple[Note, ...], target: Note) -> in
         if note.pitch_class == target.pitch_class:
             return index
     return 0
+
+
+def _choose_scale_walk_start_pitch_class(
+    rng: Random,
+    *,
+    chord_pitch_classes: SequenceABC[int],
+    last_pitch_class: int | None,
+) -> int:
+    choices = tuple(dict.fromkeys(chord_pitch_classes))
+    if not choices:
+        raise ValueError("scale_walk requires at least one chord pitch class")
+
+    if last_pitch_class is None:
+        return rng.engine.choice(choices)
+
+    return min(
+        choices,
+        key=lambda pitch_class: _ring_pitch_class_distance(
+            pitch_class,
+            last_pitch_class,
+            12,
+        ),
+    )
+
+
+def _generate_scale_walk_pitch_classes(
+    rng: Random,
+    *,
+    length: int,
+    start_pitch_class: int,
+    initial_direction: int,
+    scale_pitch_classes: SequenceABC[int],
+    direction_change_probability: float,
+    run_step_probability: float,
+) -> tuple[list[int], int]:
+    if length <= 0:
+        return [], initial_direction
+
+    scale_set = set(scale_pitch_classes)
+    index_by_pitch_class = {
+        pitch_class: index for index, pitch_class in enumerate(scale_pitch_classes)
+    }
+    span = len(scale_pitch_classes)
+
+    direction = initial_direction
+    path = [start_pitch_class]
+    for _ in range(1, length):
+        current_pitch_class = path[-1]
+        in_scale = current_pitch_class in scale_set
+
+        if in_scale and rng.engine.random() < direction_change_probability:
+            direction *= -1
+
+        if in_scale:
+            scale_index = index_by_pitch_class[current_pitch_class]
+            step = 2 if rng.engine.random() < run_step_probability else 1
+            next_pitch_class = scale_pitch_classes[(scale_index + (direction * step)) % span]
+        else:
+            next_pitch_class = (current_pitch_class + direction) % 12
+
+        path.append(next_pitch_class)
+
+    return path, direction
+
+
+def _repair_scale_walk_pitch_classes(
+    pitch_classes: SequenceABC[int],
+    *,
+    initial_direction: int,
+    scale_pitch_classes: SequenceABC[int],
+    chord_pitch_classes: SequenceABC[int],
+) -> list[int]:
+    if not pitch_classes:
+        return []
+
+    chord_set = set(chord_pitch_classes)
+    if pitch_classes[-1] in chord_set:
+        return list(pitch_classes)
+
+    scale_set = set(scale_pitch_classes)
+    index_by_pitch_class = {
+        pitch_class: index for index, pitch_class in enumerate(scale_pitch_classes)
+    }
+    span = len(scale_pitch_classes)
+    original = tuple(pitch_classes)
+    length = len(original)
+
+    @lru_cache(maxsize=None)
+    def solve(
+        position: int,
+        current_pitch_class: int,
+        current_direction: int,
+    ) -> tuple[int, tuple[int, ...]] | None:
+        if position == length - 1:
+            if current_pitch_class in chord_set:
+                return (0, ())
+            return None
+
+        direction_options = (
+            (current_direction, -current_direction)
+            if current_pitch_class in scale_set
+            else (current_direction,)
+        )
+
+        best: tuple[int, tuple[int, ...]] | None = None
+        for direction in direction_options:
+            if current_pitch_class in scale_set:
+                scale_index = index_by_pitch_class[current_pitch_class]
+                next_candidates = tuple(
+                    dict.fromkeys(
+                        (
+                    scale_pitch_classes[(scale_index + direction) % span],
+                    scale_pitch_classes[(scale_index + (2 * direction)) % span],
+                            (current_pitch_class + direction) % 12,
+                        )
+                    )
+                )
+            else:
+                next_candidates = ((current_pitch_class + direction) % 12,)
+
+            for next_pitch_class in next_candidates:
+                tail = solve(position + 1, next_pitch_class, direction)
+                if tail is None:
+                    continue
+
+                tail_cost, tail_suffix = tail
+                penalty = 0 if next_pitch_class == original[position + 1] else 1
+                candidate = (penalty + tail_cost, (next_pitch_class, *tail_suffix))
+                if best is None or candidate[0] < best[0]:
+                    best = candidate
+
+        return best
+
+    solved = solve(0, original[0], initial_direction)
+    if solved is None:
+        # Should be unreachable for valid inputs; keep deterministic fallback.
+        repaired = list(original)
+        repaired[-1] = min(
+            chord_set,
+            key=lambda pitch_class: _ring_pitch_class_distance(
+                pitch_class,
+                repaired[-1],
+                12,
+            ),
+        )
+        return repaired
+
+    return [original[0], *solved[1]]
+
+
+def _ring_pitch_class_distance(a: int, b: int, span: int) -> int:
+    forward = (a - b) % span
+    backward = (b - a) % span
+    return min(forward, backward)
+
+
+def _scale_walk_note_from_pitch_class(
+    pitch_class: int,
+    *,
+    scale_note_by_pitch_class: Mapping[int, Note],
+    chord_note_by_pitch_class: Mapping[int, Note],
+    fallback_octave: int,
+) -> Note:
+    if pitch_class in chord_note_by_pitch_class:
+        return chord_note_by_pitch_class[pitch_class]
+    if pitch_class in scale_note_by_pitch_class:
+        return scale_note_by_pitch_class[pitch_class]
+
+    midi_number = ((fallback_octave + 1) * 12) + pitch_class
+    return Note.from_midi_number(midi_number, prefer_sharps=True)
+
+
+def _infer_scale_walk_direction(
+    *,
+    previous_pitch_class: int,
+    current_pitch_class: int,
+    scale_pitch_classes: SequenceABC[int],
+) -> int:
+    scale_set = set(scale_pitch_classes)
+    if previous_pitch_class in scale_set:
+        index_by_pitch_class = {
+            pitch_class: index for index, pitch_class in enumerate(scale_pitch_classes)
+        }
+        span = len(scale_pitch_classes)
+        previous_index = index_by_pitch_class[previous_pitch_class]
+        upward = {
+            scale_pitch_classes[(previous_index + 1) % span],
+            scale_pitch_classes[(previous_index + 2) % span],
+        }
+        downward = {
+            scale_pitch_classes[(previous_index - 1) % span],
+            scale_pitch_classes[(previous_index - 2) % span],
+        }
+        if current_pitch_class in upward:
+            return 1
+        if current_pitch_class in downward:
+            return -1
+
+        if current_pitch_class == (previous_pitch_class + 1) % 12:
+            return 1
+        if current_pitch_class == (previous_pitch_class - 1) % 12:
+            return -1
+        return 1
+
+    if current_pitch_class == (previous_pitch_class + 1) % 12:
+        return 1
+    if current_pitch_class == (previous_pitch_class - 1) % 12:
+        return -1
+    return 1
 
 
 def _coerce_probability(value: Any, *, label: str) -> float:

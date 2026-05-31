@@ -65,6 +65,10 @@ Key behaviors:
 	- Algorithm constructor args belong on algorithm object creation (for example `MotifVariationSequenceAlgorithm(motif_beats=2)`).
 	- Algorithm call-time tuning args are passed as direct `Random.sequence(...)` keyword arguments and forwarded to `algorithm.generate(...)`.
 - Built-in sequence algorithms accept optional tuning parameters, but each works with no required algorithm-specific arguments.
+- `ScaleWalkSequenceAlgorithm` generates walks with explicit movement invariants:
+	- The walk starts and ends on chord tones (using the provided chord or an internally derived fallback chord when none is provided).
+	- Each step follows one directional movement rule: either a scale-walk step (1-2 scale degrees in the current direction) or a chromatic one-semitone step in the current direction.
+	- Direction changes are only considered after in-scale notes; out-of-scale notes continue in the current direction until the walk returns to in-scale movement.
 - Reusing the same algorithm object instance allows stateful continuity across calls (for example motif carry-forward).
 - Sequence continuation behavior is playback-equivalent duration extension of the previous pitched entry, not notation-specific tie modeling.
 
