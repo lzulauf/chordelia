@@ -32,8 +32,10 @@ class ChordAnchorWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
     - duration_weights: WeightInput[TimelineLike]
       Relative duration weights for each emitted event.
     - jump_probability: float in [0, 1]
-      Probability for interior events to jump directly to a chord tone instead
-      of moving one scale step.
+            Probability for interior events to jump directly to a chord tone instead
+            of moving one scale step.
+            Jumps are only considered when the current note is already a chord tone,
+            so jump transitions are always chord-tone to chord-tone.
       Default is 0.35.
 
     Notes:
@@ -73,6 +75,7 @@ class ChordAnchorWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
         )
 
         chord_tones = tuple(normalized_chord.notes)
+        chord_pitch_classes = {note.pitch_class for note in chord_tones}
         scale_notes = tuple(normalized_scale.notes)
 
         durations: list[Fraction] = []
@@ -92,7 +95,9 @@ class ChordAnchorWalkSequenceAlgorithm(SequenceRandomizationAlgorithm):
                 payload = rng.engine.choice(chord_tones)
                 previous_index = _closest_scale_note_index(scale_notes, payload)
             else:
-                if rng.engine.random() < jump_probability:
+                current_pitch_class = scale_notes[previous_index].pitch_class
+                can_jump = current_pitch_class in chord_pitch_classes
+                if can_jump and rng.engine.random() < jump_probability:
                     payload = rng.engine.choice(chord_tones)
                     previous_index = _closest_scale_note_index(scale_notes, payload)
                 else:
