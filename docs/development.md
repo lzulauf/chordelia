@@ -29,6 +29,13 @@ Contributions are welcome. Please include tests for behavior changes and keep do
 - Names prefixed with `_` are internal implementation details and may change without compatibility guarantees.
 - In particular, adapter-registry helpers in `chordelia.sequenceable` are internal; prefer public score conversion entry points such as `Score.from_sequenceable(...)` and `score_from_sequenceable(...)`.
 
+## Randomization Module Layout
+
+- Keep orchestration and shared helper logic in `src/chordelia/randomization.py`.
+- Keep built-in sequence algorithm implementations in `src/chordelia/sequence_algorithms/` (one module per algorithm).
+- Keep dispatch/validation tests in `tests/unit/chordelia/test_randomization_sequences.py`.
+- Keep algorithm behavior tests in `tests/unit/chordelia/sequence_algorithms/`.
+
 ## Versioning
 
 This project uses bump-my-version.
