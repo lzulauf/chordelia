@@ -37,6 +37,16 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 	- Coordinating dependency order between multiple plans
 	- Declaring expected test delta (new, updated, none-with-rationale) for planned code changes
 
+### plan-implementation
+
+- Path: skills/plan-implementation.md
+- Use when:
+	- Executing an existing plan one phase at a time
+	- Updating in-flight plan status/checklists during implementation
+	- Recording dated implementation notes while phases are completed
+	- Preparing one commit scope/message per phase PR boundary
+	- Closing out plans (Done/Rejected) and archiving after implementation
+
 ### next-work-selection
 
 - Path: skills/next-work-selection.md
@@ -119,6 +129,7 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 - If a task changes behavior, parsing, validation, or public contracts, load test-writing even if the user did not explicitly request tests.
 - If a task is primarily about running tests, triaging failures, or checking coverage, load test-running.
 - If a task is primarily about creating, updating, or restructuring execution plans, load plan-use.
+- If a task is primarily about implementing an existing plan phase-by-phase, load plan-implementation.
 - If a task is primarily about selecting or ranking the next plan in .plans, load next-work-selection.
 - If a task changes public APIs, parsing/validation behavior, or user-facing workflows/examples, load readme-writing to update docs/README or record a no-docs-delta rationale.
 - If a task is primarily about adding, updating, or standardizing docstrings, load docstring-writing.
@@ -131,7 +142,9 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 - If a task is primarily about generating or refining commit messages, load commit-message-writing.
 - If both apply, load both skills: function-naming for global naming and immutable-types for immutable-specific constraints.
 - If plan work includes naming or immutable model constraints, load plan-use with the relevant companion skill(s).
+- If plan work includes both authoring and execution in the same request, load plan-use first, then plan-implementation.
 - If plan work starts with choosing what to do next, load next-work-selection before plan-use.
+- If plan execution includes commit preparation, load plan-implementation with commit-message-writing.
 - If plan work includes user-facing API or behavior changes, load plan-use with readme-writing.
 - If plan work includes documentation restructuring, load plan-use with readme-writing.
 - If plan work includes skill creation or skill refactoring, load plan-use with skill-writing.
@@ -143,7 +156,8 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 
 - Keep test authoring and coverage conventions in skills/test-writing.md.
 - Keep test execution and coverage command conventions in skills/test-running.md.
-- Keep plan authoring and execution standards in skills/plan-use.md.
+- Keep plan authoring and re-scoping standards in skills/plan-use.md.
+- Keep phase-by-phase implementation execution standards in skills/plan-implementation.md.
 - Keep next-work prioritization and ranking standards in skills/next-work-selection.md.
 - Keep README/docs structuring conventions in skills/readme-writing.md.
 - Keep docstring conventions in skills/docstring-writing.md.

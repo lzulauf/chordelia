@@ -1,15 +1,15 @@
 ---
 name: plan-use
-description: 'Create and run implementation plans in .plans with clear scope, technical depth, pseudocode, diagrams, phases, checklists, milestones, acceptance criteria, and cross-links to related plans or skills. Use when preparing and executing work.'
+description: 'Create and maintain implementation plans in .plans with clear scope, technical depth, pseudocode, diagrams, phases, checklists, milestones, acceptance criteria, and cross-links to related plans or skills. Use when preparing or re-scoping work.'
 argument-hint: 'Describe the initiative and constraints to generate a phased execution plan'
 user-invocable: true
 ---
 
 # Plan Use
 
-Use this skill to draft clear, execution-ready planning documents and keep them actively updated during implementation.
+Use this skill to draft clear, execution-ready planning documents and keep them structurally accurate as scope evolves.
 
-Companion skills: function-naming for naming standards, immutable-types for immutable-model constraints, decision-writing for approach-selection docs, and readme-writing for README/docs ownership and update flow.
+Companion skills: plan-implementation for phase-by-phase execution, function-naming for naming standards, immutable-types for immutable-model constraints, decision-writing for approach-selection docs, and readme-writing for README/docs ownership and update flow.
 
 ## When To Use
 
@@ -18,9 +18,14 @@ Companion skills: function-naming for naming standards, immutable-types for immu
 - Breaking large work into phases and milestones
 - Creating prerequisite plans and dependency ordering
 - Defining success criteria before coding
-- Updating plan checklist status as implementation progresses
 - Re-scoping phases when requirements change
 - Planning public API or behavior changes that require documentation updates
+
+## Out Of Scope
+
+- Executing implementation phase checklists step-by-step (use plan-implementation)
+- Preparing per-phase PR/commit choreography and commit messages (use plan-implementation with commit-message-writing)
+- Recording day-by-day execution logs while coding (use plan-implementation implementation notes flow)
 
 ## Plan Location and Naming
 
@@ -50,8 +55,9 @@ Include these sections in order unless there is a strong reason not to:
 9. Progress checklist
 10. Phases (numbered, with concrete deliverables)
 11. Execution order recommendation
-12. Risks and mitigations (optional)
-13. Acceptance criteria
+12. Implementation notes (append-only log; may be initialized empty during drafting)
+13. Risks and mitigations (optional)
+14. Acceptance criteria
 
 ## Status Section Rules
 
@@ -120,6 +126,7 @@ Include these sections in order unless there is a strong reason not to:
 - Keep checklist wording stable so it can be updated over time.
 - Keep checklist status up to date as work progresses.
 - Mark checklist items complete immediately when the corresponding outcome is met.
+- During implementation, checklist completion is performed via plan-implementation.
 
 Checklist style example:
 - [ ] Phase 0: Inventory complete
@@ -134,6 +141,14 @@ Checklist style example:
 - Explicitly call out docs and tests phases.
 - Include technical deliverables in each phase (for example signature updates, type migrations, parser behavior).
 - For model/API phases, list target files/modules directly.
+- Define intended PR boundaries by phase so plan-implementation can prepare one commit message per PR boundary.
+
+## Implementation Notes Section Rules
+
+- Include an explicit `Implementation notes` section in every active plan.
+- During drafting, initialize with a placeholder bullet such as `- No implementation notes yet.`
+- During execution, plan-implementation appends dated, phase-scoped notes.
+- Keep this section append-only except for factual corrections.
 
 ## Naming and API Planning Rules
 
@@ -197,3 +212,4 @@ Checklist style example:
 - Move the plan from .plans/ to .plans/archive/.
 - Update references from active plans so links point to the archived file path.
 - Keep archived plans as historical records and avoid substantive rewrites after archival.
+- If implementation notes exist, preserve them verbatim as the execution record.

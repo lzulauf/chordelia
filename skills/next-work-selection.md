@@ -9,7 +9,7 @@ user-invocable: true
 
 Use this skill to choose the best next implementation target from .plans.
 
-Companion skills: plan-use for updating plan status/checklists and decision-writing when dependency order is blocked by unresolved approach choices.
+Companion skills: plan-use for plan authoring/re-scoping, plan-implementation for in-flight status/checklist updates, and decision-writing when dependency order is blocked by unresolved approach choices.
 
 ## When To Use
 
