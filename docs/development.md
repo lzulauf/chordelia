@@ -10,6 +10,14 @@ Run the full test suite:
 pytest tests/
 ```
 
+## Python Version Policy
+
+- Runtime minimum: Python 3.10+
+- CI-required matrix: Python 3.10, 3.11, 3.12, 3.13
+- Preview matrix: Python 3.14 (non-blocking)
+
+Use one of the CI-required versions for local development when possible.
+
 ## Contributing
 
 Contributions are welcome. Please include tests for behavior changes and keep docs aligned with the final API.

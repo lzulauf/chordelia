@@ -7,7 +7,7 @@ name = "chordelia"
 version = "0.4.0-rc0"
 description = "A comprehensive music theory library built around algorithmic approaches"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     # Core music theory - no external dependencies
 ]
@@ -86,7 +86,8 @@ all = [
 # Development dependencies
 dev = [
     "chordelia",
-    "ipython>=9.6.0",
+    "ipython>=8.18.0,<9.0.0; python_version < '3.11'",
+    "ipython>=9.6.0; python_version >= '3.11'",
     "pip>=25.2",
     "pytest>=8.4.2",
     "pytest-cov>=7.1.0",
