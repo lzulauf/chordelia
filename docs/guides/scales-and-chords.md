@@ -128,4 +128,5 @@ print(major_ninth.simple_degree) # 2
 ## Next Guide
 
 - Continue with [Rhythm and Timing](rhythm-and-timing.md)
+- Continue with [Sequences and Score](sequences-and-score.md)
 - See [Immutability](../immutability.md)

@@ -11,10 +11,16 @@ from typing import TYPE_CHECKING, Optional, Union
 import re
 from functools import lru_cache
 from chordelia.accidentals import Accidental
-from chordelia.intervals import Interval, IntervalLike, IntervalQuality
+from chordelia.intervals import (
+    ChromaticTransposeLike,
+    Interval,
+    coerce_chromatic_semitones,
+)
+from chordelia.scale_context import coerce_scale_context_value, get_global_scale_context
 
 if TYPE_CHECKING:
     from chordelia.score import ScoreEventContext
+    from chordelia.scales import Scale
     from chordelia.sequenceable import SequenceRender
 
 # Pre-compiled regex for faster note parsing
@@ -322,7 +328,7 @@ class Note:
                 accidental = Accidental.FLAT
         return cls(note_name, accidental, octave)
     
-    def transpose(self, interval: IntervalLike) -> 'Note':
+    def transpose(self, interval: ChromaticTransposeLike) -> 'Note':
         """
         Transpose this note by an interval.
         
@@ -332,10 +338,7 @@ class Note:
         Returns:
             A new Note object representing the transposed note
         """
-        interval = Interval.coerce(interval)
-
-        # Get the actual semitones to transpose (could be negative)
-        semitones = getattr(interval, '_original_semitones', interval.semitones)
+        semitones = coerce_chromatic_semitones(interval)
         
         # Calculate the new pitch class
         if self.octave is not None:
@@ -357,8 +360,46 @@ class Note:
             base_note = Note.from_midi_number(temp_midi, prefer_sharps)
             base_note = base_note.with_octave(None)  # Remove octave
         
-        # Adjust enharmonic spelling based on the interval
-        return self._get_enharmonic_for_interval(base_note, interval)
+        return base_note
+
+    def shift(self, steps: int, *, scale: 'Scale | str | None' = None) -> 'Note':
+        """Shift this note diatonically using explicit or global scale context."""
+
+        if not isinstance(steps, int) or isinstance(steps, bool):
+            raise TypeError(f"steps must be an int, got {type(steps).__name__}")
+
+        scale_obj = (
+            coerce_scale_context_value(scale)
+            if scale is not None
+            else get_global_scale_context()
+        )
+        if scale_obj is None:
+            raise ValueError(
+                "Note.shift requires a scale context. "
+                "Provide scale=... or set_global_scale_context(...)."
+            )
+
+        span = len(scale_obj.notes)
+        if span < 1:
+            raise ValueError("Note.shift requires a scale with at least one note")
+
+        origin_degree = scale_obj.degree_for_chord_root(self)
+        if origin_degree is None:
+            raise ValueError(
+                "Note.shift requires note to be in scale; "
+                "use transpose for chromatic movement"
+            )
+
+        origin_index = origin_degree.to_int() - 1
+        raw_index = origin_index + steps
+        target_index = raw_index % span
+        cycles = raw_index // span
+
+        shifted_pitch_class = scale_obj.notes[target_index]
+        if self.octave is None:
+            return shifted_pitch_class.with_octave(None)
+
+        return shifted_pitch_class.with_octave(self.octave + cycles)
 
     def render_for_context(self, context: 'ScoreEventContext') -> 'SequenceRender':
         """Render a single score event and consumed span for this note."""

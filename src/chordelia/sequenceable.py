@@ -54,7 +54,7 @@ class Sequenceable(Protocol):
     def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
         """Emit normalized score events and consumed span for the provided context."""
 
-    def transpose(self, interval: 'IntervalLike') -> 'Sequenceable':
+    def transpose(self, interval: 'IntervalLike | int') -> 'Sequenceable':
         """Return a transposed value that preserves sequenceable behavior."""
 
 

@@ -16,6 +16,7 @@ from chordelia import intervals
 from chordelia.degrees import Degree, DegreeLike
 from chordelia.intervals import Interval, IntervalLike, IntervalQuality
 from chordelia.notes import Note, NoteName, Accidental
+from chordelia.scale_context import coerce_scale_context_value, get_global_scale_context
 from chordelia.scales import Scale, ScaleType
 
 if TYPE_CHECKING:
@@ -708,7 +709,7 @@ class Chord:
             temp_note = Note.from_midi_number(temp_midi)
             return temp_note.with_octave(target_octave)
     
-    def transpose(self, interval: IntervalLike) -> 'Chord':
+    def transpose(self, interval: IntervalLike | int) -> 'Chord':
         """
         Transpose this chord by an interval.
         
@@ -718,11 +719,48 @@ class Chord:
         Returns:
             A new Chord object transposed by the interval
         """
-        interval = Interval.coerce(interval)
         new_root = self.root.transpose(interval)
         new_bass = self.bass_note.transpose(interval) if self.bass_note else None
         
         return self.with_(root=new_root, bass_note=new_bass)
+
+    def shift(self, steps: int, *, scale: 'Scale | str | None' = None) -> 'Chord':
+        """Shift this chord diatonically using explicit or global scale context."""
+
+        if not isinstance(steps, int) or isinstance(steps, bool):
+            raise TypeError(f"steps must be an int, got {type(steps).__name__}")
+
+        scale_obj = (
+            coerce_scale_context_value(scale)
+            if scale is not None
+            else get_global_scale_context()
+        )
+        if scale_obj is None:
+            raise ValueError(
+                "Chord.shift requires a scale context. "
+                "Provide scale=... or set_global_scale_context(...)."
+            )
+
+        shifted_root = self.root.shift(steps, scale=scale_obj)
+        shifted_bass = self.bass_note.shift(steps, scale=scale_obj) if self.bass_note else None
+
+        if self._custom_notes is not None:
+            shifted_custom_notes = tuple(
+                note.shift(steps, scale=scale_obj)
+                for note in self._custom_notes
+            )
+            return Chord(
+                root=shifted_custom_notes[0],
+                quality=self._quality,
+                extension=self._extension,
+                additions=self._additions,
+                omissions=self._omissions,
+                bass_note=shifted_bass,
+                inversion=self._inversion,
+                notes=shifted_custom_notes,
+            )
+
+        return self.with_(root=shifted_root, bass_note=shifted_bass)
 
     def render_for_context(self, context: 'ScoreEventContext') -> 'SequenceRender':
         """Render one score event containing all chord tones and consumed span."""

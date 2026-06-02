@@ -410,8 +410,20 @@ class Scale:
         
         # Create a custom scale with this pattern
         return CustomScale(new_root, normalized_pattern)
+
+    def shift(self, steps: int) -> 'Scale':
+        """Return a diatonically shifted mode rooted at a relative scale degree."""
+        if not isinstance(steps, int) or isinstance(steps, bool):
+            raise TypeError(f"steps must be an int, got {type(steps).__name__}")
+
+        span = len(self.notes)
+        if span < 1:
+            raise ValueError("Scale.shift requires at least one scale note")
+
+        target_degree = (steps % span) + 1
+        return self.mode_from_degree(target_degree)
     
-    def transpose(self, interval: IntervalLike) -> 'Scale':
+    def transpose(self, interval: IntervalLike | int) -> 'Scale':
         """
         Transpose this scale by an interval.
         
@@ -421,7 +433,6 @@ class Scale:
         Returns:
             A new Scale object transposed by the interval
         """
-        interval = Interval.coerce(interval)
         new_root = self.root.transpose(interval)
         return Scale(new_root, self.scale_type)
     

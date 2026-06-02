@@ -184,6 +184,49 @@ class Degree:
         """Return the numeric ordinal of this degree."""
         return self._number
 
+    def shift(self, steps: int, *, span: int = 7, wrap: bool = True) -> "Degree":
+        """Shift this degree by diatonic steps.
+
+        Args:
+            steps: Signed diatonic step displacement.
+            span: Active degree span used for wrapping behavior.
+            wrap: When True, normalize into 1..span; when False keep absolute ordinals.
+        """
+        if not isinstance(steps, int) or isinstance(steps, bool):
+            raise TypeError(f"steps must be an int, got {type(steps).__name__}")
+        if not isinstance(span, int) or isinstance(span, bool):
+            raise TypeError(f"span must be an int, got {type(span).__name__}")
+        if span < 1:
+            raise ValueError(f"span must be >= 1, got {span}")
+        if not isinstance(wrap, bool):
+            raise TypeError(f"wrap must be a bool, got {type(wrap).__name__}")
+
+        if wrap:
+            start_index = self._number - 1
+            shifted_number = ((start_index + steps) % span) + 1
+        else:
+            shifted_number = self._number + steps
+            if shifted_number < 1:
+                raise ValueError(
+                    "Degree.shift without wrap requires resulting ordinal >= 1, "
+                    f"got {shifted_number}"
+                )
+
+        source_roman = None
+        if self._is_roman and self._parsed_case in {"upper", "lower"}:
+            source_roman = _int_to_roman(shifted_number)
+            if self._parsed_case == "lower":
+                source_roman = source_roman.lower()
+
+        return Degree(
+            shifted_number,
+            accidental=self._accidental,
+            parsed_case=self._parsed_case,
+            is_roman=self._is_roman,
+            had_diminished_symbol=self._had_diminished_symbol,
+            source_roman=source_roman,
+        )
+
     def to_roman(self, case: RomanCase = "upper") -> str:
         """Convert this degree to Roman notation."""
         if case not in {"upper", "lower", "preserve", "auto"}:

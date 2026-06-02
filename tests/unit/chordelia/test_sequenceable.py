@@ -6,6 +6,7 @@ from chordelia.chords import Chord
 from chordelia.intervals import Interval
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
+from chordelia.scale_context import reset_global_scale_context, with_global_scale_context
 from chordelia.sequences import Rest, Sequence, SequenceEntry
 from chordelia.score import Score, ScoreEvent, ScoreEventContext
 from chordelia.sequenceable import (
@@ -500,6 +501,12 @@ class TestSequenceScheduling:
 class TestSequenceTransforms:
     """Sequence transform behavior and recursive transpose semantics."""
 
+    @pytest.fixture(autouse=True)
+    def _reset_global_scale_context(self):
+        reset_global_scale_context()
+        yield
+        reset_global_scale_context()
+
     def test_sequence_transpose_preserves_timing_and_updates_pitches(self):
         seq = Sequence(
             (
@@ -571,8 +578,107 @@ class TestSequenceTransforms:
         assert [event.pitches for event in render.events] == [(62, 66, 69), (69,)]
         assert [event.beat for event in render.events] == [Duration.from_beats(0), Duration.from_beats(0)]
 
+    def test_sequence_transpose_numeric_string_uses_semitones(self):
+        seq = Sequence(((Note("C4"), 1),))
+
+        transposed = seq.transpose("1")
+        render = transposed.render_for_context(ScoreEventContext())
+
+        assert [event.pitches for event in render.events] == [(61,)]
+
     def test_sequence_transpose_raises_for_unsupported_payloads(self):
         seq = Sequence((SequenceEntry(payload=object(), duration=1),))
 
         with pytest.raises(ValueError, match="transpose\(interval\)"):
             seq.transpose("2")
+
+    def test_sequence_shift_preserves_timing_and_updates_pitches(self):
+        seq = Sequence(
+            (
+                SequenceEntry(payload=Note("C4"), duration=2, offset=1),
+                SequenceEntry(payload=Chord("E4"), duration=1),
+            )
+        )
+
+        shifted = seq.shift(1, scale="C")
+        original_render = seq.render_for_context(ScoreEventContext())
+        shifted_render = shifted.render_for_context(ScoreEventContext())
+
+        assert [event.beat for event in shifted_render.events] == [
+            Duration.from_beats(1),
+            Duration.from_beats(3),
+        ]
+        assert [event.duration for event in shifted_render.events] == [
+            Duration.from_beats(2),
+            Duration.from_beats(1),
+        ]
+        assert [event.pitches for event in shifted_render.events] == [(62,), (65, 69, 72)]
+        assert shifted_render.consumed_duration == Duration.from_beats(4)
+
+        assert shifted is not seq
+        assert [event.pitches for event in original_render.events] == [(60,), (64, 68, 71)]
+
+    def test_sequence_shift_recurses_into_nested_sequences(self):
+        motif = Sequence(
+            (
+                (Note("C4"), 1),
+                (Note("E4"), 1),
+            )
+        )
+        arrangement = Sequence(
+            (
+                motif,
+                SequenceEntry(payload=Chord("G4"), duration=2),
+            )
+        )
+
+        shifted = arrangement.shift(-1, scale="C")
+        render = shifted.render_for_context(ScoreEventContext())
+
+        assert [event.beat for event in render.events] == [
+            Duration.from_beats(0),
+            Duration.from_beats(1),
+            Duration.from_beats(2),
+        ]
+        assert [event.pitches for event in render.events] == [(59,), (62,), (65, 69, 72)]
+        assert render.consumed_duration == Duration.from_beats(4)
+
+    def test_sequence_shift_recurses_into_simultaneous_layers(self):
+        seq = Sequence(
+            (
+                (
+                    [
+                        Chord("C4"),
+                        Note("G4"),
+                    ],
+                    1,
+                ),
+            )
+        )
+
+        shifted = seq.shift(1, scale="C")
+        render = shifted.render_for_context(ScoreEventContext())
+
+        assert [event.pitches for event in render.events] == [(62, 66, 69), (69,)]
+        assert [event.beat for event in render.events] == [Duration.from_beats(0), Duration.from_beats(0)]
+
+    def test_sequence_shift_uses_global_scale_context_when_scale_not_provided(self):
+        seq = Sequence(((Note("E4"), 1),))
+
+        with with_global_scale_context("C"):
+            shifted = seq.shift(2)
+
+        render = shifted.render_for_context(ScoreEventContext())
+        assert [event.pitches for event in render.events] == [(67,)]
+
+    def test_sequence_shift_without_any_scale_context_raises(self):
+        seq = Sequence(((Note("C4"), 1),))
+
+        with pytest.raises(ValueError, match="requires a scale context"):
+            seq.shift(1)
+
+    def test_sequence_shift_raises_for_unsupported_payloads(self):
+        seq = Sequence((SequenceEntry(payload=object(), duration=1),))
+
+        with pytest.raises(ValueError, match="shift\(steps\)"):
+            seq.shift(1, scale="C")

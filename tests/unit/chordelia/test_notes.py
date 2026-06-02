@@ -13,6 +13,8 @@ from chordelia.notes import (
 )
 from chordelia.intervals import Interval, IntervalQuality
 from chordelia.rhythm import Duration
+from chordelia.scale_context import reset_global_scale_context, with_global_scale_context
+from chordelia.scales import Scale, ScaleType
 from chordelia.score import ScoreEventContext
 
 
@@ -435,13 +437,90 @@ class TestNoteTransposition:
         assert f3.pitch_class == 5  # F
         assert f3.octave == 3
 
-    def test_transposition_accepts_interval_like_string(self):
-        """String interval representations should be coerced for transposition."""
+    def test_transposition_numeric_string_uses_semitones(self):
+        """Numeric string transpose inputs are interpreted as semitone displacements."""
         c = Note(NoteName.C)
 
-        e = c.transpose("3")
+        d_sharp = c.transpose("3")
+
+        assert d_sharp.pitch_class == 3
+
+    def test_transposition_accepts_explicit_interval_notation(self):
+        """Quality-bearing interval strings remain supported for transpose calls."""
+        c = Note(NoteName.C)
+
+        e = c.transpose("M3")
 
         assert e.pitch_class == 4
+
+    def test_transposition_by_one_semitone_from_numeric_input(self):
+        """Transposing by numeric 1 should raise pitch by one semitone."""
+        c4 = Note("C4")
+
+        assert str(c4.transpose("1")) == "C#4"
+        assert str(c4.transpose(1)) == "C#4"
+
+
+class TestNoteShift:
+    """Test note diatonic shifting behavior within explicit scale context."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_global_scale_context(self):
+        reset_global_scale_context()
+        yield
+        reset_global_scale_context()
+
+    def test_shift_in_scale_without_octave(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        shifted = Note("E").shift(2, scale=c_major)
+
+        assert str(shifted) == "G"
+        assert shifted.octave is None
+
+    def test_shift_compound_steps_adjust_octave(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        shifted = Note("E4").shift(8, scale=c_major)
+
+        assert str(shifted) == "F5"
+
+    def test_shift_negative_steps_crosses_to_previous_octave(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        shifted = Note("C4").shift(-1, scale=c_major)
+
+        assert str(shifted) == "B3"
+
+    def test_shift_requires_note_to_be_in_scale(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        with pytest.raises(ValueError, match="requires note to be in scale"):
+            Note("F#4").shift(1, scale=c_major)
+
+    def test_shift_validates_input_types(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        with pytest.raises(TypeError):
+            Note("C4").shift(1.5, scale=c_major)
+
+        with pytest.raises(TypeError):
+            Note("C4").shift(1, scale=object())
+
+    def test_shift_accepts_string_scale_context(self):
+        shifted = Note("E4").shift(2, scale="C")
+
+        assert str(shifted) == "G4"
+
+    def test_shift_uses_global_scale_context_when_scale_not_provided(self):
+        with with_global_scale_context("C"):
+            shifted = Note("E4").shift(2)
+
+        assert str(shifted) == "G4"
+
+    def test_shift_without_any_scale_context_raises(self):
+        with pytest.raises(ValueError, match="requires a scale context"):
+            Note("C4").shift(1)
 
 
 class TestNoteIntervals:

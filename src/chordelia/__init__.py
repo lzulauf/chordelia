@@ -22,6 +22,17 @@ from chordelia.sequences import Sequence, SequenceEntry, SequenceEntryLike, Rest
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
 from chordelia.sheet_music import SheetMusic
 from chordelia.sequenceable import NotesLike, Sequenceable
+from chordelia.scale_context import (
+    get_chordelia_context,
+    get_default_note_duration_context,
+    get_global_scale_context,
+    reset_chordelia_context,
+    reset_global_scale_context,
+    set_chordelia_context,
+    set_global_scale_context,
+    with_chordelia_context,
+    with_global_scale_context,
+)
 from chordelia.rhythm import (
     Duration, TimeSignature, Tempo, Beat, NoteValue,
     whole_note, half_note, quarter_note, eighth_note, sixteenth_note,
@@ -73,6 +84,15 @@ __all__ = [
     "SheetMusic",
     "Sequenceable",
     "NotesLike",
+    "get_chordelia_context",
+    "get_global_scale_context",
+    "get_default_note_duration_context",
+    "set_chordelia_context",
+    "set_global_scale_context",
+    "reset_chordelia_context",
+    "reset_global_scale_context",
+    "with_chordelia_context",
+    "with_global_scale_context",
     "Duration",
     "TimeSignature", 
     "Tempo",

@@ -6,7 +6,7 @@ Drafting
 ## Goal
 Support two distinct movement models across the library with clear naming and consistent behavior:
 1. Shifting = diatonic movement within a key/scale context.
-2. Transposing = chromatic interval movement that can modulate into a new key.
+2. Transposing = chromatic semitone movement where `+1` always means one semitone up (for example `C -> C#`).
 
 ## Why this comes first
 1. Current APIs use transpose for all movement semantics, which mixes in-key movement and key-changing movement.
@@ -19,30 +19,41 @@ Support two distinct movement models across the library with clear naming and co
 3. Implement first-class shift support for Scale and Degree.
 4. Implement context-aware shift support for Note and Chord with explicit, testable semantics.
 5. Support compound diatonic intervals (greater than 7, for example 9, 13) with consistent semantics across shift-capable APIs.
-6. Preserve current transpose behavior for backward compatibility while tightening docs around chromatic semantics.
+6. Apply a breaking transpose contract where numeric transpose inputs are semitone steps (`1` means `+1` semitone).
 7. Update tests, examples, and docs to demonstrate both movement types.
 
 ## Out of scope
 1. Automatic key inference from arbitrary note streams or chord progressions.
 2. Full harmonic analysis engine to infer borrowed chords or temporary tonicization.
 3. Microtonal or non-12TET transposition systems.
-4. Breaking removal of transpose APIs in this plan.
+4. Retaining ambiguous legacy transpose shorthand where `"1"` means unison.
 
 ## Technical design details
 ### Terminology and canonical naming
 1. Canonical transform names:
    1. shift(...): diatonic movement using scale-degree steps and a scale context.
-   2. transpose(...): chromatic movement using Interval semitone behavior.
+   2. transpose(...): chromatic movement using semitone-step behavior.
 2. Compatibility policy:
-   1. Keep existing transpose methods as canonical chromatic APIs.
-   2. Do not introduce a parallel permanent alias for transpose unless needed for migration.
-   3. New docs and examples must use shift for in-key movement and transpose for chromatic modulation.
+   1. Keep `transpose` as the canonical chromatic API name, but change its numeric-input semantics as a breaking change.
+   2. Numeric transpose inputs (`int`, numeric `str`) are interpreted as semitone steps.
+   3. Quality-bearing interval strings (for example `"m2"`, `"P5"`) and explicit `Interval` values are converted to semitone displacement before applying transpose.
+   4. New docs and examples must use shift for in-key movement and transpose for chromatic movement.
+
+### Breaking transpose contract
+1. Canonical behavior:
+   1. `transpose(1)` and `transpose("1")` mean transpose up by one semitone.
+   2. `transpose(-1)` and `transpose("-1")` mean transpose down by one semitone.
+2. Migration semantics:
+   1. Legacy numeric interval-degree intent must use explicit interval notation (for example `"P5"`) or explicit `Interval(...)` values.
+   2. Example migration: old `transpose("5")` (perfect fifth expectation) becomes `transpose("P5")`.
+3. Cross-type consistency requirement:
+   1. The same transpose contract applies to `Note`, `Chord`, `Scale`, and `Sequence` payload transposition.
 
 ### Current-state audit and classification
 1. Current movement APIs in src:
    1. src/chordelia/notes.py: Note.transpose(interval)
       1. Classification: transposing (chromatic), already aligned with new naming.
-      2. Gap: no shift API and no required scale context channel.
+      2. Gap: string coercion currently routes through Interval semantics, so `"1"` yields unison instead of `+1` semitone.
    2. src/chordelia/chords.py: Chord.transpose(interval)
       1. Classification: transposing (chromatic), already aligned.
       2. Gap: no shift API and no external scale context for diatonic movement.
@@ -63,9 +74,10 @@ Support two distinct movement models across the library with clear naming and co
       2. Gap: no dedicated diatonic step object for shift operations.
 2. Current test and docs audit:
    1. tests/unit/chordelia/test_notes.py, test_chords.py, test_scales.py validate transpose behavior only.
-   2. docs/guides/notes-and-intervals.md and docs/guides/scales-and-chords.md use transpose examples only.
-   3. examples/ uses transpose for note, chord, and progression movement.
-   4. Classification result: chromatic transposing is well-covered; diatonic shifting lacks first-class API coverage.
+   2. Existing tests currently encode numeric string inputs as interval-degree shorthand (for example `"3"`, `"5"`) and must be migrated.
+   3. docs/guides/notes-and-intervals.md and docs/guides/scales-and-chords.md use transpose examples only.
+   4. examples/ uses transpose for note, chord, and progression movement.
+   5. Classification result: chromatic transposing is covered but needs breaking-contract migration; diatonic shifting lacks first-class API coverage.
 
 ### Proposed API additions and signatures
 1. Degree-level shifting:
@@ -239,7 +251,9 @@ scale = Scale("C", ScaleType.MAJOR)
 note = Note("E4")
 
 shifted = note.shift(2, scale=scale)               # E -> G (diatonic)
-transposed = note.transpose(Interval.from_semitones(2))  # E -> F# (chromatic)
+transposed = note.transpose(2)                     # E -> F# (chromatic)
+semitone_up = Note("C4").transpose("1")           # C4 -> C#4
+perfect_fifth = note.transpose("P5")              # explicit interval-degree intent
 ```
 
 2. Compound diatonic interval usage
@@ -328,12 +342,12 @@ transpose (chromatic) remains parallel and independent of scale context
 2. Out-of-scale shift input raises ValueError with guidance to transpose if chromatic behavior is intended.
 3. Negative and large-step (compound) shifts are supported without upper bound.
 4. Selector APIs (for example degree lookups) keep explicit in-span range validation.
-5. transpose remains interval-driven and does not require a scale context.
+5. transpose remains scale-context free and semitone-driven.
 
 ### Compatibility and migration notes
-1. Existing transpose calls remain valid and unchanged.
-2. Migration is additive: introduce shift APIs and update docs/examples first, then progressively prefer shift language for diatonic cases.
-3. Existing tests for transpose remain as regression coverage for chromatic behavior.
+1. This plan includes a breaking transpose semantic change for numeric inputs: `transpose("1")` now means `+1` semitone.
+2. Migrate legacy numeric interval-degree usage to explicit interval notation (`"P5"`, `"m3"`) or explicit `Interval(...)` values.
+3. Existing transpose tests become migration targets: numeric-string interval tests should be rewritten to either semitone assertions or explicit interval notation assertions.
 4. Cross-plan alignment: `Note` and `Chord` shift outputs must remain compatible with the canonical `Sequenceable -> Score` conversion boundary used by `MidiFile` and `SheetMusic` plans.
 
 ## Testing approach
@@ -346,11 +360,13 @@ Expected test delta classification: both new tests and updated tests.
    4. Chord.shift root strategy behavior and extension or bass preservation expectations under both simple and compound steps.
 2. Updated unit tests:
    1. Add terminology assertions in docstring-based tests where applicable.
-   2. Keep transpose tests intact but clarify expected chromatic semantics.
+   2. Rewrite transpose tests that currently use numeric interval strings so they validate semitone semantics.
+   3. Add explicit interval-notation regression tests (for example `"P5"`) to preserve interval-degree workflows.
 3. Regression and edge cases:
    1. Shift by 0 returns equivalent object.
    2. Shift by values larger than scale length preserves cycle semantics for octave-aware types.
    3. Non-heptatonic scale behavior is explicit and tested with span-aware calculations.
+   4. Chromatic guarantee: `Note("C4").transpose("1") == Note("C#4")` and equivalent behavior across Chord/Scale/Sequence transposition paths.
 4. Validation commands:
    1. Focused: pytest tests/unit/chordelia/test_degrees.py tests/unit/chordelia/test_scales.py tests/unit/chordelia/test_notes.py tests/unit/chordelia/test_chords.py
    2. Full: pytest and python -m pytest --cov=src
@@ -361,6 +377,7 @@ Expected docs delta classification: both README updates and docs updates.
 1. Terminology update:
    1. Define shift versus transpose in README and docs/api-overview.md.
    2. Update existing guides to use shift in diatonic examples and transpose in chromatic examples.
+   3. Document the breaking transpose contract for numeric inputs and provide migration examples.
 2. Examples update:
    1. Add side-by-side examples demonstrating shift versus transpose outcomes.
    2. Add note and chord shift examples that pass scale context explicitly.
@@ -387,6 +404,7 @@ Expected docs delta classification: both README updates and docs updates.
 2. Confirm audit matrix against current src, tests, docs, and examples.
 3. Define acceptance-level semantics for selector versus distance APIs.
 4. Define compound-interval and cycle semantics (for example second versus ninth behavior).
+5. Lock breaking transpose contract and migration examples before implementation.
 
 ### Phase 1: Implement core diatonic shift foundations
 1. Add Degree.shift in src/chordelia/degrees.py.
@@ -420,7 +438,7 @@ Expected docs delta classification: both README updates and docs updates.
 ### Phase 6: Validation and rollout guardrails
 1. Run focused and full tests.
 2. Run coverage and review affected modules.
-3. Confirm no behavioral regression in transpose APIs.
+3. Confirm transpose behavioral migration is complete and explicitly validated for numeric semitone inputs.
 4. Confirm compound diatonic behavior is consistent across Degree, Scale, Note, and Chord.
 
 ## Execution order recommendation
@@ -448,7 +466,7 @@ Expected docs delta classification: both README updates and docs updates.
 3. Note and Chord support diatonic shifting through explicit scale context.
 4. Compound diatonic intervals greater than 7 are supported consistently (for example 9th and 13th).
 5. Compound behavior preserves cycle semantics for octave-aware outputs and class semantics for selector-style outputs.
-6. Existing transpose APIs remain backward compatible and fully tested.
+6. Breaking transpose contract is fully implemented and tested, including `Note("C4").transpose("1") -> Note("C#4")` and equivalent cross-type behavior.
 7. Tests include new and updated coverage across degree, scale, note, and chord movement.
 8. Docs and examples consistently classify and demonstrate shifting versus transposing.
 9. Focused and full test runs pass, or any exception is explicitly documented with rationale.

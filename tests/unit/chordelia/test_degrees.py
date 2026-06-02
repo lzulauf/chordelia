@@ -121,3 +121,50 @@ class TestDegreeFunctionalHints:
 
     def test_numeric_has_no_functional_hint(self):
         assert Degree(4).functional_hint is None
+
+
+class TestDegreeShift:
+    """Test diatonic shift behavior on Degree values."""
+
+    def test_shift_wraps_with_default_span(self):
+        assert Degree(1).shift(1) == Degree(2)
+        assert Degree(7).shift(1) == Degree(1)
+        assert Degree(1).shift(-1) == Degree(7)
+
+    def test_shift_supports_compound_steps(self):
+        assert Degree(1).shift(8) == Degree(2)
+        assert Degree(3).shift(15) == Degree(4)
+
+    def test_shift_without_wrap_returns_absolute_ordinal(self):
+        shifted = Degree.from_string("bIII").shift(2, wrap=False)
+
+        assert shifted.number == 5
+        assert shifted.accidental_offset == -1
+
+    def test_shift_without_wrap_rejects_non_positive_result(self):
+        with pytest.raises(ValueError, match="resulting ordinal >= 1"):
+            Degree(1).shift(-1, wrap=False)
+
+    def test_shift_preserves_roman_metadata(self):
+        shifted = Degree.from_string("ii").shift(2)
+
+        assert shifted.is_roman is True
+        assert shifted.roman_case == "lower"
+        assert str(shifted) == "iv"
+
+    @pytest.mark.parametrize("span", [0, -1])
+    def test_shift_validates_span_range(self, span):
+        with pytest.raises(ValueError, match="span must be >= 1"):
+            Degree(1).shift(1, span=span)
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            pytest.param({"steps": 1.5}, id="non-int-steps"),
+            pytest.param({"steps": 1, "span": 7.5}, id="non-int-span"),
+            pytest.param({"steps": 1, "wrap": "yes"}, id="non-bool-wrap"),
+        ],
+    )
+    def test_shift_validates_types(self, kwargs):
+        with pytest.raises(TypeError):
+            Degree(1).shift(**kwargs)

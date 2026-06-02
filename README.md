@@ -1,24 +1,18 @@
-# Chordelia - A Comprehensive Music Theory Library
+# Chordelia
 
-Chordelia is a Python library for music theory and timing workflows. It emphasizes algorithmic correctness, immutable value objects, and practical APIs that run efficiently on low-end hardware.
+Chordelia is a Python toolkit for music theory, composition, notation, and playback.
+It focuses on theory-correct results, immutable value objects, and deterministic
+score conversion.
 
-## Features
+## Why Chordelia
 
-- Intervals with quality/number math and naming
-- Degrees with int/Roman coercion and context-aware Roman case semantics
-- Notes with accidentals, enharmonics, octave, MIDI, and frequency support
-- Scales with theory-correct enharmonic spelling
-- Chords with parsing, extensions, inversions, and slash-chord handling
-- Rhythm and timing utilities for duration, meter, tempo, and beat tracking
-- Sequenceable conversion boundary for score-producing musical objects
-- Sequence timelines with `Sequence`, `SequenceEntry`, and `Rest`
-- Canonical score model with normalized events for downstream rendering/export
-- Canonical sheet rendering with `SheetMusic` SVG export and notebook display
-- Optional MIDI interface/file workflow with `MidiPlayback` and `MidiFile`
+- Theory-correct spellings for scales, intervals, and chord construction.
+- Immutable, copy-constructor style APIs that compose cleanly.
+- Sequence to Score normalization for a single canonical timeline model.
+- Built-in SVG sheet rendering plus optional LilyPond backend integration.
+- Optional audio and MIDI workflows layered on top of the same score model.
 
 ## Installation
-
-Core package:
 
 ```bash
 pip install chordelia
@@ -32,77 +26,78 @@ pip install chordelia[midi]
 pip install chordelia[all]
 ```
 
-For full install details, see [docs/installation.md](docs/installation.md).
+Python requirement: 3.13+
 
-## Quick Start
+## Quick Feature Tour
+
+### 1) Build a song form from one motif
 
 ```python
-from chordelia import Note, Scale, ScaleType, Chord, Score, ScoreEventContext
-from chordelia import SheetMusic, Sequence
+from fractions import Fraction
+from chordelia import *
 
-c_major = Scale("C", ScaleType.MAJOR)
-print([str(n) for n in c_major.notes])
+scale = Scale("E4", ScaleType.HARMONIC_MINOR)
+set_global_scale_context(scale)
+degrees = (1, 3, 4, 5, 4, 3, 2, 1)
+half = Fraction(1, 2)
 
-ii_v_i = c_major.chords_for_degrees("ii", "V", "I")
-print([chord.name for chord in ii_v_i])
+a = Sequence(tuple((scale.degree(d), half) for d in degrees))
 
-c_chord = Chord("C").with_extension("maj7").with_inversion(1)
-print(c_chord.name)
+chord_hit = scale.chord_for_degree("V")
+b = a.shift(2)
+c = Sequence(((chord_hit, half), a.shift(4)))
 
-middle_c = Note("C4")
-print(middle_c.midi_number, middle_c.frequency)
-
-score = Score.from_sequenceable(Chord("C4"))
-print(len(score.events), score.events[0].pitches)
-
-melody = Sequence((("C4", 1), ("D4", 1), ("E4", 2)))
-sheet = SheetMusic(melody, scale="C")
-sheet.to_file("melody.svg")
-
-from chordelia import Sequence, SequenceEntry
-
-# Iterable note strings are treated as one convenience chord layer.
-single_layer = Sequence(((["C4", "E4", "G4"], 1),))
-print(len(single_layer.render_for_context(ScoreEventContext()).events))  # 1
-
-# Iterable chord-like values preserve simultaneous boundaries.
-stacked_layers = Sequence((([
-	Chord.from_notes(["C4", "E4"]),
-	Chord.from_notes(["G4", "B4"]),
-], 1),))
-print(len(stacked_layers.render_for_context(ScoreEventContext()).events))  # 2
-
-# Recursive sequence transpose preserves timing metadata.
-motif = Sequence((("C4", 1), ("E4", 1)))
-transposed = motif.transpose("2")
-print([event.pitches for event in transposed.render_for_context(ScoreEventContext()).events])
+song = Sequence((a, b, c, a))
+score = Score.from_sequenceable(song, tempo=120, time_signature=(4, 4), key_signature="E minor")
 ```
 
-For a fuller walkthrough, see [docs/quickstart.md](docs/quickstart.md).
+### 2) Render that same song as sheet music
+
+```python
+# Continue from block 1 in the same Python session.
+SheetMusic(score, scale=scale).to_file("song.svg")
+```
+
+### 3) Export and play that same song via MIDI
+
+```python
+# Continue from block 1 in the same Python session.
+MidiFile(score).to_file("song.mid")
+
+MidiPlayback().play_score(score, blocking=True)
+```
 
 ## Documentation
 
-Deep documentation is in [docs/README.md](docs/README.md).
+Start here:
 
 - [Installation](docs/installation.md)
 - [Quickstart](docs/quickstart.md)
+- [Docs Index](docs/README.md)
+
+In-depth tutorials:
+
+- [Song Form from a Motif](docs/tutorials/song-form-from-motif.md)
+- [Sheet Music Rendering](docs/tutorials/sheet-music-rendering.md)
+- [Playback and MIDI](docs/tutorials/playback-and-midi.md)
+
+Guides and reference:
+
+- [Cookbook](docs/cookbook.md)
 - [Notes and Intervals](docs/guides/notes-and-intervals.md)
 - [Scales and Chords](docs/guides/scales-and-chords.md)
 - [Rhythm and Timing](docs/guides/rhythm-and-timing.md)
+- [Sequences and Score](docs/guides/sequences-and-score.md)
 - [Immutability](docs/immutability.md)
 - [API Overview](docs/api-overview.md)
-- [Sheet Rendering Quickstart](docs/quickstart.md#sheet-music-rendering)
 - [Development Guide](docs/development.md)
 
-## Design Philosophy
-
-- Algorithmic over lookup-table implementation
-- Music theory accuracy first
-- Practical performance for constrained environments
+Additional runnable examples: [examples](examples)
 
 ## Contributing
 
-Contributions are welcome. Please include tests for behavior changes and keep documentation aligned with the final API behavior.
+Contributions are welcome. Include tests for behavior changes and keep docs aligned
+with final API behavior.
 
 ## License
 

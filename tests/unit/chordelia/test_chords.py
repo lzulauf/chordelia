@@ -18,7 +18,9 @@ from chordelia.chords import (
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.intervals import Interval, IntervalQuality
 from chordelia.rhythm import Duration
+from chordelia.scale_context import reset_global_scale_context, with_global_scale_context
 from chordelia.score import ScoreEventContext
+from chordelia.scales import Scale, ScaleType
 
 
 class TestChordQuality:
@@ -905,21 +907,92 @@ class TestChordTransposition:
         cmaj7 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH)
         minor_third = Interval(IntervalQuality.MINOR, 3)
         
-        eb_maj7 = cmaj7.transpose(minor_third)
+        d_sharp_maj7 = cmaj7.transpose(minor_third)
         
-        assert eb_maj7.root.name == NoteName.E
-        assert eb_maj7.root.accidental == Accidental.FLAT
-        assert eb_maj7.quality == ChordQuality.MAJOR
-        assert eb_maj7.extension == ChordExtension.MAJOR_SEVENTH
+        assert d_sharp_maj7.root.name == NoteName.D
+        assert d_sharp_maj7.root.accidental == Accidental.SHARP
+        assert d_sharp_maj7.quality == ChordQuality.MAJOR
+        assert d_sharp_maj7.extension == ChordExtension.MAJOR_SEVENTH
 
     def test_transpose_accepts_interval_like_string(self):
         """String interval representations should be coerced for transposition."""
         c_major = Chord("C", ChordQuality.MAJOR)
 
-        g_major = c_major.transpose("5")
+        g_major = c_major.transpose("P5")
 
         assert g_major.root.name == NoteName.G
         assert g_major.quality == ChordQuality.MAJOR
+
+    def test_transpose_numeric_string_uses_semitones(self):
+        """Numeric transpose strings are interpreted as semitone displacements."""
+        c_major = Chord("C", ChordQuality.MAJOR)
+
+        c_sharp_major = c_major.transpose("1")
+
+        assert c_sharp_major.root.name == NoteName.C
+        assert c_sharp_major.root.accidental == Accidental.SHARP
+        assert c_sharp_major.quality == ChordQuality.MAJOR
+
+
+class TestChordShift:
+    """Test chord diatonic shifting behavior within explicit/global scale context."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_global_scale_context(self):
+        reset_global_scale_context()
+        yield
+        reset_global_scale_context()
+
+    def test_shift_moves_root_with_explicit_scale(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+        cmaj7 = Chord("C4", ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH)
+
+        shifted = cmaj7.shift(1, scale=c_major)
+
+        assert str(shifted.root) == "D4"
+        assert shifted.quality == ChordQuality.MAJOR
+        assert shifted.extension == ChordExtension.MAJOR_SEVENTH
+
+    def test_shift_moves_bass_note_with_explicit_scale(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+        c_over_e = Chord("C4", ChordQuality.MAJOR, bass_note="E4")
+
+        shifted = c_over_e.shift(1, scale=c_major)
+
+        assert str(shifted.root) == "D4"
+        assert str(shifted.bass_note) == "F4"
+
+    def test_shift_accepts_string_scale_context(self):
+        shifted = Chord("E4", ChordQuality.MINOR).shift(2, scale="C")
+
+        assert str(shifted.root) == "G4"
+        assert shifted.quality == ChordQuality.MINOR
+
+    def test_shift_uses_global_scale_context_when_scale_not_provided(self):
+        with with_global_scale_context("C"):
+            shifted = Chord("E4", ChordQuality.MINOR).shift(2)
+
+        assert str(shifted.root) == "G4"
+        assert shifted.quality == ChordQuality.MINOR
+
+    def test_shift_without_any_scale_context_raises(self):
+        with pytest.raises(ValueError, match="requires a scale context"):
+            Chord("C4", ChordQuality.MAJOR).shift(1)
+
+    def test_shift_validates_input_types(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        with pytest.raises(TypeError):
+            Chord("C4", ChordQuality.MAJOR).shift(1.5, scale=c_major)
+
+        with pytest.raises(TypeError):
+            Chord("C4", ChordQuality.MAJOR).shift(1, scale=object())
+
+    def test_shift_requires_root_note_to_be_in_scale(self):
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        with pytest.raises(ValueError, match="requires note to be in scale"):
+            Chord("F#4", ChordQuality.MAJOR).shift(1, scale=c_major)
 
 
 class TestChordDegreeHelpers:

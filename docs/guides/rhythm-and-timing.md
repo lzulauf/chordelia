@@ -69,4 +69,5 @@ def practice_metronome(bpm, beats_per_measure=4, num_measures=2):
 ## Next Steps
 
 - Return to [Quickstart](../quickstart.md)
+- Continue with [Sequences and Score](sequences-and-score.md)
 - Review [Development Guide](../development.md)
