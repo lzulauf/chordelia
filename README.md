@@ -11,6 +11,7 @@ Chordelia is a Python library for music theory and timing workflows. It emphasiz
 - Chords with parsing, extensions, inversions, and slash-chord handling
 - Rhythm and timing utilities for duration, meter, tempo, and beat tracking
 - Sequenceable conversion boundary for score-producing musical objects
+- Sequence timelines with `Sequence`, `SequenceEntry`, and `Rest`
 - Canonical score model with normalized events for downstream rendering/export
 
 ## Installation
@@ -34,7 +35,7 @@ For full install details, see [docs/installation.md](docs/installation.md).
 ## Quick Start
 
 ```python
-from chordelia import Note, Scale, ScaleType, Chord, Score
+from chordelia import Note, Scale, ScaleType, Chord, Score, ScoreEventContext
 
 c_major = Scale("C", ScaleType.MAJOR)
 print([str(n) for n in c_major.notes])
@@ -50,6 +51,19 @@ print(middle_c.midi_number, middle_c.frequency)
 
 score = Score.from_sequenceable(Chord("C4"))
 print(len(score.events), score.events[0].pitches)
+
+from chordelia import Sequence, SequenceEntry
+
+# Iterable note strings are treated as one convenience chord layer.
+single_layer = Sequence(((["C4", "E4", "G4"], 1),))
+print(len(single_layer.score_events_for_context(ScoreEventContext())))  # 1
+
+# Iterable chord-like values preserve simultaneous boundaries.
+stacked_layers = Sequence((([
+	Chord.from_notes(["C4", "E4"]),
+	Chord.from_notes(["G4", "B4"]),
+], 1),))
+print(len(stacked_layers.score_events_for_context(ScoreEventContext())))  # 2
 ```
 
 For a fuller walkthrough, see [docs/quickstart.md](docs/quickstart.md).

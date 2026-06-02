@@ -5,11 +5,20 @@ Demonstrates musical timing, durations, time signatures, tempo,
 and conversions between musical time and real time.
 """
 
+import sys
+
 from chordelia import (
     Duration, TimeSignature, Tempo, Beat, NoteValue,
     quarter_note, eighth_note, half_note, whole_note, dotted, triplet,
     COMMON_TIME, WALTZ_TIME, COMPOUND_DUPLE
 )
+
+
+# Avoid UnicodeEncodeError on Windows code pages when examples print symbols.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 
 def basic_rhythm_examples():

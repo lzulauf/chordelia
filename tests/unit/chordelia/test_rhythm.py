@@ -6,6 +6,7 @@ and conversions between musical time and real time.
 """
 
 import pytest
+from decimal import Decimal
 from fractions import Fraction
 from chordelia.rhythm import (
     Duration, TimeSignature, Tempo, Beat, NoteValue,
@@ -173,6 +174,36 @@ class TestDuration:
         
         custom = Duration(Fraction(5, 16))
         assert "5/16" in str(custom)
+
+    def test_from_beats_with_none_denominator_uses_beat_count(self):
+        """from_beats(..., None) should treat numerator as absolute beat count."""
+        duration = Duration.from_beats(3, None)
+
+        assert duration.mode == "beats"
+        assert duration.as_beats() == Fraction(3, 1)
+
+    def test_from_beats_with_denominator_creates_fractional_beats(self):
+        """from_beats should support fractional beat counts."""
+        duration = Duration.from_beats(3, 2)
+
+        assert duration.mode == "beats"
+        assert duration.as_beats() == Fraction(3, 2)
+
+    def test_from_seconds_creates_time_based_duration(self):
+        """Time-based durations should preserve decimal precision and mode."""
+        duration = Duration.from_seconds("1.25")
+
+        assert duration.mode == "seconds"
+        assert duration.as_seconds() == Decimal("1.25")
+        assert abs(duration.to_milliseconds(120, TimeSignature(4, 4)) - 1250.0) < 0.001
+
+    def test_mixed_mode_duration_arithmetic_raises_type_error(self):
+        """Mixed beat/time arithmetic must be explicit via conversion context."""
+        beats = Duration.from_beats(1)
+        seconds = Duration.from_seconds("0.5")
+
+        with pytest.raises(TypeError):
+            _ = beats + seconds
 
 
 class TestTimeSignature:

@@ -19,7 +19,15 @@ Example MIDI files you can try:
 """
 
 import os
+import sys
 from pathlib import Path
+
+
+# Avoid UnicodeEncodeError on Windows code pages when examples print symbols.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 # Check if MIDI functionality is available
 try:
@@ -192,6 +200,18 @@ def main():
     """Main example function."""
     print("🎹 CHORDELIA MIDI PLAYBACK EXAMPLE")
     print("=" * 40)
+    non_interactive = (
+        not sys.stdin.isatty()
+        or not sys.stdout.isatty()
+        or os.environ.get("CHORDELIA_NONINTERACTIVE") == "1"
+    )
+
+    def safe_input(prompt: str, default: str = "") -> str:
+        """Read input safely and return default if stdin is unavailable."""
+        try:
+            return input(prompt)
+        except EOFError:
+            return default
     
     if not (MIDI_AVAILABLE and PLAYBACK_AVAILABLE):
         print("❌ Required modules not available")
@@ -214,19 +234,23 @@ def main():
         print(f"🎵 Found MIDI files in current directory:")
         for i, filepath in enumerate(midi_files[:5]):  # Show first 5
             print(f"  {i+1}. {filepath.name}")
-        
-        try:
-            choice = input("\\nSelect a file (1-{}) or press Enter to create sample: ".format(len(midi_files)))
-            if choice.strip() and choice.isdigit():
-                idx = int(choice) - 1
-                if 0 <= idx < len(midi_files):
-                    midi_file = str(midi_files[idx])
-        except ValueError:
-            pass
+
+        if non_interactive:
+            midi_file = str(midi_files[0])
+            print("Non-interactive mode detected: using the first MIDI file.")
+        else:
+            try:
+                choice = safe_input("\nSelect a file (1-{}) or press Enter to create sample: ".format(len(midi_files)))
+                if choice.strip() and choice.isdigit():
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(midi_files):
+                        midi_file = str(midi_files[idx])
+            except ValueError:
+                pass
     
     # Option 2: Create a sample MIDI file
     if not midi_file:
-        print("\\n📝 Creating sample MIDI file...")
+        print("\n📝 Creating sample MIDI file...")
         midi_file = create_sample_midi()
     
     if not midi_file:
@@ -237,8 +261,18 @@ def main():
     midi = analyze_midi_file(midi_file)
     if not midi:
         return
+
+    if non_interactive:
+        print("\nNon-interactive mode detected: skipping interactive playback menu.")
+        if midi_file == "sample_scale.mid" and os.path.exists(midi_file):
+            try:
+                os.remove(midi_file)
+                print(f"🗑️  Cleaned up sample file: {midi_file}")
+            except Exception:
+                pass
+        return
     
-    print("\\n🎵 DEMO OPTIONS")
+    print("\n🎵 DEMO OPTIONS")
     print("=" * 20)
     print("1. Play with different waveforms")
     print("2. Play individual tracks")
@@ -247,14 +281,14 @@ def main():
     
     while True:
         try:
-            choice = input("\\nSelect option (1-4): ").strip()
+            choice = safe_input("\nSelect option (1-4): ").strip()
             
             if choice == "1":
                 play_midi_with_different_waveforms(midi_file)
             elif choice == "2":
                 play_individual_tracks(midi_file)
             elif choice == "3":
-                print("\\n🎵 Playing MIDI file...")
+                print("\n🎵 Playing MIDI file...")
                 play_midi_file(midi_file, waveform=Waveform.SINE)
             elif choice == "4":
                 break
@@ -262,7 +296,7 @@ def main():
                 print("❌ Invalid choice")
                 
         except KeyboardInterrupt:
-            print("\\n👋 Goodbye!")
+            print("\n👋 Goodbye!")
             break
         except Exception as e:
             print(f"❌ Error: {e}")

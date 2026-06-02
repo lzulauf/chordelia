@@ -5,8 +5,17 @@ This script demonstrates the immutable design and copy-constructor patterns
 used throughout Chordelia for Duration, Chord, and Scale classes.
 """
 
+import sys
+
 from chordelia import Duration, Chord, Scale, Note
 from chordelia import NoteValue, ChordQuality, ChordExtension, ScaleType, Interval, IntervalQuality
+
+
+# Avoid UnicodeEncodeError on Windows code pages when examples print symbols.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 
 def duration_immutability_examples():
@@ -51,15 +60,15 @@ def chord_copy_constructor_examples():
     
     # Demonstrate flexible iterable support
     print("\nFlexible iterable support in constructors:")
-    
-    # Different ways to specify extensions
-    chord_list = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH])  # List
-    chord_tuple = Chord("C", ChordQuality.MAJOR, (ChordExtension.SEVENTH,))  # Tuple  
-    chord_set = Chord("C", ChordQuality.MAJOR, {ChordExtension.SEVENTH})   # Set
-    
-    print(f"From list: {chord_list.extensions}")
-    print(f"From tuple: {chord_tuple.extensions}")
-    print(f"From set: {chord_set.extensions}")
+
+    # Different ways to specify additions
+    chord_list = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH, additions=["M9"])  # List
+    chord_tuple = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH, additions=("M9",))  # Tuple
+    chord_set = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH, additions={"M9"})  # Set
+
+    print(f"From list: {chord_list.additions}")
+    print(f"From tuple: {chord_tuple.additions}")
+    print(f"From set: {chord_set.additions}")
     
     # Individual copy-constructor methods
     print("\nIndividual modifications (each returns new instance):")
@@ -80,7 +89,7 @@ def chord_copy_constructor_examples():
     print("\nGeneric with_() method:")
     complex_chord = c_major.with_(
         root="F#",
-        extensions=[ChordExtension.SEVENTH, ChordExtension.NINTH],
+        extension=ChordExtension.NINTH,
         bass_note="A"
     )
     print(f"Multiple changes: {complex_chord.name} = {[str(note) for note in complex_chord.notes]}")
@@ -107,9 +116,9 @@ def chord_voice_leading_examples():
     c_maj7 = Chord("C4", ChordQuality.MAJOR).with_extension(ChordExtension.MAJOR_SEVENTH)
     
     # Voice leading: keep common tones, move others smoothly
-    a_min7 = c_maj7.with_(root="A", quality=ChordQuality.MINOR, extensions=[ChordExtension.SEVENTH])
-    f_maj7 = a_min7.with_(root="F", quality=ChordQuality.MAJOR, extensions=[ChordExtension.MAJOR_SEVENTH])
-    g7 = f_maj7.with_(root="G", quality=ChordQuality.MAJOR, extensions=[ChordExtension.SEVENTH])
+    a_min7 = c_maj7.with_(root="A", quality=ChordQuality.MINOR, extension=ChordExtension.SEVENTH)
+    f_maj7 = a_min7.with_(root="F", quality=ChordQuality.MAJOR, extension=ChordExtension.MAJOR_SEVENTH)
+    g7 = f_maj7.with_(root="G", quality=ChordQuality.MAJOR, extension=ChordExtension.SEVENTH)
     
     progression = [c_maj7, a_min7, f_maj7, g7]
     chord_names = ["Cmaj7", "Am7", "Fmaj7", "G7"]
@@ -164,10 +173,10 @@ def immutable_collections_examples():
     print("=== Immutable Collections Examples ===")
     
     # Chord collections
-    c7 = Chord("C", ChordQuality.MAJOR, [ChordExtension.SEVENTH, ChordExtension.NINTH])
+    c7 = Chord("C", ChordQuality.MAJOR, extension=ChordExtension.NINTH)
     
     print("Chord collections are tuples:")
-    print(f"extensions type: {type(c7.extensions)} = {c7.extensions}")
+    print(f"extension type: {type(c7.extension)} = {c7.extension}")
     print(f"notes type: {type(c7.notes)} = {[str(note) for note in c7.notes]}")
     
     # Scale collections  

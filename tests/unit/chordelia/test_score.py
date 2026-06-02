@@ -1,10 +1,9 @@
 """Tests for the score module models and normalization behavior."""
 
-from fractions import Fraction
-
 import pytest
 
 from chordelia.notes import Note
+from chordelia.rhythm import Duration
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
 from chordelia.sequenceable import _clear_sequenceable_adapters, _register_sequenceable_adapter
 
@@ -20,8 +19,8 @@ def clear_adapter_registry_between_tests():
 class TestScoreEvent:
     """Validation and coercion behavior for ScoreEvent."""
 
-    def test_score_event_coerces_fraction_and_sequence_fields(self):
-        """ScoreEvent should normalize fractions and tuple-backed sequence fields."""
+    def test_score_event_coerces_durations_and_sequence_fields(self):
+        """ScoreEvent should normalize timings to beat-based Duration values."""
         event = ScoreEvent(
             beat=0.5,
             duration=2,
@@ -29,10 +28,15 @@ class TestScoreEvent:
             spelling=["C4", "E4"],
         )
 
-        assert event.beat == Fraction(1, 2)
-        assert event.duration == Fraction(2, 1)
+        assert event.beat == Duration.from_beats(1, 2)
+        assert event.duration == Duration.from_beats(2)
         assert event.pitches == (60, 64)
         assert event.spelling == ("C4", "E4")
+
+    def test_score_event_rejects_note_fraction_durations(self):
+        """ScoreEvent requires beat/time Duration modes, not note-fraction mode."""
+        with pytest.raises(ValueError, match="Duration.from_beats"):
+            ScoreEvent(beat=Duration("quarter"), duration=Duration.from_beats(1), pitches=(60,))
 
     @pytest.mark.parametrize(
         "kwargs, expected_message",
@@ -56,23 +60,31 @@ class TestScoreEvent:
 class TestScoreEventContext:
     """Validation and copy-constructor behavior for ScoreEventContext."""
 
-    def test_context_coerces_fraction_fields(self):
-        """Context should normalize timing values to Fraction for deterministic math."""
+    def test_context_coerces_duration_fields(self):
+        """Context should normalize timing values to beat-based Duration."""
         context = ScoreEventContext(start_offset=0.25, default_duration=2)
 
-        assert context.start_offset == Fraction(1, 4)
-        assert context.default_duration == Fraction(2, 1)
+        assert context.start_offset == Duration.from_beats(1, 4)
+        assert context.default_duration == Duration.from_beats(2)
 
     def test_with_start_offset_returns_new_context(self):
         """with_start_offset should preserve immutability and return updated copy."""
-        original = ScoreEventContext(start_offset=0, default_duration=Fraction(1, 2))
+        original = ScoreEventContext(
+            start_offset=Duration.from_beats(0),
+            default_duration=Duration.from_beats(1, 2),
+        )
 
-        updated = original.with_start_offset(Fraction(3, 2))
+        updated = original.with_start_offset(Duration.from_beats(3, 2))
 
-        assert original.start_offset == Fraction(0, 1)
-        assert updated.start_offset == Fraction(3, 2)
+        assert original.start_offset == Duration.from_beats(0)
+        assert updated.start_offset == Duration.from_beats(3, 2)
         assert updated.default_duration == original.default_duration
         assert updated is not original
+
+    def test_context_rejects_note_fraction_durations(self):
+        """Context requires beat/time Duration modes for offsets and defaults."""
+        with pytest.raises(ValueError, match="Duration.from_beats"):
+            ScoreEventContext(start_offset=Duration("quarter"))
 
     @pytest.mark.parametrize(
         "kwargs, expected_message",
@@ -175,14 +187,30 @@ class TestScore:
         assert context.tempo == 88
         assert context.time_signature == (6, 8)
         assert context.key_signature == "G"
-        assert context.start_offset == Fraction(0, 1)
-        assert context.default_duration == Fraction(1, 1)
+        assert context.start_offset == Duration.from_beats(0)
+        assert context.default_duration == Duration.from_beats(1)
 
         assert score.metadata.tempo == 88
         assert score.metadata.time_signature == (6, 8)
         assert score.metadata.key_signature == "G"
         assert score.metadata.ppq == 960
         assert score.events[0].pitches == (72,)
+
+    def test_score_rejects_mixed_timing_modes(self):
+        """Scores must use a single timing mode across all events."""
+        with pytest.raises(ValueError, match="same timing mode"):
+            Score(
+                source="x",
+                metadata=ScoreMetadata(),
+                events=(
+                    ScoreEvent(beat=Duration.from_beats(0), duration=Duration.from_beats(1), pitches=(60,)),
+                    ScoreEvent(
+                        beat=Duration.from_seconds("0.5"),
+                        duration=Duration.from_seconds("0.25"),
+                        pitches=(64,),
+                    ),
+                ),
+            )
 
     def test_from_sequenceable_raises_for_unsupported_source(self):
         """Unsupported values should raise TypeError via sequenceable conversion boundary."""

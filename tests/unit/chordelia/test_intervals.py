@@ -6,8 +6,9 @@ arithmetic operations, and edge cases.
 """
 
 import pytest
+from typing import get_args
 from chordelia.degrees import Degree
-from chordelia.intervals import Interval, IntervalQuality
+from chordelia.intervals import Interval, IntervalLike, IntervalQuality
 from chordelia.intervals import (
     UNISON, MINOR_SECOND, MAJOR_SECOND, MINOR_THIRD, MAJOR_THIRD,
     PERFECT_FOURTH, TRITONE, PERFECT_FIFTH, MINOR_SIXTH, MAJOR_SIXTH,
@@ -226,6 +227,28 @@ class TestIntervalFromString:
         """Test creating intervals from valid string representations."""
         interval = Interval.from_string(input_str)
         assert interval == Interval(expected_quality, expected_number)
+
+
+class TestIntervalCoercion:
+    """Test IntervalLike coercion helpers."""
+
+    def test_interval_like_alias(self):
+        assert set(get_args(IntervalLike)) == {Interval, str}
+
+    def test_coerce_from_interval(self):
+        interval = Interval(IntervalQuality.MAJOR, 3)
+        assert Interval.coerce(interval) is interval
+
+    def test_coerce_from_string(self):
+        assert Interval.coerce("#11") == Interval(IntervalQuality.AUGMENTED, 11)
+
+    @pytest.mark.parametrize("invalid", [3, None, object()])
+    def test_coerce_invalid_value_raises(self, invalid):
+        with pytest.raises(ValueError, match="Interval value must be Interval or str"):
+            Interval.coerce(invalid)
+
+    def test_from_unknown_uses_coerce(self):
+        assert Interval.from_unknown("7") == Interval(IntervalQuality.MINOR, 7)
 
 
 class TestIntervalProperties:

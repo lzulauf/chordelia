@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Optional, Union
 import re
 from functools import lru_cache
 from chordelia.accidentals import Accidental
-from chordelia.intervals import Interval, IntervalQuality
+from chordelia.intervals import Interval, IntervalLike, IntervalQuality
 
 if TYPE_CHECKING:
     from chordelia.score import ScoreEvent, ScoreEventContext
@@ -321,7 +321,7 @@ class Note:
                 accidental = Accidental.FLAT
         return cls(note_name, accidental, octave)
     
-    def transpose(self, interval: Interval) -> 'Note':
+    def transpose(self, interval: IntervalLike) -> 'Note':
         """
         Transpose this note by an interval.
         
@@ -331,6 +331,8 @@ class Note:
         Returns:
             A new Note object representing the transposed note
         """
+        interval = Interval.coerce(interval)
+
         # Get the actual semitones to transpose (could be negative)
         semitones = getattr(interval, '_original_semitones', interval.semitones)
         
@@ -378,6 +380,10 @@ class Note:
                 spelling=(str(self),),
             ),
         )
+
+    def to_notes(self) -> tuple['Note', ...]:
+        """Represent this note as a single-note collection."""
+        return (self,)
     
     def _get_enharmonic_for_interval(self, target_note: 'Note', interval: Interval) -> 'Note':
         """

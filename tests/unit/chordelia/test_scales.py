@@ -64,6 +64,11 @@ class TestScaleCreation:
         with pytest.raises(ValueError):
             Scale("C", "invalid_scale")
 
+    def test_callable_scale_type_raises_helpful_error(self):
+        """Passing a factory function as scale_type should fail fast with guidance."""
+        with pytest.raises(TypeError, match="factory function"):
+            Scale("A", minor_scale)
+
 
 class TestScalePatterns:
     """Test scale interval patterns."""
@@ -375,6 +380,15 @@ class TestScaleTransposition:
         
         assert str(c_sharp_minor.root) == "C#"
         assert c_sharp_minor.scale_type == ScaleType.NATURAL_MINOR
+
+    def test_transpose_accepts_interval_like_string(self):
+        """String interval representations should be coerced for transposition."""
+        c_major = Scale("C", ScaleType.MAJOR)
+
+        g_major = c_major.transpose("5")
+
+        assert str(g_major.root) == "G"
+        assert g_major.scale_type == ScaleType.MAJOR
 
 
 class TestScaleImmutability:
@@ -715,6 +729,15 @@ class TestScaleStringRepresentation:
         assert "Scale" in repr_str
         assert "C" in repr_str
         assert "major" in repr_str
+        assert "Notes:" in repr_str
+
+    def test_custom_scale_repr_representation(self):
+        """CustomScale __repr__ should include pattern details and not crash."""
+        c_custom = CustomScale("C", [0, 2, 4, 7, 9])
+        repr_str = repr(c_custom)
+
+        assert "CustomScale" in repr_str
+        assert "pattern=(0, 2, 4, 7, 9)" in repr_str
         assert "Notes:" in repr_str
     
     def test_custom_scale_name(self):
