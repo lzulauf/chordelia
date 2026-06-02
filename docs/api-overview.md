@@ -89,6 +89,7 @@ Related deep docs:
 Timeline and conversion types:
 
 - `Sequence`, `SequenceEntry`, `SequenceEntryLike`, `Rest`
+- `ParallelSequence`, `ParallelChild`
 - `Sequenceable`, `NotesLike`
 - `PlayableSource`, `VisualRenderableSource`
 - `SheetMusicScaleResolver`, `TempoMetadataSource`
@@ -97,6 +98,7 @@ Timeline and conversion types:
 Score conversion entry points:
 
 - `Score.from_sequenceable(...)`
+- `Score.from_parallel_sequences(...)`
 - `score_from_sequenceable(...)`
 
 Scale context helpers for diatonic workflows:
@@ -111,6 +113,10 @@ Key behaviors:
 - `Sequence.appended(...)` composes forms immutably.
 - `Sequence.transpose(...)` is chromatic (semitones).
 - `Sequence.shift(...)` is diatonic (scale steps).
+- `ParallelSequence` composes simultaneous children with optional per-child offsets.
+- `ParallelSequence` and `Sequence` support immutable name/path targeting (`get_child_by_name`, `replace_child_by_name`, `get_child_by_path`, `replace_child_by_path`).
+- Sibling child names must be unique in one container.
+- Dot path lookup/replacement raises `KeyError` with nearest resolved segment context when traversal fails.
 - `Note.shift(...)` and `Chord.shift(...)` use `scale=...` when provided and otherwise use global scale context helpers.
 - `Score.duration` returns normalized timeline span.
 - `Score.with_(...)` returns immutable metadata/source/event updates.
@@ -120,7 +126,10 @@ Compatibility note:
 
 - `score_from_sequenceable(...)` is retained as a compatibility helper.
 - `Score.from_sequenceable(...)` is the canonical constructor-style entry point.
+- `Score.from_parallel_sequences(...)` is the explicit simultaneous-construction convenience path.
 - Direct conversion sources must be `Score` or `Sequenceable` values (for example `Note`, `Chord`, `Sequence`, `Rest`, `Scale`); `Degree` is not accepted as a direct score-wrapper input.
+- `Score.from_sequenceable(...)` remains strict single-source normalization and does not auto-detect arbitrary iterables as parallel composition.
+- Runtime mutable `Channel` controls are tracked separately from immutable composition models in [Interactive Live Song Channels Plan](../.plans/interactive_live_song_channels_plan.md).
 
 Related deep docs:
 
