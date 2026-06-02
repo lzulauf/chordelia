@@ -308,6 +308,40 @@ class Score:
         )
         return cls(source=source, metadata=metadata, events=events)
 
+    @classmethod
+    def from_parallel_sequences(
+        cls,
+        sources: Any,
+        *,
+        tempo: int = 120,
+        time_signature: tuple[int, int] = (4, 4),
+        key_signature: str | None = None,
+        default_duration: DurationLike | None = None,
+        ppq: int = 480,
+        gate_width: float = 0.9,
+        gate_offset: float = 0.0,
+        retrigger_policy: RetriggerPolicy = "retrigger_all",
+    ) -> "Score":
+        """Create a score from explicit simultaneous sequenceable sources."""
+        from chordelia.sequences import ParallelSequence
+
+        normalized_sources = tuple(sources)
+        if not normalized_sources:
+            raise ValueError("sources must contain at least one sequenceable source")
+
+        parallel = ParallelSequence(normalized_sources)
+        return cls.from_sequenceable(
+            parallel,
+            tempo=tempo,
+            time_signature=time_signature,
+            key_signature=key_signature,
+            default_duration=default_duration,
+            ppq=ppq,
+            gate_width=gate_width,
+            gate_offset=gate_offset,
+            retrigger_policy=retrigger_policy,
+        )
+
     def __len__(self) -> int:
         return len(self.events)
 

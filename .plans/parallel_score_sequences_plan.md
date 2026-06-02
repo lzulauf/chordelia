@@ -1,7 +1,7 @@
 Parallel composition and named recomposition plan for chordelia.
 
 ## Status
-Drafting
+Implementing
 
 ## Goal
 Enable explicit parallel composition with `ParallelSequence` while keeping `Sequence` as the canonical sequential model, and add optional naming/path-based immutable recomposition APIs so targeted edits are possible at any nesting level.
@@ -343,7 +343,7 @@ Expected docs delta classification: both README updates and docs updates.
 5. Explicitly document that runtime mutable `Channel` is future work and separate from immutable composition APIs.
 
 ## Progress checklist
-- [ ] Phase 0: Sequence and ParallelSequence responsibilities locked
+- [x] Phase 0: Sequence and ParallelSequence responsibilities locked
 - [ ] Phase 1: Naming/path recomposition contract finalized
 - [ ] Phase 2: ParallelSequence and score integration implemented
 - [ ] Phase 3: Focused + regression tests passing
@@ -373,6 +373,21 @@ Expected docs delta classification: both README updates and docs updates.
 ### 5. Documentation
 1. Publish model-choice guidance and examples.
 2. Clarify future `Channel` boundary and cross-link live runtime plan.
+
+## Implementation notes
+### 2026-06-02 - Phase 0
+- Scope completed: locked the public split (`Sequence` = sequential, `ParallelSequence` = simultaneous), sibling-name uniqueness, dot-path traversal semantics, and no-public-lane boundary.
+- Code touchpoints: `.plans/parallel_score_sequences_plan.md` status + checklist moved to active implementation state.
+- Tests: phase-level tests will be captured after Phase 1 behavior lands.
+- Docs: no docs delta in this phase (contract lock only).
+- Commit/PR: pending (Phase 1 implementation in progress).
+- Follow-ups: complete Phase 1 composition API and validate with new focused tests.
+
+### 2026-06-02 - Phase 1 (in progress)
+- Scope started: added initial `ParallelSequence`/`ParallelChild` model, child-offset rendering, name/path lookup-replacement helpers, and `Score.from_parallel_sequences(...)` convenience wiring.
+- Code touchpoints: `src/chordelia/sequences.py`, `src/chordelia/score.py`, `src/chordelia/__init__.py`, `tests/unit/chordelia/test_parallel_sequences.py`.
+- Tests: focused suite passing (`test_parallel_sequences.py`, `test_score.py`, `test_sequenceable.py`).
+- Follow-ups: complete remaining Phase 1/2 edge semantics and broaden regression validation listed in this plan.
 
 ## Execution order recommendation
 1. Lock semantic contracts first (`Sequence` vs `ParallelSequence`, naming/path behavior).
