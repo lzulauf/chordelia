@@ -140,7 +140,7 @@ def raspberry_pi_optimizations():
     modes = []
     start_time = time.time()
     for i in range(1, 8):
-        mode = c_major_scale.get_mode(i)  # Reuses scale calculation
+        mode = c_major_scale.mode_from_degree(i)  # Reuses scale calculation
         modes.append(mode)
     reuse_time = time.time() - start_time
     

@@ -703,30 +703,6 @@ class Chord:
             temp_note = Note.from_midi_number(temp_midi)
             return temp_note.with_octave(target_octave)
     
-    def invert(self, inversion_number: int) -> 'Chord':
-        """
-        Create an inversion of this chord.
-        
-        Args:
-            inversion_number: The inversion (1 = first inversion, etc.)
-            
-        Returns:
-            A new Chord object representing the inversion
-        """
-        return self.with_inversion(inversion_number)
-    
-    def add_extension(self, extension: Union[ChordExtension, str]) -> 'Chord':
-        """
-        Add an extension to this chord.
-        
-        Args:
-            extension: The extension to add
-            
-        Returns:
-            A new Chord object with the extension added
-        """
-        return self.with_extension(extension)
-    
     def transpose(self, interval: Interval) -> 'Chord':
         """
         Transpose this chord by an interval.

@@ -300,21 +300,21 @@ class TestScaleModes:
         c_major = Scale("C", ScaleType.MAJOR)
         
         # Second mode (Dorian) starting from D
-        d_dorian = c_major.get_mode(2)
+        d_dorian = c_major.mode_from_degree(2)
         assert str(d_dorian.root) == "D"
         
         # Fifth mode (Mixolydian) starting from G
-        g_mixolydian = c_major.get_mode(5)
+        g_mixolydian = c_major.mode_from_degree(5)
         assert str(g_mixolydian.root) == "G"
         
         # Sixth mode (Aeolian/Natural Minor) starting from A
-        a_aeolian = c_major.get_mode(6)
+        a_aeolian = c_major.mode_from_degree(6)
         assert str(a_aeolian.root) == "A"
     
     def test_mode_patterns(self):
         """Test that modes have correct interval patterns."""
         c_major = Scale("C", ScaleType.MAJOR)
-        d_dorian = c_major.get_mode(2)
+        d_dorian = c_major.mode_from_degree(2)
         
         # Dorian pattern should be (0, 2, 3, 5, 7, 9, 10)
         expected_dorian = (0, 2, 3, 5, 7, 9, 10)
@@ -325,10 +325,10 @@ class TestScaleModes:
         c_major = Scale("C", ScaleType.MAJOR)
         
         with pytest.raises(ValueError):
-            c_major.get_mode(0)
+            c_major.mode_from_degree(0)
         
         with pytest.raises(ValueError):
-            c_major.get_mode(8)
+            c_major.mode_from_degree(8)
 
 
 class TestScaleTransposition:
@@ -406,12 +406,12 @@ class TestScaleImmutability:
         assert transposed.root.name == NoteName.G
         assert transposed.scale_type == ScaleType.MAJOR
     
-    def test_get_mode_returns_new_instance(self):
-        """Test that get_mode returns a new immutable Scale instance."""
+    def test_mode_from_degree_returns_new_instance(self):
+        """Test that mode_from_degree returns a new immutable Scale instance."""
         original = Scale("C", ScaleType.MAJOR)
         
         # Get Dorian mode (2nd mode)
-        dorian = original.get_mode(2)
+        dorian = original.mode_from_degree(2)
         
         # Should return new instance
         assert dorian is not original
@@ -430,7 +430,7 @@ class TestScaleImmutability:
         
         # Test various operations that should return new instances
         transposed = original.transpose(Interval(IntervalQuality.PERFECT, 5))
-        mode = original.get_mode(3)  # Phrygian
+        mode = original.mode_from_degree(3)  # Phrygian
         
         # All should be different instances
         assert original is not transposed
@@ -468,12 +468,12 @@ class TestScaleNoteContainment:
         """Test finding scale degrees for notes."""
         c_major = Scale("C", ScaleType.MAJOR)
         
-        assert c_major.get_chord_scale_degrees(Note("C")) == 1
-        assert c_major.get_chord_scale_degrees(Note("E")) == 3
-        assert c_major.get_chord_scale_degrees(Note("G")) == 5
+        assert c_major.degree_for_chord_root(Note("C")) == 1
+        assert c_major.degree_for_chord_root(Note("E")) == 3
+        assert c_major.degree_for_chord_root(Note("G")) == 5
         
         # Note not in scale should return None
-        assert c_major.get_chord_scale_degrees(Note("F#")) is None
+        assert c_major.degree_for_chord_root(Note("F#")) is None
 
 
 class TestCustomScale:

@@ -57,7 +57,7 @@ class Scale:
         
         Scale operations (return new instances):
         >>> f_major = Scale("F", ScaleType.MAJOR)
-        >>> d_dorian = c_major.get_mode(2)  # D dorian mode
+        >>> d_dorian = c_major.mode_from_degree(2)  # D dorian mode
         >>> transposed = scale.transpose(Interval(IntervalQuality.PERFECT, 4))
         
         All methods preserve immutability - the original scale is never modified.
@@ -275,7 +275,7 @@ class Scale:
         
         return self.notes[degree_number - 1]
     
-    def get_mode(self, degree: int) -> 'Scale':
+    def mode_from_degree(self, degree: int) -> 'Scale':
         """
         Get a mode of this scale starting from the specified degree.
         
@@ -336,7 +336,7 @@ class Scale:
         scale_pitch_classes = {n.pitch_class for n in self.notes}
         return note.pitch_class in scale_pitch_classes
     
-    def get_chord_scale_degrees(self, chord_root: Note) -> Optional[int]:
+    def degree_for_chord_root(self, chord_root: Note) -> Optional[int]:
         """
         Get the scale degree for a given note.
         

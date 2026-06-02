@@ -333,7 +333,7 @@ def real_time_composition_example():
     
     print("Generated melody:")
     for note, duration in melody:
-        degree = scale.get_chord_scale_degrees(note)
+        degree = scale.degree_for_chord_root(note)
         degree_str = str(degree) if degree else "?"  
         print(f"  {note} (degree {degree_str}) - {duration}")
     

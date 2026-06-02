@@ -80,7 +80,7 @@ def scales_example():
     print(f"A harmonic minor: {[str(note) for note in a_harmonic.notes]}")
     
     # Modes
-    d_dorian = c_major.get_mode(2)
+    d_dorian = c_major.mode_from_degree(2)
     print(f"D dorian (2nd mode of C major): {[str(note) for note in d_dorian.notes]}")
     
     # Pentatonic scales
