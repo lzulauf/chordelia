@@ -1,4 +1,4 @@
-"""
+﻿"""
 Simple demonstration of Chordelia's playback functionality.
 
 This shows how the playback module integrates with the rest of Chordelia
@@ -25,10 +25,10 @@ def demonstrate_playback_integration():
     # Check if playback is available
     try:
         from chordelia import Playback, PlaybackNote, play_scale
-        print("✓ Playback module successfully imported!")
+        print("âœ“ Playback module successfully imported!")
         print("  Note: Audio output requires: pip install sounddevice numpy")
     except ImportError as e:
-        print(f"✗ Playback module not available: {e}")
+        print(f"âœ— Playback module not available: {e}")
         return
     
     print("\n1. Integration with Notes Module:")
@@ -39,7 +39,7 @@ def demonstrate_playback_integration():
     
     print("\n2. Integration with Rhythm Module:")
     # Create different durations
-    durations = [quarter_note(), dotted(quarter_note()), half_note()]
+    durations = [Duration("quarter"), dotted(Duration("quarter")), Duration("half")]
     tempo = Tempo(120)
     time_sig = COMMON_TIME
     
@@ -70,10 +70,10 @@ def demonstrate_playback_integration():
         
         # Create a simple melody
         melody_data = [
-            (Note("G4"), quarter_note()),
-            (Note("A4"), quarter_note()),
-            (Note("B4"), quarter_note()),
-            (Note("C5"), half_note()),
+            (Note("G4"), Duration("quarter")),
+            (Note("A4"), Duration("quarter")),
+            (Note("B4"), Duration("quarter")),
+            (Note("C5"), Duration("half")),
         ]
         
         playback_notes = []
@@ -101,12 +101,12 @@ def demonstrate_playback_integration():
     print("\n6. Available Playback Functions:")
     try:
         from chordelia.audio_playback import play_scale, play_chord, play_melody
-        print("   ✓ play_scale() - Play scales with timing")
-        print("   ✓ play_chord() - Play chords simultaneously") 
-        print("   ✓ play_melody() - Play note sequences")
-        print("   ✓ Playback class - Full control over playback timing")
+        print("   âœ“ play_scale() - Play scales with timing")
+        print("   âœ“ play_chord() - Play chords simultaneously") 
+        print("   âœ“ play_melody() - Play note sequences")
+        print("   âœ“ Playback class - Full control over playback timing")
     except ImportError:
-        print("   ✗ Convenience functions not available")
+        print("   âœ— Convenience functions not available")
     
     print("\n7. Musical Examples (would play with audio dependencies):")
     print("   - C major scale ascending")
@@ -116,14 +116,14 @@ def demonstrate_playback_integration():
     print("   - Complex rhythms with triplets and dotted notes")
     
     print("\nComplete Integration Summary:")
-    print("✓ Notes: Frequency calculation for sine wave generation")
-    print("✓ Rhythm: Precise timing conversion from musical to real time")
-    print("✓ Scales: Automated scale playback with proper note selection")
-    print("✓ Chords: Simultaneous note playback with voice leading")
-    print("✓ Timing: Integration of Duration, Tempo, and TimeSignature")
-    print("✓ ADSR: Attack-Decay-Sustain-Release envelope for natural sound")
-    print("✓ Threading: Non-blocking playback with precise scheduling")
-    print("✓ Context Management: Automatic cleanup of audio resources")
+    print("âœ“ Notes: Frequency calculation for sine wave generation")
+    print("âœ“ Rhythm: Precise timing conversion from musical to real time")
+    print("âœ“ Scales: Automated scale playback with proper note selection")
+    print("âœ“ Chords: Simultaneous note playback with voice leading")
+    print("âœ“ Timing: Integration of Duration, Tempo, and TimeSignature")
+    print("âœ“ ADSR: Attack-Decay-Sustain-Release envelope for natural sound")
+    print("âœ“ Threading: Non-blocking playback with precise scheduling")
+    print("âœ“ Context Management: Automatic cleanup of audio resources")
     
     print(f"\nTo enable audio playback, install dependencies:")
     print(f"  pip install sounddevice numpy")
@@ -131,3 +131,4 @@ def demonstrate_playback_integration():
 
 if __name__ == "__main__":
     demonstrate_playback_integration()
+

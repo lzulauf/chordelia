@@ -1,4 +1,4 @@
-# API Overview
+﻿# API Overview
 
 Back links: [Project README](../README.md) | [Docs Index](README.md)
 
@@ -24,11 +24,11 @@ Related deep docs:
 
 Main classes:
 
-- `Duration`, `TimeSignature`, `Tempo`, `Beat`, `NoteValue`
+- `Duration`, `TimeSignature`, `Tempo`, `Beat`
 
 Helpers/constants:
 
-- `whole_note()`, `half_note()`, `quarter_note()`, `eighth_note()`, `sixteenth_note()`
+- `Duration("whole")`, `Duration("half")`, `Duration("quarter")`, `Duration("eighth")`, `Duration("sixteenth")`
 - `dotted(duration)`, `triplet(duration)`
 - `COMMON_TIME`, `WALTZ_TIME`, `COMPOUND_DUPLE`
 
@@ -63,6 +63,13 @@ Key behaviors:
 - `Sequence.shift(...)` is diatonic (scale steps).
 - `Score.duration` returns normalized timeline span.
 - `Score.with_(...)` returns immutable metadata/source/event updates.
+- `MidiFile(...)` and `SheetMusic(...)` both normalize through the same score-first conversion path.
+
+Compatibility note:
+
+- `score_from_sequenceable(...)` is retained as a compatibility helper.
+- `Score.from_sequenceable(...)` is the canonical constructor-style entry point.
+- Direct conversion sources must be `Score` or `Sequenceable` values (for example `Note`, `Chord`, `Sequence`, `Rest`); `Scale` and `Degree` are not accepted as direct score-wrapper inputs.
 
 Related deep docs:
 
@@ -109,6 +116,19 @@ MIDI APIs (midi extra):
 - `get_midi_ports()`, `is_midi_available()`
 - `midi_play_chord(...)`, `midi_play_melody(...)`
 
+Canonical `MidiFile` workflow:
+
+- `MidiFile(source)` where `source` is `Score | Sequenceable`
+- `MidiFile.to_file(path)`
+- `MidiFile.score_to_file(score, path)`
+- `MidiFile.load_from_file(path)`
+- `MidiFile.score_from_file(path)`
+
+Notes:
+
+- MIDI read/write workflows are class-based via `MidiFile`; legacy helper delegates are intentionally not part of the canonical API surface.
+- Notebook rendering remains tracked separately in [MIDI Notebook Rendering Plan](../.plans/midi_notebook_rendering_plan.md).
+
 Articulation controls:
 
 - `ScoreMetadata.gate_width`, `ScoreMetadata.gate_offset`
@@ -137,3 +157,4 @@ Related deep docs:
 
 - [Quickstart](quickstart.md)
 - [Development Guide](development.md)
+

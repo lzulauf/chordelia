@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Iterable, TypeAlias
 from chordelia.chords import Chord
 from chordelia.intervals import IntervalLike, coerce_chromatic_semitones
 from chordelia.notes import Note
-from chordelia.rhythm import Duration
+from chordelia.rhythm import Duration, TimelineLike, coerce_timeline_duration
 from chordelia.scale_context import coerce_scale_context_value
 from chordelia.score import ScoreEvent, ScoreEventContext
 from chordelia.sequenceable import NotesLike, SequenceRender, Sequenceable, _sequence_render_for
@@ -17,23 +17,12 @@ if TYPE_CHECKING:
     from chordelia.scales import Scale
 
 
-DurationLike = Duration | int | float
+DurationLike: TypeAlias = TimelineLike
 
 
 def _coerce_duration(value: DurationLike, *, field_name: str) -> Duration:
     """Coerce values into beat/time Duration values for deterministic scheduling."""
-    if isinstance(value, Duration):
-        duration = value
-    else:
-        duration = Duration.from_beats(value, None)
-
-    if duration.mode == "note_fraction":
-        raise ValueError(
-            f"{field_name} must be beat-based or time-based Duration. "
-            "Use Duration.from_beats(...) or Duration.from_seconds(...)."
-        )
-
-    return duration
+    return coerce_timeline_duration(value, field_name=field_name)
 
 
 def _is_negative(value: Duration) -> bool:

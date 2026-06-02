@@ -1,4 +1,4 @@
-"""Tests for the canonical MidiPlayback API."""
+﻿"""Tests for the canonical MidiPlayback API."""
 
 from unittest.mock import Mock, patch
 
@@ -6,7 +6,7 @@ import pytest
 
 from chordelia.chords import Chord
 from chordelia.notes import C, D, E, Note
-from chordelia.rhythm import Duration, Tempo, half_note
+from chordelia.rhythm import Duration, Tempo
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
 
 
@@ -551,7 +551,7 @@ class TestMidiConvenienceFunctions:
 
         chord = Chord.from_string("G")
         tempo = Tempo(120)
-        duration = half_note()
+        duration = Duration("half")
         play_chord(chord, tempo=tempo, duration=duration, velocity=80)
 
         assert mock_midi["port"].send.called
@@ -629,3 +629,4 @@ class TestMidiUtilityFunctions:
             from chordelia.midi_playback import is_midi_available
 
             assert is_midi_available() is False
+

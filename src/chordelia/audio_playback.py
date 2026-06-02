@@ -1,4 +1,4 @@
-"""
+﻿"""
 Chordelia Playback Module
 
 Provides audio playback functionality for musical sequences using sine wave synthesis.
@@ -235,7 +235,7 @@ class AudioBackend:
         # This provides smooth saturation instead of hard clipping
         audio_buffer[:] = np.tanh(audio_buffer * 0.8) * 0.95
         
-        # 4. Additional safety net - hard limit at ±0.98
+        # 4. Additional safety net - hard limit at Â±0.98
         np.clip(audio_buffer, -0.98, 0.98, out=audio_buffer)
     
     def _calculate_envelope(self, note: dict, elapsed: float, current_time: float) -> float:
@@ -418,10 +418,8 @@ def play_scale(scale, tempo: Tempo = Tempo(120), note_duration: Duration = None,
         note_duration: Duration of each note (default: quarter note)
         octave: Octave to play the scale in (only used if scale notes don't have octave info)
     """
-    from chordelia.rhythm import quarter_note
-    
     if note_duration is None:
-        note_duration = quarter_note()
+        note_duration = Duration("quarter")
     
     notes = []
     current_time = Duration(0)
@@ -454,10 +452,8 @@ def play_chord(chord, tempo: Tempo = Tempo(120), duration: Duration = None,
         duration: Duration to hold the chord (default: whole note)
         octave: Base octave for the chord
     """
-    from chordelia.rhythm import whole_note
-    
     if duration is None:
-        duration = whole_note()
+        duration = Duration("whole")
     
     notes = []
     
@@ -886,3 +882,4 @@ def play_melody(melody_notes: List[Tuple[Note, Duration]], tempo: Tempo = Tempo(
     
     with Playback(tempo) as player:
         player.play_sequence(notes)
+

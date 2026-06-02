@@ -1,5 +1,6 @@
 """Tests for the canonical MidiFile score-backed wrapper behavior."""
 
+from fractions import Fraction
 from pathlib import Path
 from unittest.mock import patch
 
@@ -8,9 +9,11 @@ import pytest
 mido = pytest.importorskip("mido")
 
 from chordelia.midifile import MidiFile
+from chordelia.degrees import Degree
 from chordelia.notes import Note
 from chordelia.playback_notes import midi_tracks_to_playback_notes, score_to_playback_notes
 from chordelia.rhythm import Duration
+from chordelia.scales import Scale
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
 
 
@@ -24,6 +27,22 @@ def _collect_absolute_note_messages(midi_file):
             if message.type in {"note_on", "note_off"}:
                 absolute_messages.append((message.type, message.note, message.velocity, message.channel, absolute_tick))
     return absolute_messages
+
+
+def _collect_absolute_score_meta_messages(midi_file):
+    """Collect tempo/time/key meta messages with absolute ticks for parity checks."""
+    absolute_meta = []
+    for track in midi_file.tracks:
+        absolute_tick = 0
+        for message in track:
+            absolute_tick += message.time
+            if message.type == "set_tempo":
+                absolute_meta.append((message.type, message.tempo, absolute_tick))
+            elif message.type == "time_signature":
+                absolute_meta.append((message.type, message.numerator, message.denominator, absolute_tick))
+            elif message.type == "key_signature":
+                absolute_meta.append((message.type, message.key, absolute_tick))
+    return absolute_meta
 
 
 class TestMidiFileScoreBackedConstruction:
@@ -47,9 +66,48 @@ class TestMidiFileScoreBackedConstruction:
         assert midi.time_signature.beats_per_measure == 3
         assert midi.time_signature.beat_unit == 4
 
+    @pytest.mark.parametrize(
+        "source",
+        (
+            Scale("C", "major"),
+            Degree(1),
+        ),
+    )
+    def test_constructor_rejects_non_sequenceable_theory_types(self, source):
+        with pytest.raises(TypeError, match="not Sequenceable"):
+            MidiFile(source)
+
 
 class TestMidiFileWritePath:
     """MIDI file writing behavior from canonical score-backed wrappers."""
+
+    def test_sequenceable_and_prebuilt_score_write_identical_midi(self, tmp_path: Path):
+        direct_path = tmp_path / "direct.mid"
+        score_path = tmp_path / "score.mid"
+
+        score = Score.from_sequenceable(
+            Note("E4"),
+            tempo=104,
+            time_signature=(3, 4),
+            key_signature="E",
+            ppq=960,
+        )
+
+        MidiFile(
+            Note("E4"),
+            tempo=104,
+            time_signature=(3, 4),
+            key_signature="E",
+            ppq=960,
+        ).to_file(direct_path)
+        MidiFile(score).to_file(score_path)
+
+        direct_midi = mido.MidiFile(str(direct_path))
+        score_midi = mido.MidiFile(str(score_path))
+
+        assert direct_midi.ticks_per_beat == score_midi.ticks_per_beat == 960
+        assert _collect_absolute_score_meta_messages(direct_midi) == _collect_absolute_score_meta_messages(score_midi)
+        assert _collect_absolute_note_messages(direct_midi) == _collect_absolute_note_messages(score_midi)
 
     def test_to_file_writes_note_events_from_sequenceable_source(self, tmp_path: Path):
         output_path = tmp_path / "single_note.mid"
@@ -128,6 +186,62 @@ class TestMidiFileWritePath:
 
 class TestMidiFileReadPath:
     """MIDI file read behavior through the score-backed MidiFile wrapper."""
+
+    def test_round_trip_file_score_file_preserves_note_messages(self, tmp_path: Path):
+        source_path = tmp_path / "round_trip_source.mid"
+        round_trip_path = tmp_path / "round_trip_copy.mid"
+
+        midi = mido.MidiFile(ticks_per_beat=480)
+        track = mido.MidiTrack()
+        midi.tracks.append(track)
+        track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(108), time=0))
+        track.append(mido.MetaMessage("time_signature", numerator=4, denominator=4, time=0))
+        track.append(mido.MetaMessage("key_signature", key="D", time=0))
+        track.append(mido.Message("note_on", note=62, velocity=96, channel=0, time=0))
+        track.append(mido.Message("note_off", note=62, velocity=0, channel=0, time=240))
+        track.append(mido.Message("note_on", note=65, velocity=80, channel=1, time=120))
+        track.append(mido.Message("note_off", note=65, velocity=0, channel=1, time=360))
+        track.append(mido.MetaMessage("end_of_track", time=0))
+        midi.save(str(source_path))
+
+        score = MidiFile.score_from_file(source_path)
+        written_path = MidiFile.score_to_file(score, round_trip_path)
+
+        assert written_path == round_trip_path
+        assert round_trip_path.exists()
+        assert score.metadata.tempo == 108
+        assert score.metadata.time_signature == (4, 4)
+        assert score.metadata.key_signature == "D"
+
+        source_messages = _collect_absolute_note_messages(mido.MidiFile(str(source_path)))
+        round_trip_messages = _collect_absolute_note_messages(mido.MidiFile(str(round_trip_path)))
+        assert round_trip_messages == source_messages
+
+    def test_score_from_file_supports_overlapping_note_pairs(self, tmp_path: Path):
+        source_path = tmp_path / "overlap.mid"
+
+        midi = mido.MidiFile(ticks_per_beat=480)
+        track = mido.MidiTrack()
+        midi.tracks.append(track)
+        track.append(mido.Message("note_on", note=60, velocity=100, channel=0, time=0))
+        track.append(mido.Message("note_on", note=60, velocity=90, channel=0, time=120))
+        track.append(mido.Message("note_off", note=60, velocity=0, channel=0, time=120))
+        track.append(mido.Message("note_off", note=60, velocity=0, channel=0, time=120))
+        track.append(mido.MetaMessage("end_of_track", time=0))
+        midi.save(str(source_path))
+
+        score = MidiFile.score_from_file(source_path)
+
+        assert len(score.events) == 2
+        first, second = score.events
+        assert first.pitches == (60,)
+        assert first.velocity == 100
+        assert first.beat.as_beats() == 0
+        assert first.duration.as_beats() == Fraction(1, 2)
+        assert second.pitches == (60,)
+        assert second.velocity == 90
+        assert second.beat.as_beats() == Fraction(1, 4)
+        assert second.duration.as_beats() == Fraction(1, 2)
 
     def test_load_from_file_keeps_playback_conversion_working(self, tmp_path: Path):
         source_path = tmp_path / "source.mid"

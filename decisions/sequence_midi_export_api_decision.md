@@ -405,7 +405,7 @@ Implementation notes:
 2. Keep one canonical validation and ordering path.
 3. Keep notebook display integration optional and layered above core writer behavior.
 
-Linked implementation plan: .plans/sequence_to_midi_export_plan.md
+Linked implementation plan: .plans/archive/sequence_to_midi_export_plan.md
 
 ## Confidence and risks
 Confidence: high.
@@ -420,7 +420,7 @@ Risk controls:
 3. Gate notebook display behavior so missing optional dependencies never break core export.
 
 ## Follow-up actions
-1. Keep .plans/sequence_to_midi_export_plan.md aligned with this option framing and locked dependency-group naming.
+1. Keep .plans/archive/sequence_to_midi_export_plan.md aligned with this option framing and locked dependency-group naming.
 2. Implement Phase 1 API and normalized event model using the recommended relation-based names.
 3. Add docs/examples that show canonical APIs and wrapper delegation behavior.
 4. Add dependency-isolation tests to confirm core MIDI export works without notebook extras.

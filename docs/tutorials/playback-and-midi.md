@@ -41,7 +41,7 @@ with Playback(Tempo(score.metadata.tempo)) as player:
     player.play_sequence(playback_notes, blocking=True)
 ```
 
-## 3) MIDI File Export
+## 3) MIDI File Export (Score -> File)
 
 ```python
 from chordelia import MidiFile
@@ -49,7 +49,21 @@ from chordelia import MidiFile
 MidiFile(score).to_file("progression.mid")
 ```
 
-## 4) Live MIDI Playback
+## 4) MIDI File Read Paths (File -> Score/Wrapper)
+
+```python
+from chordelia import MidiFile
+
+loaded = MidiFile.load_from_file("progression.mid")
+loaded_score = MidiFile.score_from_file("progression.mid")
+
+MidiFile.score_to_file(loaded_score, "progression_copy.mid")
+```
+
+The canonical MIDI file workflow is class-based through `MidiFile` methods.
+Module-level helper delegates are intentionally not part of the canonical API.
+
+## 5) Live MIDI Playback
 
 ```python
 from chordelia import MidiPlayback, get_midi_ports
@@ -62,7 +76,7 @@ if ports:
         playback.play_score(score, blocking=True)
 ```
 
-## 5) Articulation and Retrigger Control
+## 6) Articulation and Retrigger Control
 
 Defaults are stored in `Score.metadata`:
 

@@ -8,7 +8,7 @@ used throughout Chordelia for Duration, Chord, and Scale classes.
 import sys
 
 from chordelia import Duration, Chord, Scale, Note
-from chordelia import NoteValue, ChordQuality, ChordExtension, ScaleType, Interval, IntervalQuality
+from chordelia import ChordQuality, ChordExtension, ScaleType, Interval, IntervalQuality
 
 
 # Avoid UnicodeEncodeError on Windows code pages when examples print symbols.
@@ -23,8 +23,8 @@ def duration_immutability_examples():
     print("=== Duration Immutability Examples ===")
     
     # Create basic durations
-    quarter = Duration(NoteValue.QUARTER)
-    eighth = Duration(NoteValue.EIGHTH)
+    quarter = Duration("quarter")
+    eighth = Duration("eighth")
     
     print(f"Original quarter note: {quarter}")
     print(f"Original eighth note: {eighth}")
@@ -43,7 +43,7 @@ def duration_immutability_examples():
     print(f"Original eighth still: {eighth}")
     
     # Chain operations
-    complex_duration = quarter + eighth + Duration(NoteValue.SIXTEENTH)
+    complex_duration = quarter + eighth + Duration("sixteenth")
     print(f"Complex duration: {complex_duration}")
     
     print()

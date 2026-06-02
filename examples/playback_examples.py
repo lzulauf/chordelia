@@ -1,4 +1,4 @@
-"""
+﻿"""
 Chordelia Playback Examples
 
 Demonstrates the playback module functionality with musical examples.
@@ -38,25 +38,25 @@ def basic_playback_examples():
     # Example 1: Play a C major scale
     print("1. Playing C major scale...")
     c_major = Scale("C", ScaleType.MAJOR)
-    play_scale(c_major, tempo, quarter_note(), octave=4)
+    play_scale(c_major, tempo, Duration("quarter"), octave=4)
     
     time.sleep(0.5)  # Brief pause between examples
     
     # Example 2: Play a C major chord
     print("2. Playing C major chord...")
     c_chord = Chord.from_string("C")
-    play_chord(c_chord, tempo, whole_note(), octave=4)
+    play_chord(c_chord, tempo, Duration("whole"), octave=4)
     
     time.sleep(0.5)
     
     # Example 3: Play a simple melody
     print("3. Playing simple melody (C-D-E-F-G)...")
     melody = [
-        (Note("C4"), quarter_note()),
-        (Note("D4"), quarter_note()),
-        (Note("E4"), quarter_note()),
-        (Note("F4"), quarter_note()),
-        (Note("G4"), half_note()),
+        (Note("C4"), Duration("quarter")),
+        (Note("D4"), Duration("quarter")),
+        (Note("E4"), Duration("quarter")),
+        (Note("F4"), Duration("quarter")),
+        (Note("G4"), Duration("half")),
     ]
     play_melody(melody, tempo)
     
@@ -78,7 +78,7 @@ def chord_progression_example():
     
     notes = []
     current_time = Duration(0)
-    chord_duration = whole_note()
+    chord_duration = Duration("whole")
     
     for chord_name in progression_chords:
         chord = Chord.from_string(chord_name)
@@ -117,21 +117,21 @@ def melody_with_rhythm_example():
     
     # Mary Had a Little Lamb - simplified version
     melody_notes = [
-        (Note("E4"), quarter_note()),  # Ma-
-        (Note("D4"), quarter_note()),  # ry
-        (Note("C4"), quarter_note()),  # had
-        (Note("D4"), quarter_note()),  # a
-        (Note("E4"), quarter_note()),  # lit-
-        (Note("E4"), quarter_note()),  # tle
-        (Note("E4"), half_note()),     # lamb
+        (Note("E4"), Duration("quarter")),  # Ma-
+        (Note("D4"), Duration("quarter")),  # ry
+        (Note("C4"), Duration("quarter")),  # had
+        (Note("D4"), Duration("quarter")),  # a
+        (Note("E4"), Duration("quarter")),  # lit-
+        (Note("E4"), Duration("quarter")),  # tle
+        (Note("E4"), Duration("half")),     # lamb
         
-        (Note("D4"), quarter_note()),  # lit-
-        (Note("D4"), quarter_note()),  # tle
-        (Note("D4"), half_note()),     # lamb
+        (Note("D4"), Duration("quarter")),  # lit-
+        (Note("D4"), Duration("quarter")),  # tle
+        (Note("D4"), Duration("half")),     # lamb
         
-        (Note("E4"), quarter_note()),  # lit-
-        (Note("G4"), quarter_note()),  # tle
-        (Note("G4"), half_note()),     # lamb
+        (Note("E4"), Duration("quarter")),  # lit-
+        (Note("G4"), Duration("quarter")),  # tle
+        (Note("G4"), Duration("half")),     # lamb
     ]
     
     tempo = Tempo(120)
@@ -158,7 +158,7 @@ def arpeggio_example():
     
     notes = []
     current_time = Duration(0)
-    note_duration = eighth_note()
+    note_duration = Duration("eighth")
     
     # Arpeggio pattern
     pattern = ["C", "E", "G"]
@@ -206,13 +206,13 @@ def advanced_timing_example():
     
     # Complex rhythm pattern
     rhythm_pattern = [
-        (Note("C4"), quarter_note()),      # Regular quarter
-        (Note("D4"), dotted(quarter_note())),  # Dotted quarter
-        (Note("E4"), eighth_note()),       # Eighth to complete the dotted quarter
-        (Note("F4"), triplet(quarter_note())),  # Quarter triplet
-        (Note("G4"), triplet(quarter_note())),  # Quarter triplet  
-        (Note("A4"), triplet(quarter_note())),  # Quarter triplet
-        (Note("B4"), half_note()),         # Half note
+        (Note("C4"), Duration("quarter")),      # Regular quarter
+        (Note("D4"), dotted(Duration("quarter"))),  # Dotted quarter
+        (Note("E4"), Duration("eighth")),       # Eighth to complete the dotted quarter
+        (Note("F4"), triplet(Duration("quarter"))),  # Quarter triplet
+        (Note("G4"), triplet(Duration("quarter"))),  # Quarter triplet  
+        (Note("A4"), triplet(Duration("quarter"))),  # Quarter triplet
+        (Note("B4"), Duration("half")),         # Half note
     ]
     
     print("Complex rhythm pattern:")
@@ -273,7 +273,7 @@ def tempo_comparison_example():
     print("Playing the same scale at different tempos...")
     
     scale = Scale("G", ScaleType.MAJOR)
-    note_duration = quarter_note()
+    note_duration = Duration("quarter")
     
     tempos = [Tempo(60), Tempo(120), Tempo(180)]  # Slow, medium, fast
     
@@ -301,7 +301,7 @@ def jazz_chord_voicing_example():
     for chord_name in jazz_chords:
         print(f"Playing {chord_name}...")
         chord = Chord.from_string(chord_name)
-        play_chord(chord, tempo, dotted(half_note()), octave=4)
+        play_chord(chord, tempo, dotted(Duration("half")), octave=4)
         time.sleep(0.2)  # Brief pause between chords
     
     print("Jazz chord example complete!\n")
@@ -322,8 +322,8 @@ def real_time_composition_example():
     
     # Simple melody pattern: 1-3-5-3-2-4-3-1
     scale_degrees = [1, 3, 5, 3, 2, 4, 3, 1]
-    durations = [quarter_note(), eighth_note(), eighth_note(), quarter_note(),
-                eighth_note(), eighth_note(), quarter_note(), half_note()]
+    durations = [Duration("quarter"), Duration("eighth"), Duration("eighth"), Duration("quarter"),
+                Duration("eighth"), Duration("eighth"), Duration("quarter"), Duration("half")]
     
     melody = []
     for degree, duration in zip(scale_degrees, durations):
@@ -378,3 +378,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

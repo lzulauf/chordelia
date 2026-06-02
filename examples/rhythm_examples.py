@@ -1,4 +1,4 @@
-"""
+﻿"""
 Example usage of Chordelia's rhythm module.
 
 Demonstrates musical timing, durations, time signatures, tempo,
@@ -8,8 +8,8 @@ and conversions between musical time and real time.
 import sys
 
 from chordelia import (
-    Duration, TimeSignature, Tempo, Beat, NoteValue,
-    quarter_note, eighth_note, half_note, whole_note, dotted, triplet,
+    Duration, TimeSignature, Tempo, Beat,
+    dotted, triplet,
     COMMON_TIME, WALTZ_TIME, COMPOUND_DUPLE
 )
 
@@ -26,10 +26,10 @@ def basic_rhythm_examples():
     print("=== Basic Rhythm Examples ===")
     
     # Create durations
-    quarter = Duration(NoteValue.QUARTER)
-    eighth = Duration(NoteValue.EIGHTH)
-    dotted_quarter = dotted(quarter_note())
-    quarter_triplet = triplet(quarter_note())
+    quarter = Duration("quarter")
+    eighth = Duration("eighth")
+    dotted_quarter = dotted(Duration("quarter"))
+    quarter_triplet = triplet(Duration("quarter"))
     
     print(f"Quarter note: {quarter}")
     print(f"Eighth note: {eighth}")
@@ -96,12 +96,12 @@ def duration_conversion_examples():
     
     # Convert various durations to milliseconds
     durations = [
-        whole_note(),
-        half_note(),
-        quarter_note(),
-        eighth_note(),
-        dotted(quarter_note()),
-        triplet(quarter_note())
+        Duration("whole"),
+        Duration("half"),
+        Duration("quarter"),
+        Duration("eighth"),
+        dotted(Duration("quarter")),
+        triplet(Duration("quarter"))
     ]
     
     for duration in durations:
@@ -130,7 +130,7 @@ def musical_timing_example():
     
     # Famous opening rhythm pattern (simplified)
     # Three quarters, one half note
-    pattern = [quarter_note(), quarter_note(), quarter_note(), half_note()]
+    pattern = [Duration("quarter"), Duration("quarter"), Duration("quarter"), Duration("half")]
     
     print("Opening pattern timing:")
     current_time = 0
@@ -158,10 +158,10 @@ def beat_tracking_example():
     
     # Add various durations
     durations_to_add = [
-        quarter_note(),
-        eighth_note(), 
-        dotted(quarter_note()),
-        quarter_note()
+        Duration("quarter"),
+        Duration("eighth"), 
+        dotted(Duration("quarter")),
+        Duration("quarter")
     ]
     
     for duration in durations_to_add:
@@ -184,8 +184,8 @@ def compound_time_example():
     print(f"Tempo: {tempo} eighth notes per minute")
     
     # In 6/8, we feel it in 2 (groups of 3 eighths)
-    dotted_quarter = dotted(quarter_note())  # Main beat in 6/8
-    eighth = eighth_note()
+    dotted_quarter = dotted(Duration("quarter"))  # Main beat in 6/8
+    eighth = Duration("eighth")
     
     print(f"Main beat (dotted quarter): {dotted_quarter}")
     ms_main = dotted_quarter.to_milliseconds(tempo.bpm, six_eight)
@@ -216,3 +216,4 @@ if __name__ == "__main__":
     print("- Beat position tracking")
     print("- Support for complex rhythms (dotted notes, triplets)")
     print("- Algorithmic calculations for efficiency")
+

@@ -1,4 +1,4 @@
-"""Tests for the Sequenceable protocol, adapter registry, and score normalization."""
+"""Tests for the Sequenceable protocol and score normalization boundary."""
 
 import pytest
 
@@ -13,18 +13,8 @@ from chordelia.sequenceable import (
     NotesLike,
     SequenceRender,
     Sequenceable,
-    _clear_sequenceable_adapters,
-    _register_sequenceable_adapter,
     _sequence_render_for,
 )
-
-
-@pytest.fixture(autouse=True)
-def clear_adapter_registry_between_tests():
-    """Keep adapter registry isolated between test cases."""
-    _clear_sequenceable_adapters()
-    yield
-    _clear_sequenceable_adapters()
 
 
 class TestSequenceableProtocol:
@@ -67,28 +57,22 @@ class TestSequenceableProtocol:
         assert isinstance(Rest(), NotesLike)
 
 
-class TestAdapterRegistry:
-    """Adapter registration and fallback behavior."""
+class TestSequenceRenderBoundary:
+    """SequenceRender conversion behavior without adapter fallback."""
 
     class ExternalTone:
-        """Example non-sequenceable value for adapter tests."""
+        """Simple direct Sequenceable value used for conversion tests."""
 
         def __init__(self, midi_number: int):
             self.midi_number = midi_number
 
-    class ExternalToneVariant(ExternalTone):
-        """Subclass used to verify MRO-based adapter lookup."""
-
-    def test_sequence_render_for_uses_registered_adapter(self):
-        """_sequence_render_for should route unknown values through registered adapters."""
-
-        def tone_adapter(value, context):
+        def render_for_context(self, context):
             return SequenceRender(
                 events=(
                     ScoreEvent(
                         beat=context.start_offset,
                         duration=context.default_duration,
-                        pitches=(value.midi_number,),
+                        pitches=(self.midi_number,),
                         velocity=context.velocity,
                         channel=context.channel,
                         voice=context.voice,
@@ -97,7 +81,11 @@ class TestAdapterRegistry:
                 consumed_duration=context.default_duration,
             )
 
-        _register_sequenceable_adapter(self.ExternalTone, tone_adapter)
+        def transpose(self, _interval):
+            return self
+
+    def test_sequence_render_for_uses_sequenceable_values_directly(self):
+        """_sequence_render_for should consume Sequenceable values directly."""
 
         context = ScoreEventContext(start_offset=1, default_duration=2, velocity=88)
         render = _sequence_render_for(self.ExternalTone(72), context)
@@ -110,32 +98,36 @@ class TestAdapterRegistry:
         assert events[0].velocity == 88
         assert render.consumed_duration == Duration.from_beats(2)
 
-    def test_adapter_lookup_uses_base_class_registration(self):
-        """Adapter lookup should resolve through MRO for subclass values."""
-
-        def tone_adapter(value, _context):
-            return SequenceRender(
-                events=(ScoreEvent(beat=0, duration=1, pitches=(value.midi_number,)),),
-                consumed_duration=Duration.from_beats(1),
-            )
-
-        _register_sequenceable_adapter(self.ExternalTone, tone_adapter)
-
-        events = _sequence_render_for(self.ExternalToneVariant(69), ScoreEventContext()).events
-
-        assert events[0].pitches == (69,)
-
     def test_sequence_render_for_raises_for_unsupported_values(self):
         """Unsupported values should fail with actionable guidance."""
-        with pytest.raises(TypeError, match="_register_sequenceable_adapter"):
+        with pytest.raises(TypeError, match="not Sequenceable"):
             _sequence_render_for(object(), ScoreEventContext())
+
+    def test_sequence_render_normalizes_note_fraction_consumed_duration(self):
+        """SequenceRender should normalize note-fraction Duration consumed inputs."""
+        render = SequenceRender(events=(), consumed_duration=Duration("quarter"))
+
+        assert render.consumed_duration == Duration.from_beats(1)
 
 
 class TestScoreFromSequenceable:
-    """Score normalization behavior from sequenceable and adapted values."""
+    """Score normalization behavior from direct sequenceable values."""
 
     class ExternalPattern:
-        """Non-sequenceable test value converted via adapter."""
+        """Sequenceable helper used to verify deterministic score sorting."""
+
+        def render_for_context(self, _context):
+            return SequenceRender(
+                events=(
+                    ScoreEvent(beat=2, duration=1, pitches=(64,), channel=1),
+                    ScoreEvent(beat=1, duration=1, pitches=(60,), channel=1),
+                    ScoreEvent(beat=1, duration=1, pitches=(67,), channel=0),
+                ),
+                consumed_duration=Duration.from_beats(3),
+            )
+
+        def transpose(self, _interval):
+            return self
 
     def test_score_from_sequenceable_includes_metadata(self):
         """Score constructor should preserve metadata defaults and overrides."""
@@ -153,19 +145,7 @@ class TestScoreFromSequenceable:
         assert score.metadata.key_signature == "D"
 
     def test_score_from_sequenceable_sorts_events_deterministically(self):
-        """Score should normalize event ordering regardless of adapter output order."""
-
-        def pattern_adapter(_value, _context):
-            return SequenceRender(
-                events=(
-                    ScoreEvent(beat=2, duration=1, pitches=(64,), channel=1),
-                    ScoreEvent(beat=1, duration=1, pitches=(60,), channel=1),
-                    ScoreEvent(beat=1, duration=1, pitches=(67,), channel=0),
-                ),
-                consumed_duration=Duration.from_beats(3),
-            )
-
-        _register_sequenceable_adapter(self.ExternalPattern, pattern_adapter)
+        """Score should normalize event ordering for any Sequenceable source."""
 
         score = Score.from_sequenceable(self.ExternalPattern())
 
@@ -323,6 +303,23 @@ class TestSequenceScheduling:
             Duration.from_beats(5),
             Duration.from_beats(6),
         ]
+
+    def test_sequence_entry_accepts_note_fraction_duration_and_offset(self):
+        seq = Sequence(
+            (
+                SequenceEntry(
+                    payload=Note("C4"),
+                    duration=Duration("eighth"),
+                    offset=Duration("quarter"),
+                ),
+            )
+        )
+
+        render = seq.render_for_context(ScoreEventContext())
+
+        assert render.events[0].beat == Duration.from_beats(1)
+        assert render.events[0].duration == Duration.from_beats(1, 2)
+        assert render.consumed_duration == Duration.from_beats(3, 2)
 
     def test_sequence_rest_entries_emit_no_events(self):
         seq = Sequence(

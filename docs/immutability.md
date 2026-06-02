@@ -7,9 +7,9 @@ Chordelia core value objects are immutable: operations return new instances inst
 ## Duration Immutability
 
 ```python
-from chordelia import Duration, NoteValue
+from chordelia import Duration
 
-quarter = Duration(NoteValue.QUARTER)
+quarter = Duration("quarter")
 half = quarter * 2
 
 print(quarter)  # quarter

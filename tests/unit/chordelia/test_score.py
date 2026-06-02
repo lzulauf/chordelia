@@ -2,24 +2,20 @@
 
 import pytest
 
+from chordelia.degrees import Degree
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
+from chordelia.scales import Scale
 from chordelia.scale_context import reset_chordelia_context, with_chordelia_context
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
-from chordelia.sequenceable import (
-    SequenceRender,
-    _clear_sequenceable_adapters,
-    _register_sequenceable_adapter,
-)
+from chordelia.sequenceable import SequenceRender
 
 
 @pytest.fixture(autouse=True)
-def clear_adapter_registry_between_tests():
-    """Keep private adapter registrations isolated to each test."""
-    _clear_sequenceable_adapters()
+def clear_runtime_context_between_tests():
+    """Keep runtime context isolated to each test."""
     reset_chordelia_context()
     yield
-    _clear_sequenceable_adapters()
     reset_chordelia_context()
 
 
@@ -40,10 +36,16 @@ class TestScoreEvent:
         assert event.pitches == (60, 64)
         assert event.spelling == ("C4", "E4")
 
-    def test_score_event_rejects_note_fraction_durations(self):
-        """ScoreEvent requires beat/time Duration modes, not note-fraction mode."""
-        with pytest.raises(ValueError, match="Duration.from_beats"):
-            ScoreEvent(beat=Duration("quarter"), duration=Duration.from_beats(1), pitches=(60,))
+    def test_score_event_normalizes_note_fraction_durations(self):
+        """ScoreEvent should normalize note-fraction timing values into beats."""
+        event = ScoreEvent(
+            beat=Duration("quarter"),
+            duration=Duration("eighth"),
+            pitches=(60,),
+        )
+
+        assert event.beat == Duration.from_beats(1)
+        assert event.duration == Duration.from_beats(1, 2)
 
     @pytest.mark.parametrize(
         "kwargs, expected_message",
@@ -88,10 +90,16 @@ class TestScoreEventContext:
         assert updated.default_duration == original.default_duration
         assert updated is not original
 
-    def test_context_rejects_note_fraction_durations(self):
-        """Context requires beat/time Duration modes for offsets and defaults."""
-        with pytest.raises(ValueError, match="Duration.from_beats"):
-            ScoreEventContext(start_offset=Duration("quarter"))
+    def test_context_normalizes_note_fraction_durations_with_time_signature(self):
+        """Context should normalize note-fraction timings using the beat-unit denominator."""
+        context = ScoreEventContext(
+            time_signature=(6, 8),
+            start_offset=Duration("quarter"),
+            default_duration=Duration("eighth"),
+        )
+
+        assert context.start_offset == Duration.from_beats(2)
+        assert context.default_duration == Duration.from_beats(1)
 
     @pytest.mark.parametrize(
         "kwargs, expected_message",
@@ -182,7 +190,16 @@ class TestScore:
     """Score sorting and conversion behavior."""
 
     class External:
-        """Simple adapted source type for conversion tests."""
+        """Simple sequenceable source type for conversion tests."""
+
+        def __init__(self, on_render):
+            self._on_render = on_render
+
+        def render_for_context(self, context):
+            return self._on_render(context)
+
+        def transpose(self, _interval):
+            return self
 
     def test_score_sorts_with_full_deterministic_key(self):
         """Sorting should use beat, channel, voice, pitches, then duration."""
@@ -340,7 +357,7 @@ class TestScore:
         """Score.from_sequenceable should propagate conversion context and metadata values."""
         captured = {}
 
-        def external_adapter(_value, context):
+        def external_render(context):
             captured["context"] = context
             return SequenceRender(
                 events=(
@@ -356,10 +373,8 @@ class TestScore:
                 consumed_duration=context.default_duration,
             )
 
-        _register_sequenceable_adapter(self.External, external_adapter)
-
         score = Score.from_sequenceable(
-            self.External(),
+            self.External(external_render),
             tempo=88,
             time_signature=(6, 8),
             key_signature="G",
@@ -400,8 +415,20 @@ class TestScore:
 
     def test_from_sequenceable_raises_for_unsupported_source(self):
         """Unsupported values should raise TypeError via sequenceable conversion boundary."""
-        with pytest.raises(TypeError, match="_register_sequenceable_adapter"):
+        with pytest.raises(TypeError, match="not Sequenceable"):
             Score.from_sequenceable(object())
+
+    @pytest.mark.parametrize(
+        "source",
+        (
+            Scale("C", "major"),
+            Degree(1),
+        ),
+    )
+    def test_from_sequenceable_rejects_non_sequenceable_theory_types(self, source):
+        """Scale and Degree are theory helpers, not direct sequenceable score sources."""
+        with pytest.raises(TypeError, match="not Sequenceable"):
+            Score.from_sequenceable(source)
 
     def test_score_from_sequenceable_helper_delegates_to_classmethod(self):
         """Compatibility helper should delegate behavior to Score.from_sequenceable."""

@@ -6,59 +6,10 @@ tempo, and conversions between musical time and real time (milliseconds).
 All calculations are done algorithmically for precision and efficiency.
 """
 
-from enum import Enum
 from decimal import Decimal, InvalidOperation
-from typing import Optional, Union, Tuple
+from typing import Optional, Union, Tuple, TypeAlias
 from fractions import Fraction
 import math
-
-
-class NoteValue(Enum):
-    """Enumeration of standard note duration values."""
-    WHOLE = Fraction(1, 1)
-    HALF = Fraction(1, 2)
-    QUARTER = Fraction(1, 4)
-    EIGHTH = Fraction(1, 8)
-    SIXTEENTH = Fraction(1, 16)
-    THIRTY_SECOND = Fraction(1, 32)
-    SIXTY_FOURTH = Fraction(1, 64)
-    
-    # Dotted notes (1.5x original duration)
-    DOTTED_WHOLE = Fraction(3, 2)
-    DOTTED_HALF = Fraction(3, 4)
-    DOTTED_QUARTER = Fraction(3, 8)
-    DOTTED_EIGHTH = Fraction(3, 16)
-    DOTTED_SIXTEENTH = Fraction(3, 32)
-    
-    # Triplet notes (2/3 of original duration)
-    WHOLE_TRIPLET = Fraction(2, 3)
-    HALF_TRIPLET = Fraction(1, 3)
-    QUARTER_TRIPLET = Fraction(1, 6)
-    EIGHTH_TRIPLET = Fraction(1, 12)
-    SIXTEENTH_TRIPLET = Fraction(1, 24)
-
-    def __str__(self) -> str:
-        """String representation of note value."""
-        names = {
-            Fraction(1, 1): "whole",
-            Fraction(1, 2): "half",
-            Fraction(1, 4): "quarter",
-            Fraction(1, 8): "eighth",
-            Fraction(1, 16): "sixteenth",
-            Fraction(1, 32): "thirty-second",
-            Fraction(1, 64): "sixty-fourth",
-            Fraction(3, 2): "dotted whole",
-            Fraction(3, 4): "dotted half",
-            Fraction(3, 8): "dotted quarter",
-            Fraction(3, 16): "dotted eighth",
-            Fraction(3, 32): "dotted sixteenth",
-            Fraction(2, 3): "whole triplet",
-            Fraction(1, 3): "half triplet",
-            Fraction(1, 6): "quarter triplet",
-            Fraction(1, 12): "eighth triplet",
-            Fraction(1, 24): "sixteenth triplet",
-        }
-        return names.get(self.value, f"{self.value} note")
 
 
 class Duration:
@@ -72,7 +23,6 @@ class Duration:
     
     Examples:
         Creating durations:
-        >>> duration = Duration(NoteValue.QUARTER)
         >>> duration = Duration(Fraction(1, 4))  
         >>> duration = Duration("quarter")
         >>> duration = Duration(0.25)
@@ -91,24 +41,44 @@ class Duration:
     _MODE_NOTE_FRACTION = 'note_fraction'
     _MODE_BEATS = 'beats'
     _MODE_SECONDS = 'seconds'
+
+    _BASE_DURATION_NAMES: dict[str, Fraction] = {
+        "whole": Fraction(1, 1),
+        "half": Fraction(1, 2),
+        "quarter": Fraction(1, 4),
+        "eighth": Fraction(1, 8),
+        "sixteenth": Fraction(1, 16),
+        "thirty-second": Fraction(1, 32),
+        "sixty-fourth": Fraction(1, 64),
+    }
+
+    _COMMON_FRACTION_NAMES: dict[Fraction, str] = (
+        {fraction: name for name, fraction in _BASE_DURATION_NAMES.items()}
+        | {
+            fraction * Fraction(3, 2): f"dotted {name}"
+            for name, fraction in _BASE_DURATION_NAMES.items()
+        }
+        | {
+            fraction * Fraction(2, 3): f"{name} triplet"
+            for name, fraction in _BASE_DURATION_NAMES.items()
+        }
+    )
     
-    def __init__(self, value: Union[NoteValue, Fraction, float, str]):
+    def __init__(self, value: Union[Fraction, float, str]):
         """
         Initialize an immutable duration.
         
         Args:
-            value: Note value, fraction, float, or string representation
+            value: Fraction, float/int, or string representation
                   String examples: "1/4", "quarter", "dotted quarter", "1/8 triplet"
         """
-        if isinstance(value, NoteValue):
-            fraction = value.value
-        elif isinstance(value, (Fraction, float, int)):
+        if isinstance(value, (Fraction, float, int)):
             fraction = Fraction(value).limit_denominator()
         elif isinstance(value, str):
             fraction = self._parse_duration_string(value)
         else:
             raise ValueError(f"Invalid duration value: {value}")
-        
+
         self._mode = self._MODE_NOTE_FRACTION
         self._fraction = fraction
         self._beats = None
@@ -199,31 +169,21 @@ class Duration:
             return Fraction(duration_str)
         
         # Handle named durations
-        duration_map = {
-            'whole': Fraction(1, 1),
-            'half': Fraction(1, 2),
-            'quarter': Fraction(1, 4),
-            'eighth': Fraction(1, 8),
-            'sixteenth': Fraction(1, 16),
-            'thirty-second': Fraction(1, 32),
-            'sixty-fourth': Fraction(1, 64),
-        }
-        
         # Handle dotted notes
         if 'dotted' in duration_str:
             base_duration = duration_str.replace('dotted', '').strip()
-            if base_duration in duration_map:
-                return duration_map[base_duration] * Fraction(3, 2)
+            if base_duration in self._BASE_DURATION_NAMES:
+                return self._BASE_DURATION_NAMES[base_duration] * Fraction(3, 2)
         
         # Handle triplets
         if 'triplet' in duration_str:
             base_duration = duration_str.replace('triplet', '').strip()
-            if base_duration in duration_map:
-                return duration_map[base_duration] * Fraction(2, 3)
+            if base_duration in self._BASE_DURATION_NAMES:
+                return self._BASE_DURATION_NAMES[base_duration] * Fraction(2, 3)
         
         # Handle standard durations
-        if duration_str in duration_map:
-            return duration_map[duration_str]
+        if duration_str in self._BASE_DURATION_NAMES:
+            return self._BASE_DURATION_NAMES[duration_str]
         
         raise ValueError(f"Cannot parse duration string: {duration_str}")
     
@@ -369,9 +329,8 @@ class Duration:
             return f"{self._seconds} seconds"
 
         # Try to match common note values
-        for note_value in NoteValue:
-            if note_value.value == self._fraction:
-                return str(note_value)
+        if self._fraction in self._COMMON_FRACTION_NAMES:
+            return self._COMMON_FRACTION_NAMES[self._fraction]
         
         # Fallback to fraction representation
         return f"{self._fraction} note"
@@ -401,6 +360,49 @@ class Duration:
         if self._mode == self._MODE_BEATS:
             return self._beats
         return self._seconds
+
+
+TimelineLike: TypeAlias = Duration | int | float | Fraction
+
+
+def context_beat_unit(
+    time_signature: tuple[int, int] | None,
+    *,
+    default: int = 4,
+) -> int:
+    """Resolve denominator beat unit from an optional time signature."""
+    if time_signature is None:
+        return default
+    if len(time_signature) != 2:
+        raise ValueError("time_signature must be (numerator, denominator)")
+    _numerator, denominator = time_signature
+    if denominator <= 0:
+        raise ValueError(f"time signature denominator must be > 0, got {denominator}")
+    return denominator
+
+
+def coerce_timeline_duration(
+    value: TimelineLike,
+    *,
+    field_name: str,
+    beat_unit: int = 4,
+) -> Duration:
+    """Coerce scheduling-boundary values into beat/time Duration modes."""
+    if beat_unit <= 0:
+        raise ValueError(f"beat_unit must be > 0, got {beat_unit}")
+
+    if isinstance(value, Duration):
+        if value.mode == "note_fraction":
+            return Duration.from_beats(value.as_beats(beat_unit=beat_unit), None)
+        return value
+
+    if isinstance(value, (int, float, Fraction)) and not isinstance(value, bool):
+        return Duration.from_beats(value, None)
+
+    raise TypeError(
+        f"{field_name} must be Duration, int, float, or Fraction; "
+        f"got {type(value).__name__}"
+    )
 
 
 class TimeSignature:
@@ -671,27 +673,6 @@ class Beat:
         """Detailed string representation."""
         return f"Beat({self.measure}, {self.beat}, {self.time_signature})"
 
-
-# Convenience functions for common durations
-def whole_note() -> Duration:
-    """Create a whole note duration."""
-    return Duration(NoteValue.WHOLE)
-
-def half_note() -> Duration:
-    """Create a half note duration."""
-    return Duration(NoteValue.HALF)
-
-def quarter_note() -> Duration:
-    """Create a quarter note duration."""
-    return Duration(NoteValue.QUARTER)
-
-def eighth_note() -> Duration:
-    """Create an eighth note duration."""
-    return Duration(NoteValue.EIGHTH)
-
-def sixteenth_note() -> Duration:
-    """Create a sixteenth note duration."""
-    return Duration(NoteValue.SIXTEENTH)
 
 def dotted(duration: Duration) -> Duration:
     """Create a dotted version of a duration (1.5x length)."""
