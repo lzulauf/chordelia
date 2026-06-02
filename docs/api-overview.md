@@ -15,6 +15,7 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `SequenceEntry`: One payload plus duration/offset timing metadata.
 - `Rest`: Explicit silent payload marker for sequence timelines.
 - `Score`: Canonical wrapper around a source and ordered normalized events; includes `score.duration` for normalized timeline span.
+- `SheetMusic`: Canonical sheet wrapper for score-backed SVG output and notebook MIME display.
 - `MidiPlayback`: Live MIDI output transport for chord, note, and score playback.
 - `MidiFile`: MIDI wrapper for score conversion, file IO, and interface playback.
 - `Duration`: Fractional note duration utilities.
@@ -101,10 +102,9 @@ context = ScoreEventContext(
 - Use `Score.from_sequenceable(...)` to normalize composition data.
 - Use `MidiFile(score)` when you want file export and wrapper methods.
 - Use `MidiFile.to_file(path)` to write a `.mid` file.
-- Score-backed `MidiFile.to_playback_notes(...)` honors retrigger policy (`retrigger_all` default, `delta` optional override).
-- Use `MidiFile.play_to_interface(...)` to send score-backed playback to a MIDI output.
+- Use `score_to_playback_notes(score, ...)` for score-backed audio-note conversion with retrigger policy (`retrigger_all` default, `delta` optional override).
 - Use `MidiPlayback` directly for repeated live transport sessions and `play_score(...)`.
-- `MidiPlayback.play_score(...)` and `MidiFile.play_to_interface(...)` accept optional `gate_width`, `gate_offset`, and `retrigger_policy` overrides.
+- `MidiPlayback.play_score(...)` accepts optional `gate_width`, `gate_offset`, and `retrigger_policy` overrides.
 - Install optional dependencies with `pip install chordelia[midi]`.
 
 Example overrides:
@@ -120,6 +120,40 @@ score = score.with_(gate_width=1.0, retrigger_policy="delta")
 # Or override at playback call site only.
 with MidiPlayback() as playback:
 	playback.play_score(score, gate_width=1.0, retrigger_policy="delta")
+```
+
+## Sheet Music Workflow
+
+- Use `SheetMusic(source, scale=None)` where `source` is `Score` or any `Sequenceable` input accepted by `Score.from_sequenceable(...)`.
+- Use `SheetMusic.to_file(path, format="svg")` to write deterministic SVG output.
+- Use `SheetMusic.score_to_file(score, path, format="svg")` for direct score-based export.
+- Use notebook display via `_repr_mimebundle_` (returns `image/svg+xml` plus plain-text fallback).
+- v1 boundary: write-only output; no parse/load APIs are exposed.
+
+Example:
+
+```python
+from chordelia import Note, Sequence, SheetMusic
+
+phrase = Sequence(((Note("C4"), 1), (Note("D4"), 1), (Note("E4"), 2)))
+sheet = SheetMusic(phrase, scale="C")
+sheet.to_file("phrase.svg")
+```
+
+- `SheetMusic` is part of the core package (`pip install chordelia`), with no dependency on MIDI extras.
+
+### Optional LilyPond Backend
+
+- Use `chordelia.sheetmusic_backends.configure_sheet_music_lilypond_backend(executable_path, crop=True)` to route `SheetMusic` SVG output through LilyPond.
+- This backend includes score-to-LilyPond conversion and subprocess rendering; calling code only provides the executable path.
+- With `crop=True` (default), LilyPond's cropped SVG output is preferred over full-page SVG.
+
+Example:
+
+```python
+from chordelia.sheetmusic_backends import configure_sheet_music_lilypond_backend
+
+configure_sheet_music_lilypond_backend("C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe")
 ```
 
 ## Real-World Applications

@@ -88,7 +88,8 @@ Expected docs delta classification: both README updates and docs updates.
 - [x] Phase 0: Score contracts finalized
 - [x] Phase 1: Score core model implemented
 - [x] Phase 2: Sequenceable normalization implemented
-- [ ] Phase 3: MidiFile and SheetMusic adapter seams implemented
+- [x] Phase 3A: MidiFile score adapter seam implemented
+- [x] Phase 3B: SheetMusic score adapter seam implemented
 - [ ] Phase 4: Parity and performance evaluation completed
 - [ ] Phase 5: Documentation and migration notes completed
 - [ ] Shared Score contract adopted as canonical
@@ -109,6 +110,7 @@ Expected docs delta classification: both README updates and docs updates.
 ### Phase 3: Wrapper integration
 1. Connect `MidiFile` score write path.
 2. Connect `SheetMusic` score write path.
+3. Current state: `MidiFile` and `SheetMusic` score-backed integrations are complete.
 
 ### Phase 4: Comparative validation
 1. Compare direct conversions versus score-first conversions.

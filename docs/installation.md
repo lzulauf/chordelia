@@ -42,7 +42,7 @@ uv sync --group dev --group all
 
 | Installation | Features Available |
 |--------------|-------------------|
-| `chordelia` | Core music theory: Notes, Scales, Chords, Intervals, Rhythm |
+| `chordelia` | Core music theory + score-backed SVG sheet rendering (`SheetMusic`) |
 | `chordelia[audio]` | Audio playback with multiple waveforms |
 | `chordelia[midi]` | MIDI file loading and conversion |
 | `chordelia[all]` | Playback and MIDI support |

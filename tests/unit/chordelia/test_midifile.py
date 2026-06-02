@@ -9,6 +9,8 @@ mido = pytest.importorskip("mido")
 
 from chordelia.midifile import MidiFile
 from chordelia.notes import Note
+from chordelia.playback_notes import midi_tracks_to_playback_notes, score_to_playback_notes
+from chordelia.rhythm import Duration
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
 
 
@@ -65,6 +67,34 @@ class TestMidiFileWritePath:
         assert ("note_on", 60, 64, 0, 0) in note_messages
         assert ("note_off", 60, 0, 0, 480) in note_messages
 
+    def test_to_file_writes_loaded_midi_source_when_score_is_none(self, tmp_path: Path):
+        source_path = tmp_path / "source.mid"
+        output_path = tmp_path / "copied.mid"
+
+        midi = mido.MidiFile(ticks_per_beat=480)
+        track = mido.MidiTrack()
+        midi.tracks.append(track)
+        track.append(mido.Message("note_on", note=60, velocity=90, channel=0, time=0))
+        track.append(mido.Message("note_off", note=60, velocity=0, channel=0, time=480))
+        track.append(mido.MetaMessage("end_of_track", time=0))
+        midi.save(str(source_path))
+
+        loaded = MidiFile.load_from_file(source_path)
+        loaded.score = None
+
+        written_path = loaded.to_file(output_path)
+
+        assert written_path == output_path
+        assert output_path.exists()
+
+    def test_to_file_raises_when_wrapper_has_no_score_or_midi_data(self, tmp_path: Path):
+        midi = MidiFile.__new__(MidiFile)
+        midi.score = None
+        midi.midi_file = None
+
+        with pytest.raises(ValueError, match="no score or source MIDI data"):
+            midi.to_file(tmp_path / "missing.mid")
+
     def test_score_to_file_writes_polyphonic_channel_events(self, tmp_path: Path):
         output_path = tmp_path / "polyphonic.mid"
 
@@ -96,8 +126,8 @@ class TestMidiFileWritePath:
         assert ("note_off", 64, 0, 2, 1920) in note_messages
 
 
-class TestMidiFileReadCompatibility:
-    """Legacy file-load compatibility while score-backed APIs roll out."""
+class TestMidiFileReadPath:
+    """MIDI file read behavior through the score-backed MidiFile wrapper."""
 
     def test_load_from_file_keeps_playback_conversion_working(self, tmp_path: Path):
         source_path = tmp_path / "source.mid"
@@ -111,12 +141,92 @@ class TestMidiFileReadCompatibility:
         midi.save(str(source_path))
 
         loaded = MidiFile.load_from_file(source_path)
-        playback_notes = loaded.to_playback_notes()
+        assert loaded.midi_file is not None
+        playback_notes = midi_tracks_to_playback_notes(
+            loaded.midi_file,
+            tempo_bpm=loaded.tempo.bpm,
+        )
 
         assert loaded.filepath == source_path
         assert loaded.score is not None
         assert len(playback_notes) == 1
         assert str(playback_notes[0].note) == "C4"
+
+    def test_load_from_file_analyzes_track_metadata_and_duration(self, tmp_path: Path):
+        source_path = tmp_path / "analysis.mid"
+
+        midi = mido.MidiFile(ticks_per_beat=480)
+        track = mido.MidiTrack()
+        midi.tracks.append(track)
+        track.append(mido.MetaMessage("track_name", name="Lead", time=0))
+        track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(90), time=0))
+        track.append(mido.MetaMessage("time_signature", numerator=3, denominator=4, time=0))
+        track.append(mido.Message("program_change", program=12, channel=2, time=0))
+        track.append(mido.Message("note_on", note=64, velocity=90, channel=2, time=0))
+        track.append(mido.Message("note_off", note=64, velocity=0, channel=2, time=480))
+        track.append(mido.MetaMessage("end_of_track", time=0))
+        midi.save(str(source_path))
+
+        loaded = MidiFile.load_from_file(source_path)
+
+        assert loaded.tempo.bpm == pytest.approx(90.0)
+        assert loaded.time_signature.beats_per_measure == 3
+        assert loaded.time_signature.beat_unit == 4
+        assert loaded.duration_seconds > 0
+        assert len(loaded.tracks_info) == 1
+        assert loaded.tracks_info[0].name == "Lead"
+        assert loaded.tracks_info[0].channel == 2
+        assert loaded.tracks_info[0].instrument == 12
+        assert loaded.tracks_info[0].note_count == 1
+
+    def test_score_from_file_loads_metadata_and_ignores_orphan_note_off(self, tmp_path: Path):
+        source_path = tmp_path / "metadata.mid"
+
+        midi = mido.MidiFile(ticks_per_beat=960)
+        track = mido.MidiTrack()
+        midi.tracks.append(track)
+        track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(90), time=0))
+        track.append(mido.MetaMessage("time_signature", numerator=3, denominator=4, time=0))
+        track.append(mido.MetaMessage("key_signature", key="G", time=0))
+        # Orphan note_off should be ignored.
+        track.append(mido.Message("note_off", note=60, velocity=0, channel=0, time=120))
+        track.append(mido.Message("note_on", note=62, velocity=70, channel=1, time=0))
+        track.append(mido.Message("note_off", note=62, velocity=0, channel=1, time=480))
+        track.append(mido.MetaMessage("end_of_track", time=0))
+        midi.save(str(source_path))
+
+        score = MidiFile.score_from_file(source_path)
+
+        assert score.metadata.tempo == 90
+        assert score.metadata.time_signature == (3, 4)
+        assert score.metadata.key_signature == "G"
+        assert score.metadata.ppq == 960
+        assert len(score.events) == 1
+        assert score.events[0].pitches == (62,)
+        assert score.events[0].channel == 1
+
+    def test_score_from_file_raises_for_missing_path(self, tmp_path: Path):
+        with pytest.raises(FileNotFoundError, match="MIDI file not found"):
+            MidiFile.score_from_file(tmp_path / "does-not-exist.mid")
+
+    def test_score_from_file_raises_for_invalid_midi_data(self, tmp_path: Path):
+        bad_path = tmp_path / "invalid.mid"
+        bad_path.write_text("not a midi file", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="Invalid MIDI file"):
+            MidiFile.score_from_file(bad_path)
+
+    def test_constructor_raises_for_missing_file_path(self, tmp_path: Path):
+        with pytest.raises(FileNotFoundError, match="MIDI file not found"):
+            MidiFile(tmp_path / "absent.mid")
+
+    def test_constructor_raises_for_invalid_midi_file(self, tmp_path: Path):
+        bad_path = tmp_path / "broken.mid"
+        bad_path.write_text("broken midi", encoding="utf-8")
+
+        with patch("chordelia.midifile.mido.MidiFile", side_effect=RuntimeError("bad parse")):
+            with pytest.raises(ValueError, match="Invalid MIDI file"):
+                MidiFile(bad_path)
 
 
 class TestMidiFileScoreBackedAudioConversion:
@@ -131,9 +241,7 @@ class TestMidiFileScoreBackedAudioConversion:
                 ScoreEvent(beat=1, duration=1, pitches=(60,), channel=0, velocity=70),
             ),
         )
-        midi = MidiFile(score)
-
-        playback_notes = midi.to_playback_notes()
+        playback_notes = score_to_playback_notes(score)
 
         assert len(playback_notes) == 2
         assert playback_notes[0].start_time == pytest.approx(0.0)
@@ -150,9 +258,7 @@ class TestMidiFileScoreBackedAudioConversion:
                 ScoreEvent(beat=1, duration=1, pitches=(60,), channel=0),
             ),
         )
-        midi = MidiFile(score)
-
-        playback_notes = midi.to_playback_notes(retrigger_policy="delta")
+        playback_notes = score_to_playback_notes(score, retrigger_policy="delta")
 
         assert len(playback_notes) == 1
         assert playback_notes[0].start_time == pytest.approx(0.0)
@@ -167,45 +273,64 @@ class TestMidiFileScoreBackedAudioConversion:
                 ScoreEvent(beat=1, duration=1, pitches=(60,), channel=1),
             ),
         )
-        midi = MidiFile(score)
-
-        playback_notes = midi.to_playback_notes()
+        playback_notes = score_to_playback_notes(score)
 
         assert len(playback_notes) == 2
 
     def test_score_backed_playback_notes_reject_bad_policy(self):
-        midi = MidiFile(Note("C4"))
+        score = Score.from_sequenceable(Note("C4"))
 
         with pytest.raises(ValueError, match="retrigger_policy"):
-            midi.to_playback_notes(retrigger_policy="bad")
+            score_to_playback_notes(score, retrigger_policy="bad")
 
 
-class TestMidiFileInterfacePlayback:
-    """Playback-to-interface behavior through the canonical MidiPlayback transport."""
+class TestMidiFileUtilities:
+    def test_score_to_file_rejects_non_score_inputs(self, tmp_path: Path):
+        with pytest.raises(TypeError, match="score must be a Score instance"):
+            MidiFile.score_to_file("not-a-score", tmp_path / "x.mid")
 
-    def test_play_to_interface_delegates_to_midiplayback(self):
+    def test_score_backed_wrapper_with_empty_events_has_no_tracks(self):
+        score = Score(source="manual", metadata=ScoreMetadata(), events=())
+        midi = MidiFile(score)
+
+        assert midi.tracks_info == []
+        assert midi.duration_seconds == 0.0
+
+    def test_duration_helpers_support_seconds_mode(self):
+        midi = MidiFile(Note("C4"))
+        seconds_duration = Duration.from_seconds(0.5)
+
+        assert midi._duration_to_ticks(seconds_duration, tempo_bpm=120, ppq=480) == 480
+        assert midi._duration_to_seconds(seconds_duration, tempo_bpm=120) == pytest.approx(0.5)
+
+    def test_mido_from_score_includes_key_signature_meta_message(self):
+        score = Score(
+            source="manual",
+            metadata=ScoreMetadata(key_signature="G"),
+            events=(ScoreEvent(beat=0, duration=1, pitches=(60,), channel=0),),
+        )
+        midi = MidiFile(score)
+
+        rendered = midi._mido_from_score(score)
+
+        meta_types = [message.type for message in rendered.tracks[0] if message.is_meta]
+        assert "key_signature" in meta_types
+
+    def test_analyze_file_requires_loaded_midi(self):
+        midi = MidiFile.__new__(MidiFile)
+        midi.midi_file = None
+
+        with pytest.raises(ValueError, match="No MIDI file is loaded"):
+            midi._analyze_file()
+
+    def test_print_info_emits_summary_lines(self, capsys):
         midi = MidiFile(Note("C4"))
 
-        with patch("chordelia.midi_playback.MidiPlayback") as mock_transport:
-            transport_instance = mock_transport.return_value.__enter__.return_value
+        midi.print_info()
 
-            midi.play_to_interface(
-                output_name="Test MIDI Port",
-                blocking=False,
-                velocity_scale=1.2,
-                channel_override=3,
-                gate_width=0.8,
-                gate_offset=0.1,
-                retrigger_policy="retrigger_all",
-            )
+        captured = capsys.readouterr().out
+        assert "MIDI File:" in captured
+        assert "Tempo:" in captured
+        assert "Tracks:" in captured
 
-            mock_transport.assert_called_once_with(output_name="Test MIDI Port")
-            transport_instance.play_score.assert_called_once()
-            args, kwargs = transport_instance.play_score.call_args
-            assert args[0] is midi.score
-            assert kwargs["blocking"] is False
-            assert kwargs["velocity_scale"] == 1.2
-            assert kwargs["channel_override"] == 3
-            assert kwargs["gate_width"] == 0.8
-            assert kwargs["gate_offset"] == 0.1
-            assert kwargs["retrigger_policy"] == "retrigger_all"
+

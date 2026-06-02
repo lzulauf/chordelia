@@ -105,6 +105,34 @@ arrangement = Sequence([motif] * 2)
 print(len(arrangement.entries))  # 2
 ```
 
+## Sheet Music Rendering
+
+```python
+from chordelia import Note, Sequence, SheetMusic
+
+phrase = Sequence(((Note("C4"), 1), (Note("D4"), 1), (Note("E4"), 2)))
+
+# The optional scale context drives key-signature and accidental rendering.
+sheet = SheetMusic(phrase, scale="C")
+sheet.to_file("phrase.svg")
+
+# In notebooks, evaluate `sheet` to render inline SVG.
+```
+
+`SheetMusic` is write-only in v1: use `to_file(...)` and notebook display, but no parse/load API.
+
+To route all `SheetMusic` SVG rendering through LilyPond, configure the backend once:
+
+```python
+from chordelia.sheetmusic_backends import configure_sheet_music_lilypond_backend
+
+configure_sheet_music_lilypond_backend("C:/Users/you/Desktop/lilypond-2.24.4/bin/lilypond.exe")
+
+# Crop to the rendered music bounds (default behavior).
+# To keep full-page output instead, pass crop=False.
+# configure_sheet_music_lilypond_backend(".../lilypond.exe", crop=False)
+```
+
 ## MIDI Interface Playback (Optional)
 
 ```python
@@ -121,10 +149,7 @@ score = Score.from_sequenceable(progression, tempo=104)
 midi = MidiFile(score)
 midi.to_file("progression.mid")
 
-# Play score through a MIDI output interface via MidiFile.
-# midi.play_to_interface(output_name=None, blocking=True)
-
-# Or use MidiPlayback directly for repeated interactive use.
+# Play score through a MIDI output interface.
 # with MidiPlayback(output_name=None) as playback:
 #     playback.play_score(score, blocking=True)
 
@@ -154,3 +179,4 @@ pip install chordelia[midi]
 - [Scales and Chords](guides/scales-and-chords.md)
 - [Rhythm and Timing](guides/rhythm-and-timing.md)
 - [Immutability](immutability.md)
+- [API Overview](api-overview.md)

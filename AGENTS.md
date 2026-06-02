@@ -84,8 +84,18 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 	- Applying immutable-specific copy-constructor naming constraints
 	- Enforcing tuple-backed collection returns and immutable conventions
 
+### commit-message-writing
+
+- Path: skills/commit-message-writing.md
+- Use when:
+	- Generating commit messages from current workspace changes
+	- Applying required commit-message templates (summary, blank line, detailed bullets)
+	- Choosing conventional commit types and scopes from mixed file deltas
+	- Summarizing behavior, API, test, and docs changes accurately
+
 ### Skill Selection Rule
 
+- If a user asks to generate, rewrite, or refine a commit message, ALWAYS load commit-message-writing first.
 - If a task is primarily about test coverage or test refactoring, load test-writing.
 - If a task changes behavior, parsing, validation, or public contracts, load test-writing even if the user did not explicitly request tests.
 - If a task is primarily about running tests, triaging failures, or checking coverage, load test-running.
@@ -96,6 +106,7 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 - If a task is primarily about creating or reviewing skill files, load skill-writing.
 - If a task is primarily about naming strategy, load function-naming.
 - If a task is primarily about immutable model design, load immutable-types.
+- If a task is primarily about generating or refining commit messages, load commit-message-writing.
 - If both apply, load both skills: function-naming for global naming and immutable-types for immutable-specific constraints.
 - If plan work includes naming or immutable model constraints, load plan-use with the relevant companion skill(s).
 - If plan work includes user-facing API or behavior changes, load plan-use with readme-writing.
@@ -115,4 +126,5 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 - Keep decision-document conventions in skills/decision-writing.md.
 - Keep global naming conventions in skills/function-naming.md.
 - Keep immutable-specific modeling constraints in skills/immutable-types.md.
+- Keep commit message formatting and decision rules in skills/commit-message-writing.md.
 - Keep AGENTS.md focused on skill discovery and when to load each skill.

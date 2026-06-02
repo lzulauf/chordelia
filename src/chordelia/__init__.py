@@ -20,6 +20,7 @@ from chordelia.scales import Scale, ScaleType
 from chordelia.chords import Chord, ChordQuality, ChordExtension
 from chordelia.sequences import Sequence, SequenceEntry, SequenceEntryLike, Rest
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
+from chordelia.sheet_music import SheetMusic
 from chordelia.sequenceable import NotesLike, Sequenceable
 from chordelia.rhythm import (
     Duration, TimeSignature, Tempo, Beat, NoteValue,
@@ -30,6 +31,7 @@ from chordelia.rhythm import (
 # Audio playback module - optional import (requires sounddevice and numpy)
 try:
     from chordelia.audio_playback import Playback, PlaybackNote, Waveform, play_scale, play_chord, play_melody, create_chord_notes
+    from chordelia.playback_notes import midi_tracks_to_playback_notes, score_to_playback_notes
     _PLAYBACK_AVAILABLE = True
 except ImportError:
     _PLAYBACK_AVAILABLE = False
@@ -38,7 +40,7 @@ except ImportError:
 try:
     from chordelia.midi_playback import MidiPlayback, get_midi_ports, is_midi_available
     from chordelia.midi_playback import play_chord as midi_play_chord, play_melody as midi_play_melody
-    from chordelia.midifile import MidiFile, MidiTrackInfo, load_midi_file, play_midi_file
+    from chordelia.midifile import MidiFile, MidiTrackInfo
     _MIDI_AVAILABLE = True
 except ImportError:
     _MIDI_AVAILABLE = False
@@ -68,6 +70,7 @@ __all__ = [
     "ScoreEventContext",
     "ScoreMetadata",
     "score_from_sequenceable",
+    "SheetMusic",
     "Sequenceable",
     "NotesLike",
     "Duration",
@@ -93,6 +96,8 @@ if _PLAYBACK_AVAILABLE:
         "Playback",
         "PlaybackNote", 
         "Waveform",
+        "midi_tracks_to_playback_notes",
+        "score_to_playback_notes",
         "play_scale",
         "play_chord",
         "play_melody",
@@ -107,10 +112,8 @@ if _MIDI_AVAILABLE:
         "MidiTrackInfo",
         "get_midi_ports", 
         "is_midi_available",
-        "load_midi_file", 
         "midi_play_chord",
         "midi_play_melody",
-        "play_midi_file",
     ])
 
 

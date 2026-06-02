@@ -2,7 +2,7 @@
 
 This script demonstrates:
 1. Loading/analyzing a MIDI file with MidiFile
-2. Playing a file to a MIDI output interface with MidiFile.play_to_interface
+2. Playing a file-derived score to a MIDI output interface with MidiPlayback
 3. Playing an in-memory score to a MIDI output interface with MidiPlayback
 
 Dependencies:
@@ -111,7 +111,11 @@ def analyze_midi_file(filepath: Path) -> Optional[MidiFile]:
 def play_file_to_interface(filepath: Path, output_name: Optional[str]) -> None:
     """Play an on-disk MIDI file to a MIDI output interface."""
     midi = MidiFile.load_from_file(filepath)
-    midi.play_to_interface(output_name=output_name, blocking=True)
+    if midi.score is None:
+        raise ValueError("MidiFile did not produce a score")
+
+    with MidiPlayback(output_name=output_name) as playback:
+        playback.play_score(midi.score, blocking=True)
 
 
 def play_generated_score_to_interface(output_name: Optional[str]) -> None:

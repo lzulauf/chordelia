@@ -1,45 +1,14 @@
-"""
-MIDI File Module for Chordelia
+"""MIDI file I/O and score normalization utilities for Chordelia."""
 
-This module provides functionality to read MIDI files and convert them
-to sequences suitable for playback using Chordelia's audio system.
-
-Features:
-- Read MIDI files using the mido library
-- Convert MIDI notes to PlaybackNote objects
-- Extract tempo and time signature information
-- Handle multiple     # Play using Chordelia's playback system
-    print(f"🎵 Playing {midi.filepath.name} ({len(notes)} notes)")
-    with Playback(midi.tempo, default_waveform=waveform) as playback:
-        playback.play_sequence(notes, blocking=blocking)ks and channels
-- Support for velocity mapping
-
-Example:
-    >>> from chordelia.midifile import MidiFile
-    >>> from chordelia.audio_playback import AudioPlayer
-    >>> 
-    >>> # Load a MIDI file
-    >>> midi = MidiFile("song.mid")
-    >>> 
-    >>> # Convert to playback sequence
-    >>> notes = midi.to_playback_notes()
-    >>> 
-    >>> # Play using Chordelia's audio playback system
-    >>> with AudioPlayer() as player:
-    ...     player.play_sequence(notes, blocking=True)
-"""
-
-from typing import Any, List, Optional, Dict, Union
+from typing import Any, List, Optional, Union
 from pathlib import Path
 import mido
 from dataclasses import dataclass
 from fractions import Fraction
 
 # Import Chordelia components
-from chordelia.notes import Note, NoteName, Accidental
 from chordelia.rhythm import Tempo, Duration, TimeSignature
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
-from chordelia.audio_playback import PlaybackNote, Waveform
 
 
 @dataclass
@@ -53,11 +22,10 @@ class MidiTrackInfo:
 
 class MidiFile:
     """
-    A class to read and process MIDI files for Chordelia playback.
-    
-    This class handles the conversion of MIDI data to Chordelia's
-    musical representation, making it easy to play MIDI files
-    using the audio playback system.
+    A class to read MIDI files and normalize them to Chordelia Score objects.
+
+    This class is responsible for MIDI file parsing/writing and score-backed
+    metadata inspection.
     """
     
     def __init__(
@@ -210,36 +178,6 @@ class MidiFile:
             return output_path
 
         raise ValueError("MidiFile has no score or source MIDI data to write")
-
-    def play_to_interface(
-        self,
-        output_name: Optional[str] = None,
-        *,
-        blocking: bool = True,
-        velocity_scale: float = 1.0,
-        channel_override: Optional[int] = None,
-        gate_width: Optional[float] = None,
-        gate_offset: Optional[float] = None,
-        retrigger_policy: Optional[str] = None,
-    ) -> None:
-        """Play this wrapper's normalized score to a MIDI output interface."""
-        from chordelia.midi_playback import MidiPlayback
-
-        if self.score is None:
-            if self.filepath is None:
-                raise ValueError("MidiFile has no score or file source to play")
-            self.score = self.score_from_file(self.filepath)
-
-        with MidiPlayback(output_name=output_name) as playback:
-            playback.play_score(
-                self.score,
-                blocking=blocking,
-                velocity_scale=velocity_scale,
-                channel_override=channel_override,
-                gate_width=gate_width,
-                gate_offset=gate_offset,
-                retrigger_policy=retrigger_policy,
-            )
 
     def _initialize_from_file(self, filepath: Path) -> None:
         """Initialize wrapper state from an on-disk MIDI file."""
@@ -457,261 +395,6 @@ class MidiFile:
             for event in self.score.events
         )
     
-    def _midi_note_to_note(self, midi_note: int) -> Note:
-        """
-        Convert a MIDI note number to a Chordelia Note object.
-        
-        Args:
-            midi_note: MIDI note number (0-127)
-            
-        Returns:
-            Note object with proper name, accidental, and octave
-        """
-        # MIDI note 60 = C4 (middle C)
-        # Each octave spans 12 semitones
-        octave = (midi_note // 12) - 1  # MIDI octave offset
-        semitone = midi_note % 12
-        
-        # Map semitones to note names (using sharps for black keys)
-        note_mapping = [
-            (NoteName.C, Accidental.NATURAL),      # 0
-            (NoteName.C, Accidental.SHARP),        # 1
-            (NoteName.D, Accidental.NATURAL),      # 2
-            (NoteName.D, Accidental.SHARP),        # 3
-            (NoteName.E, Accidental.NATURAL),      # 4
-            (NoteName.F, Accidental.NATURAL),      # 5
-            (NoteName.F, Accidental.SHARP),        # 6
-            (NoteName.G, Accidental.NATURAL),      # 7
-            (NoteName.G, Accidental.SHARP),        # 8
-            (NoteName.A, Accidental.NATURAL),      # 9
-            (NoteName.A, Accidental.SHARP),        # 10
-            (NoteName.B, Accidental.NATURAL),      # 11
-        ]
-        
-        note_name, accidental = note_mapping[semitone]
-        return Note(note_name, accidental, octave)
-    
-    def to_playback_notes(self, 
-                         track_indices: Optional[List[int]] = None,
-                         waveform: Waveform = Waveform.SINE,
-                         velocity_scale: float = 1.0,
-                         retrigger_policy: Optional[str] = None) -> List[PlaybackNote]:
-        """
-        Convert MIDI file to a list of PlaybackNote objects.
-        
-        Args:
-            track_indices: List of track indices to include (None = all tracks)
-            waveform: Waveform to use for all notes
-            velocity_scale: Scale factor for note velocities (0.0-1.0)
-            retrigger_policy: Optional override for score-backed playback note scheduling
-                ("delta" or "retrigger_all").
-            
-        Returns:
-            List of PlaybackNote objects ready for playback
-        """
-        if self.midi_file is None:
-            if self.score is None:
-                raise ValueError("MidiFile has no MIDI data or score source to convert")
-            return self._score_to_playback_notes(
-                velocity_scale=velocity_scale,
-                retrigger_policy=retrigger_policy,
-            )
-
-        playback_notes = []
-        
-        # Select tracks to process
-        if track_indices is None:
-            tracks_to_process = enumerate(self.midi_file.tracks)
-        else:
-            tracks_to_process = [(i, self.midi_file.tracks[i]) 
-                               for i in track_indices 
-                               if i < len(self.midi_file.tracks)]
-        
-        for track_idx, track in tracks_to_process:
-            # Track active notes (note_on without note_off)
-            active_notes: Dict[int, Dict] = {}
-            current_time = 0.0  # Time in seconds
-            
-            for msg in track:
-                # Update current time
-                current_time += mido.tick2second(msg.time, 
-                                               self.midi_file.ticks_per_beat, 
-                                               mido.bpm2tempo(self._tempo.bpm))
-                
-                if msg.type == 'note_on' and msg.velocity > 0:
-                    # Start a new note
-                    note = self._midi_note_to_note(msg.note)
-                    velocity = (msg.velocity / 127.0) * velocity_scale
-                    
-                    active_notes[msg.note] = {
-                        'note': note,
-                        'start_time': current_time,
-                        'velocity': velocity,
-                        'channel': msg.channel
-                    }
-                
-                elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
-                    # End a note
-                    if msg.note in active_notes:
-                        note_info = active_notes[msg.note]
-                        duration = current_time - note_info['start_time']
-                        
-                        # Create PlaybackNote
-                        playback_note = PlaybackNote(
-                            start_time=note_info['start_time'],
-                            note=note_info['note'],
-                            duration=duration,
-                            velocity=note_info['velocity']
-                        )
-                        playback_notes.append(playback_note)
-                        
-                        # Remove from active notes
-                        del active_notes[msg.note]
-            
-            # Handle any notes that didn't have explicit note_off events
-            for note_info in active_notes.values():
-                duration = current_time - note_info['start_time']
-                if duration > 0:
-                    playback_note = PlaybackNote(
-                        start_time=note_info['start_time'],
-                        note=note_info['note'],
-                        duration=duration,
-                        velocity=note_info['velocity']
-                    )
-                    playback_notes.append(playback_note)
-        
-        # Sort notes by start time
-        playback_notes.sort(key=lambda n: n.start_time)
-        return playback_notes
-
-    @staticmethod
-    def _validate_retrigger_policy(policy: str) -> None:
-        """Validate score-backed audio retrigger policy values."""
-        if policy not in {"delta", "retrigger_all"}:
-            raise ValueError(
-                "retrigger_policy must be 'delta' or 'retrigger_all', "
-                f"got {policy!r}"
-            )
-
-    def _score_to_playback_notes(
-        self,
-        *,
-        velocity_scale: float,
-        retrigger_policy: Optional[str],
-    ) -> List[PlaybackNote]:
-        """Convert score-backed state into playback notes without a source MIDI file."""
-        assert self.score is not None
-
-        playback_notes: list[PlaybackNote] = []
-        tempo_bpm = self.score.metadata.tempo
-        effective_policy = (
-            self.score.metadata.retrigger_policy
-            if retrigger_policy is None
-            else retrigger_policy
-        )
-        self._validate_retrigger_policy(effective_policy)
-
-        if effective_policy == "retrigger_all":
-            for event in self.score.events:
-                start_time = self._duration_to_seconds(event.beat, tempo_bpm=tempo_bpm)
-                duration = self._duration_to_seconds(event.duration, tempo_bpm=tempo_bpm)
-                velocity = (event.velocity / 127.0) * velocity_scale
-
-                for pitch in event.pitches:
-                    note = self._midi_note_to_note(pitch)
-                    playback_notes.append(
-                        PlaybackNote(
-                            start_time=start_time,
-                            note=note,
-                            duration=duration,
-                            velocity=velocity,
-                        )
-                    )
-
-            playback_notes.sort(key=lambda note: note.start_time)
-            return playback_notes
-
-        # Delta mode: merge repeated overlapping/contiguous note windows.
-        active_notes: dict[tuple[int, int], dict[str, float | Note]] = {}
-
-        def _flush_finished_notes(before_time: float) -> None:
-            for key, note_info in tuple(active_notes.items()):
-                end_time = note_info["end_time"]
-                if end_time < before_time:
-                    start_time = note_info["start_time"]
-                    duration = end_time - start_time
-                    if duration > 0:
-                        playback_notes.append(
-                            PlaybackNote(
-                                start_time=start_time,
-                                note=note_info["note"],
-                                duration=duration,
-                                velocity=note_info["velocity"],
-                            )
-                        )
-                    del active_notes[key]
-
-        for event in self.score.events:
-            start_time = self._duration_to_seconds(event.beat, tempo_bpm=tempo_bpm)
-            duration = self._duration_to_seconds(event.duration, tempo_bpm=tempo_bpm)
-            end_time = start_time + duration
-            velocity = (event.velocity / 127.0) * velocity_scale
-
-            _flush_finished_notes(start_time)
-
-            for pitch in event.pitches:
-                key = (event.channel, pitch)
-                note_info = active_notes.get(key)
-                if note_info is not None and note_info["end_time"] >= start_time:
-                    if end_time > note_info["end_time"]:
-                        note_info["end_time"] = end_time
-                    continue
-
-                active_notes[key] = {
-                    "note": self._midi_note_to_note(pitch),
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "velocity": velocity,
-                }
-
-        for note_info in active_notes.values():
-            duration = note_info["end_time"] - note_info["start_time"]
-            if duration <= 0:
-                continue
-            playback_notes.append(
-                PlaybackNote(
-                    start_time=note_info["start_time"],
-                    note=note_info["note"],
-                    duration=duration,
-                    velocity=note_info["velocity"],
-                )
-            )
-
-        playback_notes.sort(key=lambda note: note.start_time)
-        return playback_notes
-    
-    def get_track_notes(self, track_index: int, 
-                       waveform: Waveform = Waveform.SINE) -> List[PlaybackNote]:
-        """
-        Get PlaybackNote objects for a specific track.
-        
-        Args:
-            track_index: Index of the track to extract
-            waveform: Waveform to use for the notes
-            
-        Returns:
-            List of PlaybackNote objects for the specified track
-        """
-        if self.midi_file is None:
-            if track_index != 0:
-                raise IndexError("Score-backed MidiFile exposes only a synthetic track 0")
-            return self.to_playback_notes(waveform=waveform)
-
-        if track_index >= len(self.midi_file.tracks):
-            raise IndexError(f"Track index {track_index} out of range")
-            
-        return self.to_playback_notes(track_indices=[track_index], waveform=waveform)
-    
     def print_info(self):
         """Print information about the MIDI file."""
         source_name = self.filepath.name if self.filepath is not None else "<score-source>"
@@ -728,47 +411,3 @@ class MidiFile:
             print(f"    🎺 Instrument: {track.instrument}")
             print(f"    🎵 Notes: {track.note_count}")
             print()
-
-
-def load_midi_file(filepath: Union[str, Path]) -> MidiFile:
-    """
-    Convenience function to load a MIDI file.
-    
-    Args:
-        filepath: Path to the MIDI file
-        
-    Returns:
-        MidiFile object
-    """
-    return MidiFile.load_from_file(filepath)
-
-
-def play_midi_file(filepath: Union[str, Path], 
-                  track_indices: Optional[List[int]] = None,
-                  waveform: Waveform = Waveform.SINE,
-                  blocking: bool = True):
-    """
-    Convenience function to load and play a MIDI file.
-    
-    Args:
-        filepath: Path to the MIDI file
-        track_indices: List of track indices to play (None = all tracks)
-        waveform: Waveform to use for playback
-        blocking: Whether to block until playback is complete
-    """
-    from chordelia.audio_playback import Playback
-    
-    # Load MIDI file
-    midi = MidiFile(filepath)
-    
-    # Convert to playback notes
-    notes = midi.to_playback_notes(track_indices=track_indices, waveform=waveform)
-    
-    if not notes:
-        print("No notes found in MIDI file")
-        return
-    
-    # Play using Chordelia's playback system with specified performance mode
-    print(f"🎵 Playing {midi.filepath.name} ({len(notes)} notes)")
-    with Playback(midi.tempo, default_waveform=waveform) as playback:
-        playback.play_sequence(notes, blocking=blocking)
