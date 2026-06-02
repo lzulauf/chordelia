@@ -325,11 +325,22 @@ class Score:
         """Create a score from explicit simultaneous sequenceable sources."""
         from chordelia.sequences import ParallelSequence
 
-        normalized_sources = tuple(sources)
-        if not normalized_sources:
+        if isinstance(sources, ParallelSequence):
+            parallel = sources
+        else:
+            if isinstance(sources, (str, bytes)):
+                raise TypeError("sources must be an iterable of sequenceable sources")
+            try:
+                normalized_sources = tuple(sources)
+            except TypeError as exc:
+                raise TypeError("sources must be an iterable of sequenceable sources") from exc
+            if not normalized_sources:
+                raise ValueError("sources must contain at least one sequenceable source")
+            parallel = ParallelSequence(normalized_sources)
+
+        if len(parallel) == 0:
             raise ValueError("sources must contain at least one sequenceable source")
 
-        parallel = ParallelSequence(normalized_sources)
         return cls.from_sequenceable(
             parallel,
             tempo=tempo,

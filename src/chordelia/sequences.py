@@ -441,7 +441,13 @@ class ParallelSequence:
         *,
         name: str | None = None,
     ):
-        normalized_children = tuple(ParallelChild.coerce(child) for child in children)
+        normalized_children_list: list[ParallelChild] = []
+        for idx, child in enumerate(children):
+            try:
+                normalized_children_list.append(ParallelChild.coerce(child))
+            except (TypeError, ValueError) as exc:
+                raise type(exc)(f"Invalid parallel child at index {idx}: {exc}") from exc
+        normalized_children = tuple(normalized_children_list)
 
         if name is not None:
             _validate_child_name(name)
@@ -491,10 +497,10 @@ class ParallelSequence:
         events: list[ScoreEvent] = []
         span_end = context.start_offset
 
-        for child in self.children:
+        for idx, child in enumerate(self.children):
             if child.offset.mode != context.start_offset.mode:
                 raise ValueError(
-                    "Parallel child offset mode must match context timing mode "
+                    f"Parallel child at index {idx} offset mode must match context timing mode "
                     f"(got {child.offset.mode!r} and {context.start_offset.mode!r})"
                 )
 
@@ -504,7 +510,7 @@ class ParallelSequence:
 
             if child_render.consumed_duration.mode != context.start_offset.mode:
                 raise ValueError(
-                    "Rendered child consumed_duration mode must match context timing mode "
+                    f"Rendered child at index {idx} consumed_duration mode must match context timing mode "
                     f"(got {child_render.consumed_duration.mode!r} and {context.start_offset.mode!r})"
                 )
 

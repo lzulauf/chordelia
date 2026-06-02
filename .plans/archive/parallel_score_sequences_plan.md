@@ -1,7 +1,7 @@
 Parallel composition and named recomposition plan for chordelia.
 
 ## Status
-Implementing
+Done
 
 ## Goal
 Enable explicit parallel composition with `ParallelSequence` while keeping `Sequence` as the canonical sequential model, and add optional naming/path-based immutable recomposition APIs so targeted edits are possible at any nesting level.
@@ -344,10 +344,10 @@ Expected docs delta classification: both README updates and docs updates.
 
 ## Progress checklist
 - [x] Phase 0: Sequence and ParallelSequence responsibilities locked
-- [ ] Phase 1: Naming/path recomposition contract finalized
-- [ ] Phase 2: ParallelSequence and score integration implemented
-- [ ] Phase 3: Focused + regression tests passing
-- [ ] Phase 4: Documentation updates completed
+- [x] Phase 1: Naming/path recomposition contract finalized
+- [x] Phase 2: ParallelSequence and score integration implemented
+- [x] Phase 3: Focused + regression tests passing
+- [x] Phase 4: Documentation updates completed
 
 ## Phases
 ### 1. Contract lock
@@ -388,6 +388,20 @@ Expected docs delta classification: both README updates and docs updates.
 - Code touchpoints: `src/chordelia/sequences.py`, `src/chordelia/score.py`, `src/chordelia/__init__.py`, `tests/unit/chordelia/test_parallel_sequences.py`.
 - Tests: focused suite passing (`test_parallel_sequences.py`, `test_score.py`, `test_sequenceable.py`).
 - Follow-ups: complete remaining Phase 1/2 edge semantics and broaden regression validation listed in this plan.
+
+### 2026-06-02 - Phase 1/2/3 completion
+- Scope completed: finalized immutable naming/path recomposition APIs, completed `ParallelSequence` integration and `Score.from_parallel_sequences(...)`, and hardened parallel child error semantics with child-index context.
+- Code touchpoints: `src/chordelia/sequences.py`, `src/chordelia/score.py`, `tests/unit/chordelia/test_parallel_sequences.py`.
+- Tests: focused + regression validation passed (`test_parallel_sequences.py`, `test_sequenceable.py`, `test_score.py`, `test_midifile.py`, `test_sheet_music.py`).
+- Docs: deferred to Phase 4.
+- Follow-ups: complete documentation updates for model-choice guidance and examples.
+
+### 2026-06-02 - Phase 4 and closeout
+- Scope completed: published sequential-vs-parallel model guidance, immutable path replacement examples, and explicit future `Channel` boundary notes.
+- Code touchpoints: `README.md`, `docs/api-overview.md`, `docs/guides/sequences-and-score.md`, `docs/quickstart.md`.
+- Tests: no additional runtime tests required for docs-only phase; focused/regression suite passed and final full suite validation passed (`pytest`).
+- Commit/PR: pending final docs+plan-close commit.
+- Follow-ups: none for this plan; archived as completed.
 
 ## Execution order recommendation
 1. Lock semantic contracts first (`Sequence` vs `ParallelSequence`, naming/path behavior).

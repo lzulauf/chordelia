@@ -8,9 +8,35 @@ canonical score normalization.
 ## Core Concepts
 
 - `Sequence`: ordered immutable list of scheduled entries.
+- `ParallelSequence`: immutable simultaneous composition with optional per-child offsets.
 - `SequenceEntry`: payload plus timing metadata (`duration`, optional `offset`).
 - `Rest`: explicit silent payload.
 - `Score`: canonical timeline of normalized `ScoreEvent` items.
+
+## Sequence vs ParallelSequence
+
+Use `Sequence` when cursor-advancing order is the main intent, and
+`ParallelSequence` when layering simultaneous parts is the main intent.
+
+```python
+from chordelia import ParallelSequence, Score, Sequence
+
+lead = Sequence((("E4", 1), ("G4", 1), ("A4", 2)))
+bass = Sequence((("E3", 4),))
+
+song = ParallelSequence(
+    (
+        ("lead", lead, 0),
+        ("bass", bass, 0),
+    ),
+    name="song",
+)
+
+score = Score.from_parallel_sequences(song, tempo=112, time_signature=(4, 4), key_signature="E minor")
+```
+
+`Score.from_sequenceable(...)` remains strict single-source normalization.
+Use `Score.from_parallel_sequences(...)` for explicit simultaneous source sets.
 
 ## Sequence Entry Forms
 
@@ -51,6 +77,34 @@ stacked = Sequence((([
 rendered = stacked.render_for_context(ScoreEventContext())
 print([event.pitches for event in rendered.events])
 ```
+
+For larger structures, prefer `ParallelSequence` over implicit iterable-layer
+payloads so part identity and offsets remain explicit.
+
+## Named Immutable Recomposition
+
+Both `Sequence` and `ParallelSequence` support optional names for direct and
+nested immutable edits.
+
+```python
+from chordelia import ParallelSequence, Sequence
+
+lead = Sequence((("E4", 1), ("G4", 1)), name="lead_line")
+bass = Sequence((("E3", 2),), name="bass_line")
+
+arrangement = ParallelSequence(
+    (
+        ("lead", lead, 0),
+        ("bass", bass, 0),
+    ),
+    name="section",
+)
+
+updated = arrangement.replace_child_by_path("lead", lead.transpose(12))
+```
+
+Path segments are dot-separated child names. Missing segments raise a `KeyError`
+that includes the nearest resolved path segment.
 
 ## Transpose vs Shift
 
@@ -98,6 +152,10 @@ SheetMusic(score).to_file("form.svg")
 
 Migration note: `score_from_sequenceable(...)` remains as a compatibility helper,
 but `Score.from_sequenceable(...)` is the canonical entry point.
+
+Boundary note: immutable composition APIs are intentionally separate from future
+runtime mutable channel controls tracked in
+[Interactive Live Song Channels Plan](../../.plans/interactive_live_song_channels_plan.md).
 
 ## Related
 

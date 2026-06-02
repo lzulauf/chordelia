@@ -4,7 +4,7 @@ import pytest
 
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
-from chordelia.score import Score
+from chordelia.score import Score, ScoreEventContext
 from chordelia.sequences import ParallelSequence, Sequence
 
 
@@ -43,6 +43,17 @@ class TestParallelSequenceScheduling:
     def test_negative_child_offset_is_rejected(self):
         with pytest.raises(ValueError, match="offset must be >= 0"):
             ParallelSequence(((Sequence(((Note("C4"), 1),)), -1),))
+
+    def test_invalid_child_reports_index_context(self):
+        with pytest.raises(TypeError, match="index 1"):
+            ParallelSequence((Sequence(((Note("C4"), 1),)), object()))
+
+    def test_offset_mode_mismatch_reports_child_index(self):
+        lead = Sequence(((Note("C4"), 1),))
+        parallel = ParallelSequence(((lead, Duration.from_seconds("1.0")),))
+
+        with pytest.raises(ValueError, match="index 0"):
+            parallel.render_for_context(ScoreEventContext())
 
 
 class TestParallelSequenceRecomposition:
@@ -88,6 +99,13 @@ class TestParallelSequenceRecomposition:
         assert [event.pitches for event in original_score.events] == [(48,), (60,)]
         assert [event.pitches for event in updated_score.events] == [(48,), (62,)]
 
+    def test_missing_path_reports_nearest_resolved_segment(self):
+        section = ParallelSequence((("lead", Sequence(((Note("C4"), 1),)), 0),), name="section")
+        arrangement = ParallelSequence((("section", section, 0),), name="song")
+
+        with pytest.raises(KeyError, match="from section"):
+            arrangement.get_child_by_path("section.bass")
+
 
 class TestScoreFromParallelSequences:
     """Explicit parallel score constructor behavior."""
@@ -106,3 +124,21 @@ class TestScoreFromParallelSequences:
     def test_from_parallel_sequences_rejects_empty_sources(self):
         with pytest.raises(ValueError, match="at least one"):
             Score.from_parallel_sequences(())
+
+    @pytest.mark.parametrize("bad_sources", [123, "C4"])
+    def test_from_parallel_sequences_rejects_non_iterable_or_string_sources(self, bad_sources):
+        with pytest.raises(TypeError, match="iterable"):
+            Score.from_parallel_sequences(bad_sources)
+
+    def test_from_parallel_sequences_propagates_child_index_context(self):
+        lead = Sequence(((Note("C4"), 1),))
+
+        with pytest.raises(TypeError, match="index 1"):
+            Score.from_parallel_sequences((lead, object()))
+
+    def test_from_parallel_sequences_accepts_parallel_sequence_directly(self):
+        parallel = ParallelSequence((Sequence(((Note("C4"), 1),)),))
+
+        score = Score.from_parallel_sequences(parallel)
+
+        assert [event.pitches for event in score.events] == [(60,)]

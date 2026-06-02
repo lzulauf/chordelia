@@ -79,14 +79,46 @@ For `Random.sequence(...)`, pass algorithm-specific per-call tuning values as di
 
 The resulting `Score` is the canonical shared boundary for both rendering and MIDI export.
 
-### 2) Render that same song as sheet music
+### 2) Compose sequential and simultaneous parts explicitly
+
+```python
+from chordelia import ParallelSequence, Sequence
+
+lead = Sequence((("E4", 1), ("G4", 1), ("A4", 2)))
+bass = Sequence((("E3", 4),))
+
+arrangement = ParallelSequence(
+	(
+		("lead", lead, 0),
+		("bass", bass, 0),
+	),
+	name="song",
+)
+
+score = Score.from_parallel_sequences(arrangement, tempo=120, time_signature=(4, 4))
+```
+
+`Sequence` remains the canonical sequential model. Use `ParallelSequence` when
+simultaneous layering and per-child offsets are the primary intent.
+
+### 3) Target immutable deep updates with named paths
+
+```python
+updated = arrangement.replace_child_by_path("lead", lead.transpose(12))
+updated_score = Score.from_sequenceable(updated)
+```
+
+Named child paths are dot-separated and immutable replacement returns a new
+composition tree.
+
+### 4) Render that same song as sheet music
 
 ```python
 # Continue from block 1 in the same Python session.
 SheetMusic(score, scale=scale).to_file("song.svg")
 ```
 
-### 3) Export and play that same song via MIDI
+### 5) Export and play that same song via MIDI
 
 ```python
 # Continue from block 1 in the same Python session.
@@ -94,6 +126,10 @@ MidiFile(score).to_file("song.mid")
 
 MidiPlayback().play_score(score, blocking=True)
 ```
+
+Note: immutable composition models (`Sequence`, `ParallelSequence`) are separate
+from future runtime channel controls tracked in
+[Interactive Live Song Channels Plan](.plans/interactive_live_song_channels_plan.md).
 
 ## Documentation
 

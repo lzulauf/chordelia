@@ -35,17 +35,39 @@ phrase = motif.appended(*answer.entries)
 print(len(phrase.entries))
 ```
 
-## 3) Convert to a canonical score
+## 3) Layer parts simultaneously when needed
+
+```python
+from chordelia import ParallelSequence, Sequence
+
+bass = Sequence((("C3", 4),))
+arrangement = ParallelSequence(
+    (
+        ("lead", phrase, 0),
+        ("bass", bass, 0),
+    ),
+    name="song",
+)
+```
+
+## 4) Convert to a canonical score
 
 ```python
 from chordelia import Score
 
-score = Score.from_sequenceable(phrase, tempo=120, time_signature=(4, 4), key_signature="C")
+score = Score.from_parallel_sequences(arrangement, tempo=120, time_signature=(4, 4), key_signature="C")
 print(len(score.events), score.duration)
 print(score.events[0].beat, score.events[0].pitches)
 ```
 
-## 4) Render notation to SVG
+## 5) Target immutable deep updates
+
+```python
+updated = arrangement.replace_child_by_path("lead", phrase.transpose(12))
+updated_score = Score.from_sequenceable(updated)
+```
+
+## 6) Render notation to SVG
 
 ```python
 from chordelia import SheetMusic
@@ -53,7 +75,7 @@ from chordelia import SheetMusic
 SheetMusic(score).to_file("phrase.svg")
 ```
 
-## 5) Optional playback and export
+## 7) Optional playback and export
 
 ```python
 from chordelia import MidiFile
@@ -67,6 +89,10 @@ Install optional features when needed:
 pip install chordelia[audio]
 pip install chordelia[midi]
 ```
+
+Immutable composition (`Sequence`, `ParallelSequence`) is separate from future
+runtime mutable channels tracked in
+[Interactive Live Song Channels Plan](../.plans/interactive_live_song_channels_plan.md).
 
 ## Continue Learning
 
