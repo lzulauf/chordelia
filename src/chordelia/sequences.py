@@ -6,10 +6,11 @@ from dataclasses import dataclass, replace
 from typing import Any, Iterable, TypeAlias
 
 from chordelia.chords import Chord
+from chordelia.intervals import Interval, IntervalLike
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
 from chordelia.score import ScoreEvent, ScoreEventContext
-from chordelia.sequenceable import NotesLike, Sequenceable, _score_events_for
+from chordelia.sequenceable import NotesLike, SequenceRender, Sequenceable, _sequence_render_for
 
 
 DurationLike = Duration | int | float
@@ -92,11 +93,17 @@ class _SimultaneousPayload:
 
     layers: tuple[Sequenceable, ...]
 
-    def score_events_for_context(self, context: ScoreEventContext) -> tuple[ScoreEvent, ...]:
+    def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
         events: list[ScoreEvent] = []
         for layer in self.layers:
-            events.extend(_score_events_for(layer, context))
-        return tuple(events)
+            events.extend(_sequence_render_for(layer, context).events)
+        return SequenceRender(events=tuple(events), consumed_duration=context.default_duration)
+
+    def transpose(self, interval: IntervalLike) -> "_SimultaneousPayload":
+        """Return a transposed copy while preserving simultaneous boundaries."""
+        return _SimultaneousPayload(
+            tuple(_transpose_payload(layer, interval) for layer in self.layers)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,9 +114,14 @@ class Rest:
         """Represent this rest as an empty note collection."""
         return ()
 
-    def score_events_for_context(self, _context: ScoreEventContext) -> tuple[ScoreEvent, ...]:
-        """Rests are sequenceable and emit no score events."""
-        return ()
+    def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
+        """Rests are sequenceable and emit no score events while consuming span."""
+        return SequenceRender(events=(), consumed_duration=context.default_duration)
+
+    def transpose(self, interval: IntervalLike) -> "Rest":
+        """Transpose is a no-op for rests but accepted for recursive sequence transforms."""
+        Interval.coerce(interval)
+        return self
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,16 +183,34 @@ class Sequence:
 
     entries: tuple[SequenceEntry, ...]
 
-    def __init__(self, entries: Iterable['SequenceEntryLike'] = ()):
-        normalized_entries = tuple(SequenceEntry.coerce(entry_value) for entry_value in entries)
-        object.__setattr__(self, "entries", normalized_entries)
+    def __init__(self, entries: Iterable['SequenceInputLike'] = ()):
+        normalized_entries: list[SequenceEntry] = []
+        for entry_value in entries:
+            if isinstance(entry_value, Sequenceable):
+                normalized_entries.append(SequenceEntry(payload=entry_value))
+                continue
+            normalized_entries.append(SequenceEntry.coerce(entry_value))
+        object.__setattr__(self, "entries", tuple(normalized_entries))
 
-    def appended(self, *entries: 'SequenceEntryLike') -> "Sequence":
+    def appended(self, *entries: 'SequenceInputLike') -> "Sequence":
         """Return a new sequence with entries appended in order."""
         return Sequence((*self.entries, *entries))
 
-    def score_events_for_context(self, context: ScoreEventContext) -> tuple[ScoreEvent, ...]:
-        """Flatten sequence entries into score events using deterministic scheduling."""
+    def transpose(self, interval: IntervalLike) -> "Sequence":
+        """Return a recursively transposed sequence with unchanged timing metadata."""
+        coerced_interval = Interval.coerce(interval)
+        transposed_entries = tuple(
+            SequenceEntry(
+                payload=_transpose_payload(entry.payload, coerced_interval),
+                duration=entry.duration,
+                offset=entry.offset,
+            )
+            for entry in self.entries
+        )
+        return Sequence(transposed_entries)
+
+    def render_for_context(self, context: ScoreEventContext) -> SequenceRender:
+        """Render sequence entries into score events using deterministic span scheduling."""
         events: list[ScoreEvent] = []
         cursor = context.start_offset
 
@@ -206,15 +236,24 @@ class Sequence:
                 start_offset=start,
                 default_duration=entry.duration,
             )
-            events.extend(_score_events_for(entry.payload, child_context))
+            child_render = _sequence_render_for(entry.payload, child_context)
+            if child_render.consumed_duration.mode != cursor.mode:
+                raise ValueError(
+                    "Rendered child consumed_duration mode must match context timing mode "
+                    f"(got {child_render.consumed_duration.mode!r} and {cursor.mode!r})"
+                )
+            events.extend(child_render.events)
 
-            end = start + entry.duration
+            end = start + child_render.consumed_duration
             if entry.offset is None:
                 cursor = end
             elif end > cursor:
                 cursor = end
 
-        return tuple(events)
+        return SequenceRender(
+            events=tuple(events),
+            consumed_duration=cursor - context.start_offset,
+        )
 
     def __len__(self) -> int:
         return len(self.entries)
@@ -228,3 +267,16 @@ SequenceEntryLike: TypeAlias = (
     | tuple[Any, DurationLike]
     | tuple[Any, DurationLike, DurationLike | None]
 )
+
+SequenceInputLike: TypeAlias = SequenceEntryLike | Sequenceable
+
+
+def _transpose_payload(payload: Any, interval: IntervalLike) -> Any:
+    """Transpose one payload value or raise an actionable capability error."""
+    if isinstance(payload, Sequenceable):
+        return payload.transpose(interval)
+
+    raise ValueError(
+        "Sequence.transpose requires Sequenceable payloads that implement transpose(interval). "
+        f"Unsupported payload type: {type(payload).__name__}."
+    )

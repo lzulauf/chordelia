@@ -9,12 +9,14 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - `Degree`: Degree value object with numeric and Roman coercion helpers.
 - `Scale`: Scale generation with theory-aware note spelling.
 - `Chord`: Chord quality, extensions, inversions, and slash chords.
-- `Sequenceable`: Protocol for objects that can emit normalized score events.
+- `Sequenceable`: Protocol for objects that render normalized score events/consumed span and support transpose transforms.
 - `NotesLike`: Protocol for values that can represent zero or more notes.
 - `Sequence`: Immutable ordered timeline of sequence entries.
 - `SequenceEntry`: One payload plus duration/offset timing metadata.
 - `Rest`: Explicit silent payload marker for sequence timelines.
-- `Score`: Canonical wrapper around a source and ordered normalized events.
+- `Score`: Canonical wrapper around a source and ordered normalized events; includes `score.duration` for normalized timeline span.
+- `MidiPlayback`: Live MIDI output transport for chord, note, and score playback.
+- `MidiFile`: MIDI wrapper for score conversion, file IO, and interface playback.
 - `Duration`: Fractional note duration utilities.
 - `TimeSignature`: Meter representation such as 4/4, 3/4, 6/8.
 - `Tempo`: BPM and traditional marking helpers.
@@ -38,15 +40,20 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - Duration modification: `dotted(duration)`, `triplet(duration)`
 - Common time signatures: `COMMON_TIME`, `WALTZ_TIME`, `COMPOUND_DUPLE`
 - Score conversion: `score_from_sequenceable(...)`
+- MIDI ports: `get_midi_ports()`
 
 ## Score Conversion Workflow
 
 - Use `Score.from_sequenceable(...)` or `score_from_sequenceable(...)` for canonical normalization.
-- `Note` and `Chord` implement `Sequenceable` and provide `score_events_for_context(...)`.
+- `Note` and `Chord` implement `Sequenceable` and provide `render_for_context(...)`.
 - `Sequence` and `Rest` implement `Sequenceable` and can be converted the same way.
 - Timing fields in score APIs use `Duration` objects, typically with `Duration.from_beats(...)`.
 - Use `Duration.from_seconds(...)` only for fixed wall-clock offsets that should not adapt to tempo changes.
 - `Score.events` are sorted deterministically for downstream consistency.
+- `Score.with_tempo(...)` returns an immutable score copy with updated tempo.
+- `Score.with_(...)` supports multi-field metadata updates (tempo, time signature, key signature, ppq) and optional source/events replacement in one call.
+- `ScoreMetadata` includes playback articulation defaults: `gate_width` (default `0.9`), `gate_offset` (default `0.0`), and `retrigger_policy` (default `retrigger_all`; options `delta` or `retrigger_all`).
+- `ScoreEvent` supports optional per-event `gate_width` and `gate_offset` overrides without changing notated duration.
 
 ### Sequence Payload Coercion
 
@@ -54,6 +61,9 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 - Iterable payloads are interpreted as simultaneous layers.
 - Iterable note strings or `Note` values are kept as one convenience chord layer.
 - Iterable values containing chord-like boundaries (for example `Chord`, `Rest`, or mixed `Note` and `Chord`) preserve each item as its own simultaneous layer.
+- Constructor input can include bare `Sequenceable` values, which coerce to default 1-beat entries.
+- Constructor input can include child `Sequence` values, which are treated as sequenceable payloads and consume their rendered span.
+- `Sequence.transpose(interval)` recursively transposes payloads while preserving entry duration and offset timing metadata.
 - Empty iterables coerce to `Rest`.
 
 Example:
@@ -85,6 +95,32 @@ context = ScoreEventContext(
 - `Scale.degree_for_chord_root(...) -> Degree | None`
 - `Chord.tone_at(...)`, `Chord.degree_for_tone(...) -> Degree | None`
 - `Interval.degree`, `Interval.simple_degree`
+
+## MIDI Workflow (Optional)
+
+- Use `Score.from_sequenceable(...)` to normalize composition data.
+- Use `MidiFile(score)` when you want file export and wrapper methods.
+- Use `MidiFile.to_file(path)` to write a `.mid` file.
+- Score-backed `MidiFile.to_playback_notes(...)` honors retrigger policy (`retrigger_all` default, `delta` optional override).
+- Use `MidiFile.play_to_interface(...)` to send score-backed playback to a MIDI output.
+- Use `MidiPlayback` directly for repeated live transport sessions and `play_score(...)`.
+- `MidiPlayback.play_score(...)` and `MidiFile.play_to_interface(...)` accept optional `gate_width`, `gate_offset`, and `retrigger_policy` overrides.
+- Install optional dependencies with `pip install chordelia[midi]`.
+
+Example overrides:
+
+```python
+from chordelia import MidiPlayback, Score
+
+score = Score.from_sequenceable(sequence, tempo=112)
+
+# Keep full written durations (100% gate) and preserve delta-style note continuity.
+score = score.with_(gate_width=1.0, retrigger_policy="delta")
+
+# Or override at playback call site only.
+with MidiPlayback() as playback:
+	playback.play_score(score, gate_width=1.0, retrigger_policy="delta")
+```
 
 ## Real-World Applications
 

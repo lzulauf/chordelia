@@ -485,7 +485,8 @@ class TestChordScoreEvents:
         """Chord conversion should emit one event containing all chord pitches."""
         context = ScoreEventContext(default_duration=Duration.from_beats(3, 4), velocity=75)
 
-        events = Chord.from_string("C4").score_events_for_context(context)
+        render = Chord.from_string("C4").render_for_context(context)
+        events = render.events
 
         assert len(events) == 1
         event = events[0]
@@ -494,11 +495,12 @@ class TestChordScoreEvents:
         assert event.pitches == (60, 64, 67)
         assert event.velocity == 75
         assert event.spelling == ("C4", "E4", "G4")
+        assert render.consumed_duration == Duration.from_beats(3, 4)
 
     def test_chord_without_octave_raises_value_error(self):
         """Chord conversion requires octave information on all notes."""
         with pytest.raises(ValueError, match="requires octave information"):
-            Chord.from_string("C").score_events_for_context(ScoreEventContext())
+            Chord.from_string("C").render_for_context(ScoreEventContext())
 
     def test_chord_event_uses_context_channel_voice_and_offset(self):
         """Chord event should preserve context timing and playback routing fields."""
@@ -510,24 +512,26 @@ class TestChordScoreEvents:
             voice=4,
         )
 
-        event = Chord("C4").score_events_for_context(context)[0]
+        render = Chord("C4").render_for_context(context)
+        event = render.events[0]
 
         assert event.beat == Duration.from_beats(2)
         assert event.duration == Duration.from_beats(1, 8)
         assert event.velocity == 70
         assert event.channel == 7
         assert event.voice == 4
+        assert render.consumed_duration == Duration.from_beats(1, 8)
 
     def test_chord_with_inversion_emits_inverted_pitch_order(self):
         """Chord inversion should be reflected in the emitted pitch and spelling order."""
-        event = Chord("C4", inversion=1).score_events_for_context(ScoreEventContext())[0]
+        event = Chord("C4", inversion=1).render_for_context(ScoreEventContext()).events[0]
 
         assert event.pitches == (64, 67, 72)
         assert event.spelling == ("E4", "G4", "C5")
 
     def test_chord_with_bass_note_inserts_bass_first(self):
         """Slash-chord bass notes not in the triad should be inserted at the bottom."""
-        event = Chord("C4", bass_note="B3").score_events_for_context(ScoreEventContext())[0]
+        event = Chord("C4", bass_note="B3").render_for_context(ScoreEventContext()).events[0]
 
         assert event.pitches == (59, 60, 64, 67)
         assert event.spelling == ("B3", "C4", "E4", "G4")
@@ -537,7 +541,7 @@ class TestChordScoreEvents:
         chord = Chord.from_notes(["C4", "E", "G4"])
 
         with pytest.raises(ValueError, match="requires octave information"):
-            chord.score_events_for_context(ScoreEventContext())
+            chord.render_for_context(ScoreEventContext())
 
 
 class TestChordNotesWithOctaves:

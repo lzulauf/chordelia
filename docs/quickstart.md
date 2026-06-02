@@ -72,7 +72,7 @@ context = ScoreEventContext(
 	start_offset=Duration.from_beats(1, 2),
 	default_duration=Duration.from_beats(1),
 )
-event = Chord("F#4").score_events_for_context(context)[0]
+event = Chord("F#4").render_for_context(context).events[0]
 print(event.beat, event.duration)
 
 # Helper conversion
@@ -87,7 +87,7 @@ from chordelia import Chord, Sequence, ScoreEventContext
 
 # Iterable note strings are treated as one chord layer.
 single_layer = Sequence(((["C4", "E4", "G4"], 1),))
-single_events = single_layer.score_events_for_context(ScoreEventContext())
+single_events = single_layer.render_for_context(ScoreEventContext()).events
 print(len(single_events), single_events[0].pitches)  # 1, (60, 64, 67)
 
 # Iterable chord-like values preserve simultaneous boundaries.
@@ -95,9 +95,57 @@ stacked_layers = Sequence((([
 	Chord.from_notes(["C4", "E4"]),
 	Chord.from_notes(["G4", "B4"]),
 ], 1),))
-stacked_events = stacked_layers.score_events_for_context(ScoreEventContext())
+stacked_events = stacked_layers.render_for_context(ScoreEventContext()).events
 print(len(stacked_events))  # 2
 print([event.pitches for event in stacked_events])  # [(60, 64), (67, 71)]
+
+# Child sequences in constructor input behave like any Sequenceable payload.
+motif = Sequence(((Chord("Am4"), 1), (Chord("Dm4"), 1)))
+arrangement = Sequence([motif] * 2)
+print(len(arrangement.entries))  # 2
+```
+
+## MIDI Interface Playback (Optional)
+
+```python
+from chordelia import Chord, MidiFile, MidiPlayback, Score, Sequence
+
+progression = Sequence((
+	(Chord("C4"), 1),
+	(Chord("A4", "minor"), 1),
+	(Chord("F4"), 1),
+	(Chord("G4"), 1),
+))
+
+score = Score.from_sequenceable(progression, tempo=104)
+midi = MidiFile(score)
+midi.to_file("progression.mid")
+
+# Play score through a MIDI output interface via MidiFile.
+# midi.play_to_interface(output_name=None, blocking=True)
+
+# Or use MidiPlayback directly for repeated interactive use.
+# with MidiPlayback(output_name=None) as playback:
+#     playback.play_score(score, blocking=True)
+
+# Articulation defaults are gate_width=0.9 and retrigger_policy="retrigger_all".
+# To force full-duration playback while keeping delta retrigger behavior:
+score = score.with_(gate_width=1.0, retrigger_policy="delta")
+
+# Equivalent playback-call override:
+with MidiPlayback(output_name=None) as playback:
+    playback.play_score(
+        score,
+        blocking=True,
+        gate_width=1.0,
+        retrigger_policy="delta",
+    )
+```
+
+Requires MIDI extras:
+
+```bash
+pip install chordelia[midi]
 ```
 
 ## Where to Go Next

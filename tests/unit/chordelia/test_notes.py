@@ -351,7 +351,8 @@ class TestNoteScoreEvents:
             voice=1,
         )
 
-        events = Note("C4").score_events_for_context(context)
+        render = Note("C4").render_for_context(context)
+        events = render.events
 
         assert len(events) == 1
         event = events[0]
@@ -362,11 +363,12 @@ class TestNoteScoreEvents:
         assert event.channel == 2
         assert event.voice == 1
         assert event.spelling == ("C4",)
+        assert render.consumed_duration == Duration.from_beats(1, 2)
 
     def test_note_without_octave_raises_value_error(self):
         """Notes without octave cannot emit MIDI pitch values."""
         with pytest.raises(ValueError, match="requires octave information"):
-            Note("C").score_events_for_context(ScoreEventContext())
+            Note("C").render_for_context(ScoreEventContext())
 
     def test_note_emits_accidental_midi_pitch_and_spelling(self):
         """Accidental notes should emit the matching MIDI pitch and spelling."""
@@ -377,7 +379,8 @@ class TestNoteScoreEvents:
             voice=2,
         )
 
-        event = Note("F#4").score_events_for_context(context)[0]
+        render = Note("F#4").render_for_context(context)
+        event = render.events[0]
 
         assert event.beat == Duration.from_beats(1, 4)
         assert event.duration == Duration.from_beats(3, 8)
@@ -385,6 +388,7 @@ class TestNoteScoreEvents:
         assert event.channel == 3
         assert event.voice == 2
         assert event.spelling == ("F#4",)
+        assert render.consumed_duration == Duration.from_beats(3, 8)
 
 
 class TestNoteTransposition:

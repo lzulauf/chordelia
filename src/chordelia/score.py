@@ -3,12 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, Literal
 
 from chordelia.rhythm import Duration
 
 
 DurationLike = Duration | int | float
+_UNCHANGED = object()
+RetriggerPolicy = Literal["delta", "retrigger_all"]
+
+
+def _validate_normalized_fraction(value: float, *, field_name: str) -> None:
+    """Validate normalized articulation values constrained to [0.0, 1.0]."""
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(f"{field_name} must be between 0.0 and 1.0, got {value}")
+
+
+def _validate_retrigger_policy(value: str) -> None:
+    """Validate supported playback retrigger policies."""
+    if value not in {"delta", "retrigger_all"}:
+        raise ValueError(
+            "retrigger_policy must be 'delta' or 'retrigger_all', "
+            f"got {value!r}"
+        )
 
 
 def _coerce_duration(value: DurationLike, *, field_name: str) -> Duration:
@@ -62,6 +79,8 @@ class ScoreEvent:
     channel: int = 0
     voice: int = 0
     spelling: tuple[str, ...] | None = None
+    gate_width: float | None = None
+    gate_offset: float | None = None
 
     def __post_init__(self) -> None:
         beat = _coerce_duration(self.beat, field_name="beat")
@@ -92,6 +111,10 @@ class ScoreEvent:
             raise ValueError(f"channel must be >= 0, got {self.channel}")
         if self.voice < 0:
             raise ValueError(f"voice must be >= 0, got {self.voice}")
+        if self.gate_width is not None:
+            _validate_normalized_fraction(self.gate_width, field_name="gate_width")
+        if self.gate_offset is not None:
+            _validate_normalized_fraction(self.gate_offset, field_name="gate_offset")
 
         object.__setattr__(self, "beat", beat)
         object.__setattr__(self, "duration", duration)
@@ -160,6 +183,9 @@ class ScoreMetadata:
     time_signature: tuple[int, int] = (4, 4)
     key_signature: str | None = None
     ppq: int = 480
+    gate_width: float = 0.9
+    gate_offset: float = 0.0
+    retrigger_policy: RetriggerPolicy = "retrigger_all"
 
     def __post_init__(self) -> None:
         if self.tempo <= 0:
@@ -173,6 +199,45 @@ class ScoreMetadata:
             raise ValueError(f"time signature denominator must be > 0, got {denominator}")
         if self.ppq <= 0:
             raise ValueError(f"ppq must be > 0, got {self.ppq}")
+        _validate_normalized_fraction(self.gate_width, field_name="gate_width")
+        _validate_normalized_fraction(self.gate_offset, field_name="gate_offset")
+        _validate_retrigger_policy(self.retrigger_policy)
+
+    def with_tempo(self, tempo: int) -> "ScoreMetadata":
+        """Return a copy with updated tempo."""
+        return replace(self, tempo=tempo)
+
+    def with_(
+        self,
+        *,
+        tempo: int | object = _UNCHANGED,
+        time_signature: tuple[int, int] | object = _UNCHANGED,
+        key_signature: str | None | object = _UNCHANGED,
+        ppq: int | object = _UNCHANGED,
+        gate_width: float | object = _UNCHANGED,
+        gate_offset: float | object = _UNCHANGED,
+        retrigger_policy: RetriggerPolicy | object = _UNCHANGED,
+    ) -> "ScoreMetadata":
+        """Return a copy with any combination of metadata field updates."""
+        changes: dict[str, Any] = {}
+        if tempo is not _UNCHANGED:
+            changes["tempo"] = tempo
+        if time_signature is not _UNCHANGED:
+            changes["time_signature"] = time_signature
+        if key_signature is not _UNCHANGED:
+            changes["key_signature"] = key_signature
+        if ppq is not _UNCHANGED:
+            changes["ppq"] = ppq
+        if gate_width is not _UNCHANGED:
+            changes["gate_width"] = gate_width
+        if gate_offset is not _UNCHANGED:
+            changes["gate_offset"] = gate_offset
+        if retrigger_policy is not _UNCHANGED:
+            changes["retrigger_policy"] = retrigger_policy
+
+        if not changes:
+            return self
+        return replace(self, **changes)
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,21 +268,28 @@ class Score:
         time_signature: tuple[int, int] = (4, 4),
         key_signature: str | None = None,
         ppq: int = 480,
+        gate_width: float = 0.9,
+        gate_offset: float = 0.0,
+        retrigger_policy: RetriggerPolicy = "retrigger_all",
     ) -> "Score":
         """Create a score by normalizing any sequenceable (or adapted) value."""
-        from chordelia.sequenceable import _score_events_for
+        from chordelia.sequenceable import _sequence_render_for
 
         context = ScoreEventContext(
             tempo=tempo,
             time_signature=time_signature,
             key_signature=key_signature,
         )
-        events = _score_events_for(source, context)
+        render = _sequence_render_for(source, context)
+        events = render.events
         metadata = ScoreMetadata(
             tempo=tempo,
             time_signature=time_signature,
             key_signature=key_signature,
             ppq=ppq,
+            gate_width=gate_width,
+            gate_offset=gate_offset,
+            retrigger_policy=retrigger_policy,
         )
         return cls(source=source, metadata=metadata, events=events)
 
@@ -226,6 +298,53 @@ class Score:
 
     def __iter__(self):
         return iter(self.events)
+
+    @property
+    def duration(self) -> Duration:
+        """Return the normalized score span from beat/second zero to timeline end."""
+        if not self.events:
+            return Duration.from_beats(0, None)
+        return max(event.beat + event.duration for event in self.events)
+
+    def with_tempo(self, tempo: int) -> "Score":
+        """Return a copy with updated metadata tempo."""
+        return self.with_(tempo=tempo)
+
+    def with_(
+        self,
+        *,
+        source: Any = _UNCHANGED,
+        metadata: ScoreMetadata | object = _UNCHANGED,
+        events: tuple[ScoreEvent, ...] | list[ScoreEvent] | object = _UNCHANGED,
+        tempo: int | object = _UNCHANGED,
+        time_signature: tuple[int, int] | object = _UNCHANGED,
+        key_signature: str | None | object = _UNCHANGED,
+        ppq: int | object = _UNCHANGED,
+        gate_width: float | object = _UNCHANGED,
+        gate_offset: float | object = _UNCHANGED,
+        retrigger_policy: RetriggerPolicy | object = _UNCHANGED,
+    ) -> "Score":
+        """Return a copy with source/events and/or metadata fields updated."""
+        next_source = self.source if source is _UNCHANGED else source
+        next_events = self.events if events is _UNCHANGED else events
+
+        base_metadata = self.metadata if metadata is _UNCHANGED else metadata
+        if not isinstance(base_metadata, ScoreMetadata):
+            raise TypeError(
+                f"metadata must be ScoreMetadata, got {type(base_metadata).__name__}"
+            )
+
+        next_metadata = base_metadata.with_(
+            tempo=tempo,
+            time_signature=time_signature,
+            key_signature=key_signature,
+            ppq=ppq,
+            gate_width=gate_width,
+            gate_offset=gate_offset,
+            retrigger_policy=retrigger_policy,
+        )
+
+        return Score(source=next_source, metadata=next_metadata, events=next_events)
 
 
 def _score_event_sort_key(event: ScoreEvent):
@@ -245,6 +364,9 @@ def score_from_sequenceable(
     tempo: int = 120,
     time_signature: tuple[int, int] = (4, 4),
     key_signature: str | None = None,
+    gate_width: float = 0.9,
+    gate_offset: float = 0.0,
+    retrigger_policy: RetriggerPolicy = "retrigger_all",
 ) -> Score:
     """Compatibility helper that delegates to Score.from_sequenceable."""
     return Score.from_sequenceable(
@@ -252,4 +374,7 @@ def score_from_sequenceable(
         tempo=tempo,
         time_signature=time_signature,
         key_signature=key_signature,
+        gate_width=gate_width,
+        gate_offset=gate_offset,
+        retrigger_policy=retrigger_policy,
     )

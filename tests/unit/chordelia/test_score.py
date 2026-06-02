@@ -5,7 +5,11 @@ import pytest
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
-from chordelia.sequenceable import _clear_sequenceable_adapters, _register_sequenceable_adapter
+from chordelia.sequenceable import (
+    SequenceRender,
+    _clear_sequenceable_adapters,
+    _register_sequenceable_adapter,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -109,6 +113,49 @@ class TestScoreEventContext:
 class TestScoreMetadata:
     """Validation behavior for ScoreMetadata."""
 
+    def test_with_tempo_returns_updated_copy(self):
+        metadata = ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480)
+
+        updated = metadata.with_tempo(144)
+
+        assert updated.tempo == 144
+        assert updated.time_signature == (4, 4)
+        assert updated.key_signature == "C"
+        assert updated.ppq == 480
+        assert updated.gate_width == 0.9
+        assert updated.gate_offset == 0.0
+        assert updated.retrigger_policy == "retrigger_all"
+        assert metadata.tempo == 120
+        assert updated is not metadata
+
+    def test_with_allows_multiple_field_updates(self):
+        metadata = ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480)
+
+        updated = metadata.with_(
+            tempo=96,
+            time_signature=(3, 4),
+            key_signature="G",
+            ppq=960,
+            gate_width=0.75,
+            gate_offset=0.1,
+            retrigger_policy="retrigger_all",
+        )
+
+        assert updated.tempo == 96
+        assert updated.time_signature == (3, 4)
+        assert updated.key_signature == "G"
+        assert updated.ppq == 960
+        assert updated.gate_width == 0.75
+        assert updated.gate_offset == 0.1
+        assert updated.retrigger_policy == "retrigger_all"
+
+    def test_with_without_changes_returns_same_instance(self):
+        metadata = ScoreMetadata()
+
+        updated = metadata.with_()
+
+        assert updated is metadata
+
     @pytest.mark.parametrize(
         "kwargs, expected_message",
         [
@@ -117,6 +164,9 @@ class TestScoreMetadata:
             ({"time_signature": (0, 4)}, "numerator must be > 0"),
             ({"time_signature": (4, 0)}, "denominator must be > 0"),
             ({"ppq": 0}, "ppq must be > 0"),
+            ({"gate_width": -0.1}, "gate_width must be between 0.0 and 1.0"),
+            ({"gate_offset": 1.1}, "gate_offset must be between 0.0 and 1.0"),
+            ({"retrigger_policy": "bad"}, "retrigger_policy must be"),
         ],
     )
     def test_metadata_validation_errors(self, kwargs, expected_message):
@@ -156,21 +206,136 @@ class TestScore:
         assert len(score) == 2
         assert [event.pitches for event in score] == [(60,), (64,)]
 
+    def test_score_duration_returns_timeline_end_for_beats(self):
+        events = (
+            ScoreEvent(beat=1, duration=2, pitches=(60,)),
+            ScoreEvent(beat=4, duration=1, pitches=(64,)),
+        )
+
+        score = Score(source="x", metadata=ScoreMetadata(), events=events)
+
+        assert score.duration == Duration.from_beats(5)
+
+    def test_score_duration_returns_timeline_end_for_seconds(self):
+        events = (
+            ScoreEvent(
+                beat=Duration.from_seconds("1.5"),
+                duration=Duration.from_seconds("0.5"),
+                pitches=(60,),
+            ),
+            ScoreEvent(
+                beat=Duration.from_seconds("0.25"),
+                duration=Duration.from_seconds("0.75"),
+                pitches=(64,),
+            ),
+        )
+
+        score = Score(source="x", metadata=ScoreMetadata(), events=events)
+
+        assert score.duration == Duration.from_seconds("2.0")
+
+    def test_score_duration_for_empty_score_is_zero_beats(self):
+        score = Score(source="x", metadata=ScoreMetadata(), events=())
+
+        assert score.duration == Duration.from_beats(0)
+
+    def test_with_tempo_updates_score_metadata_only(self):
+        score = Score(
+            source="x",
+            metadata=ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480),
+            events=(ScoreEvent(beat=0, duration=1, pitches=(60,)),),
+        )
+
+        updated = score.with_tempo(140)
+
+        assert updated.metadata.tempo == 140
+        assert updated.metadata.time_signature == (4, 4)
+        assert updated.metadata.key_signature == "C"
+        assert updated.metadata.ppq == 480
+        assert updated.metadata.gate_width == 0.9
+        assert updated.metadata.gate_offset == 0.0
+        assert updated.metadata.retrigger_policy == "retrigger_all"
+        assert updated.source == score.source
+        assert updated.events == score.events
+        assert score.metadata.tempo == 120
+
+    def test_with_supports_multiple_metadata_updates_in_one_call(self):
+        score = Score(
+            source="x",
+            metadata=ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480),
+            events=(ScoreEvent(beat=0, duration=1, pitches=(60,)),),
+        )
+
+        updated = score.with_(
+            tempo=90,
+            time_signature=(3, 4),
+            key_signature="Am",
+            ppq=960,
+            gate_width=0.8,
+            gate_offset=0.15,
+            retrigger_policy="retrigger_all",
+        )
+
+        assert updated.metadata.tempo == 90
+        assert updated.metadata.time_signature == (3, 4)
+        assert updated.metadata.key_signature == "Am"
+        assert updated.metadata.ppq == 960
+        assert updated.metadata.gate_width == 0.8
+        assert updated.metadata.gate_offset == 0.15
+        assert updated.metadata.retrigger_policy == "retrigger_all"
+
+    def test_with_supports_source_events_and_metadata_override(self):
+        score = Score(
+            source="source-a",
+            metadata=ScoreMetadata(tempo=120, time_signature=(4, 4), key_signature="C", ppq=480),
+            events=(ScoreEvent(beat=1, duration=1, pitches=(64,)),),
+        )
+        replacement_metadata = ScoreMetadata(tempo=110, time_signature=(6, 8), key_signature="D", ppq=240)
+        replacement_events = (ScoreEvent(beat=0, duration=1, pitches=(60,)),)
+
+        updated = score.with_(
+            source="source-b",
+            metadata=replacement_metadata,
+            events=replacement_events,
+            tempo=132,
+            key_signature="G",
+            gate_offset=0.2,
+        )
+
+        assert updated.source == "source-b"
+        assert updated.events == replacement_events
+        assert updated.metadata.tempo == 132
+        assert updated.metadata.time_signature == (6, 8)
+        assert updated.metadata.key_signature == "G"
+        assert updated.metadata.ppq == 240
+        assert updated.metadata.gate_width == 0.9
+        assert updated.metadata.gate_offset == 0.2
+        assert updated.metadata.retrigger_policy == "retrigger_all"
+
+    def test_with_rejects_non_metadata_override(self):
+        score = Score(source="x", metadata=ScoreMetadata(), events=(ScoreEvent(beat=0, duration=1, pitches=(60,)),))
+
+        with pytest.raises(TypeError, match="ScoreMetadata"):
+            score.with_(metadata="bad")
+
     def test_from_sequenceable_passes_context_and_builds_metadata(self):
         """Score.from_sequenceable should propagate conversion context and metadata values."""
         captured = {}
 
         def external_adapter(_value, context):
             captured["context"] = context
-            return (
-                ScoreEvent(
-                    beat=context.start_offset,
-                    duration=context.default_duration,
-                    pitches=(72,),
-                    velocity=context.velocity,
-                    channel=context.channel,
-                    voice=context.voice,
+            return SequenceRender(
+                events=(
+                    ScoreEvent(
+                        beat=context.start_offset,
+                        duration=context.default_duration,
+                        pitches=(72,),
+                        velocity=context.velocity,
+                        channel=context.channel,
+                        voice=context.voice,
+                    ),
                 ),
+                consumed_duration=context.default_duration,
             )
 
         _register_sequenceable_adapter(self.External, external_adapter)
@@ -194,6 +359,9 @@ class TestScore:
         assert score.metadata.time_signature == (6, 8)
         assert score.metadata.key_signature == "G"
         assert score.metadata.ppq == 960
+        assert score.metadata.gate_width == 0.9
+        assert score.metadata.gate_offset == 0.0
+        assert score.metadata.retrigger_policy == "retrigger_all"
         assert score.events[0].pitches == (72,)
 
     def test_score_rejects_mixed_timing_modes(self):
