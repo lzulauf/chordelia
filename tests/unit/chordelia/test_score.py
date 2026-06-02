@@ -418,14 +418,22 @@ class TestScore:
     @pytest.mark.parametrize(
         "source",
         (
-            Scale("C", "major"),
             Degree(1),
         ),
     )
     def test_from_sequenceable_rejects_non_sequenceable_theory_types(self, source):
-        """Scale and Degree are theory helpers, not direct sequenceable score sources."""
+        """Degree remains a theory helper and not a direct sequenceable score source."""
         with pytest.raises(TypeError, match="not Sequenceable"):
             Score.from_sequenceable(source)
+
+    def test_from_sequenceable_accepts_scale_source(self):
+        score = Score.from_sequenceable(Scale("C", "major"))
+
+        assert isinstance(score, Score)
+        assert len(score.events) == 8
+        assert score.events[0].pitches == (60,)
+        assert score.events[-1].pitches == (72,)
+        assert all(event.duration.as_beats() == 1 for event in score.events)
 
     def test_score_from_sequenceable_helper_delegates_to_classmethod(self):
         """Compatibility helper should delegate behavior to Score.from_sequenceable."""

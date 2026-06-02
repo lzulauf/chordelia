@@ -69,13 +69,21 @@ class TestMidiFileScoreBackedConstruction:
     @pytest.mark.parametrize(
         "source",
         (
-            Scale("C", "major"),
             Degree(1),
         ),
     )
     def test_constructor_rejects_non_sequenceable_theory_types(self, source):
         with pytest.raises(TypeError, match="not Sequenceable"):
             MidiFile(source)
+
+    def test_constructor_accepts_scale_source(self):
+        midi = MidiFile(Scale("C", "major"))
+
+        assert isinstance(midi.score, Score)
+        assert midi.score is not None
+        assert len(midi.score.events) == 8
+        assert midi.score.events[0].pitches == (60,)
+        assert midi.score.events[-1].pitches == (72,)
 
 
 class TestMidiFileWritePath:

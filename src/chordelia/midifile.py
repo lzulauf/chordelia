@@ -1,6 +1,6 @@
 """MIDI file I/O and score normalization utilities for Chordelia."""
 
-from typing import Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 from pathlib import Path
 import mido
 from dataclasses import dataclass
@@ -9,6 +9,9 @@ from fractions import Fraction
 # Import Chordelia components
 from chordelia.rhythm import Tempo, Duration, TimeSignature
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
+
+if TYPE_CHECKING:
+    from chordelia.sequenceable import Sequenceable
 
 
 @dataclass
@@ -30,7 +33,7 @@ class MidiFile:
     
     def __init__(
         self,
-        source: Union[str, Path, Score, Any],
+        source: Union[str, Path, Score, 'Sequenceable'],
         *,
         tempo: int = 120,
         time_signature: tuple[int, int] = (4, 4),

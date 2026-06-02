@@ -236,13 +236,41 @@ from chordelia import MotifVariationSequenceAlgorithm, Random
 rng = Random(seed=77)
 motif = MotifVariationSequenceAlgorithm(motif_beats=2)
 
-phrase_a = rng.sequence(8, algorithm=motif, scale="D minor", mutation_probability=0)
-phrase_b = rng.sequence(8, algorithm=motif, scale="D minor", mutation_probability=0)
+phrase_a = rng.sequence(
+    8,
+    algorithm=motif,
+    scale="D minor",
+    mutation_probability=0,
+)
+phrase_b = rng.sequence(
+    8,
+    algorithm=motif,
+    scale="D minor",
+    mutation_probability=0,
+)
 
 print(phrase_a == phrase_b)
 ```
 
-## 17) Use weighted random algorithm selection
+## 17) Seed motif variation from an explicit motif sequence
+
+```python
+from chordelia import MotifVariationSequenceAlgorithm, Note, Random, Sequence
+
+rng = Random(seed=77)
+motif_sequence = Sequence(((Note("C4"), 1), (Note("D4"), 1)))
+motif = MotifVariationSequenceAlgorithm(motif_sequence=motif_sequence)
+
+phrase = rng.sequence(
+    4,
+    algorithm=motif,
+    mutation_probability=0,
+)
+
+print([entry.payload for entry in phrase.entries])
+```
+
+## 18) Use weighted random algorithm selection
 
 ```python
 from chordelia import Random
@@ -261,6 +289,51 @@ phrase = rng.sequence(
 )
 
 print(len(phrase.entries))
+```
+
+## 19) Understand scale walk movement rules
+
+```python
+from chordelia import Random
+
+rng = Random(seed=202606)
+phrase = rng.sequence(
+        16,
+        algorithm="scale_walk",
+        scale="C major",
+        chord="G",
+)
+```
+
+What to expect from this generated phrase:
+
+- It starts and ends on chord tones for the selected chord context (`G` here).
+- Each note-to-note move follows one direction at a time:
+    - either by scale walk (1-2 degrees in that direction),
+    - or by one chromatic semitone in that same direction.
+- Direction changes are only introduced when the current note is in-scale.
+    If the walk is currently out-of-scale, it keeps moving in the same direction
+    until it returns to an in-scale step.
+
+## 20) Sequence argument placement cheat sheet
+
+```python
+from chordelia import MotifVariationSequenceAlgorithm, Random
+
+# 1) Random constructor args
+rng = Random(seed=202606)
+
+# 2) Algorithm constructor args
+motif = MotifVariationSequenceAlgorithm(motif_beats=2)
+
+# 3) Random.sequence standard args + 4) algorithm call-time args
+phrase = rng.sequence(
+    8,
+    algorithm=motif,
+    scale="D minor",
+    mutation_probability=0,
+    duration_weights={0.5: 3, 1: 2},
+)
 ```
 
 ## Related

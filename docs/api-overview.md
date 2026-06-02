@@ -59,7 +59,19 @@ Key behaviors:
 - Selector methods support both instance and class calls; class calls route through the lazy global singleton.
 - `Random.sequence(...)` requires a positive beat-length timeline value and returns a `Sequence` that consumes exactly that beat span.
 - Sequence algorithm resolution order is: explicit algorithm instance, algorithm name token, then weighted random selection (only when `algorithm` is omitted).
+- `Random.sequence(...)` argument placement is explicit:
+	- Random constructor args (`seed`, `engine`) belong to `Random(...)`.
+	- Sequence-call standard args are `beat_length`, `algorithm`, `algorithm_weights`, `scale`, and `chord`.
+	- Algorithm constructor args belong on algorithm object creation (for example `MotifVariationSequenceAlgorithm(motif_beats=2)`).
+	- Algorithm call-time tuning args are passed as direct `Random.sequence(...)` keyword arguments and forwarded to `algorithm.generate(...)`.
 - Built-in sequence algorithms accept optional tuning parameters, but each works with no required algorithm-specific arguments.
+- `ScaleWalkSequenceAlgorithm` generates walks with explicit movement invariants:
+	- The walk starts and ends on chord tones (using the provided chord or an internally derived fallback chord when none is provided).
+	- Each step follows one directional movement rule: either a scale-walk step (1-2 scale degrees in the current direction) or a chromatic one-semitone step in the current direction.
+	- Direction changes are only considered after in-scale notes; out-of-scale notes continue in the current direction until the walk returns to in-scale movement.
+- `ChordAnchorWalkSequenceAlgorithm` keeps jump transitions chord-anchored:
+	- Non-adjacent jump transitions only occur when both the current and next notes are chord tones.
+	- If the current note is not a chord tone, movement continues by adjacent scale step until the walk returns to a chord tone.
 - Reusing the same algorithm object instance allows stateful continuity across calls (for example motif carry-forward).
 - Sequence continuation behavior is playback-equivalent duration extension of the previous pitched entry, not notation-specific tie modeling.
 
@@ -78,6 +90,8 @@ Timeline and conversion types:
 
 - `Sequence`, `SequenceEntry`, `SequenceEntryLike`, `Rest`
 - `Sequenceable`, `NotesLike`
+- `PlayableSource`, `VisualRenderableSource`
+- `SheetMusicScaleResolver`, `TempoMetadataSource`
 - `Score`, `ScoreEvent`, `ScoreEventContext`, `ScoreMetadata`
 
 Score conversion entry points:
@@ -106,7 +120,7 @@ Compatibility note:
 
 - `score_from_sequenceable(...)` is retained as a compatibility helper.
 - `Score.from_sequenceable(...)` is the canonical constructor-style entry point.
-- Direct conversion sources must be `Score` or `Sequenceable` values (for example `Note`, `Chord`, `Sequence`, `Rest`); `Scale` and `Degree` are not accepted as direct score-wrapper inputs.
+- Direct conversion sources must be `Score` or `Sequenceable` values (for example `Note`, `Chord`, `Sequence`, `Rest`, `Scale`); `Degree` is not accepted as a direct score-wrapper input.
 
 Related deep docs:
 

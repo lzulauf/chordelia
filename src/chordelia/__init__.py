@@ -21,7 +21,14 @@ from chordelia.chords import Chord, ChordQuality, ChordExtension
 from chordelia.sequences import Sequence, SequenceEntry, SequenceEntryLike, Rest
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
 from chordelia.sheet_music import SheetMusic
-from chordelia.sequenceable import NotesLike, Sequenceable
+from chordelia.sequenceable import (
+    NotesLike,
+    PlayableSource,
+    Sequenceable,
+    SheetMusicScaleResolver,
+    TempoMetadataSource,
+    VisualRenderableSource,
+)
 from chordelia.scale_context import (
     get_chordelia_context,
     get_default_note_duration_context,
@@ -94,6 +101,10 @@ __all__ = [
     "SheetMusic",
     "Sequenceable",
     "NotesLike",
+    "PlayableSource",
+    "VisualRenderableSource",
+    "SheetMusicScaleResolver",
+    "TempoMetadataSource",
     "get_chordelia_context",
     "get_global_scale_context",
     "get_default_note_duration_context",

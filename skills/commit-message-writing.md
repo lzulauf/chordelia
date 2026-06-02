@@ -49,7 +49,9 @@ Companion skills: readme-writing when docs changes are a meaningful part of the 
 
 3. Build the summary line.
 - Prefer imperative mood.
-- Use a grammatically correct sentence (no need for ending period)
+- Use a plain English sentence that starts with an imperative verb.
+- Do not use conventional commit prefixes (`feat:`, `fix:`, `chore:`) or scoped tokens (`type(scope):`) unless the user explicitly requests conventional commit format.
+- Do not include a trailing period.
 - Capitalize the first character
 - Fit in 72 characters
 
@@ -67,7 +69,8 @@ Companion skills: readme-writing when docs changes are a meaningful part of the 
 
 6. Add compatibility notes when needed.
 - If behavior is breaking, mark it clearly.
-- Use `!` in summary and/or include `BREAKING CHANGE:` details in body when applicable.
+- By default, keep the summary as a plain imperative sentence and include `BREAKING CHANGE:` details in the body.
+- Use `!` in the summary only when the user explicitly requests conventional commit formatting.
 
 ## Output Rules
 
@@ -82,6 +85,7 @@ Companion skills: readme-writing when docs changes are a meaningful part of the 
 
 - Message reflects current workspace changes accurately.
 - Summary line is specific and action-oriented.
+- Summary line is a plain imperative sentence (no conventional-commit prefix unless requested).
 - Body includes important behavior/API/test/docs information.
 - Body avoids baseline-only validation noise unless requested.
 - User-requested structure is followed exactly.

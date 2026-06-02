@@ -75,6 +75,7 @@ print(len(phrase.entries))
 ```
 
 For weighted algorithm selection, stateful motif reuse, and global-singleton randomization recipes, see [Cookbook](docs/cookbook.md).
+For `Random.sequence(...)`, pass algorithm-specific per-call tuning values as direct keyword arguments.
 
 The resulting `Score` is the canonical shared boundary for both rendering and MIDI export.
 

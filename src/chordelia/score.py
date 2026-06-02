@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any, Literal, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 from chordelia.rhythm import Duration, TimelineLike, coerce_timeline_duration, context_beat_unit
 from chordelia.scale_context import get_default_note_duration_context
+
+if TYPE_CHECKING:
+    from chordelia.sequenceable import Sequenceable
 
 
 DurationLike: TypeAlias = TimelineLike
@@ -262,7 +265,7 @@ class Score:
     @classmethod
     def from_sequenceable(
         cls,
-        source: Any,
+        source: 'Sequenceable',
         *,
         tempo: int = 120,
         time_signature: tuple[int, int] = (4, 4),
@@ -375,7 +378,7 @@ def _score_event_sort_key(event: ScoreEvent):
 
 
 def score_from_sequenceable(
-    source: Any,
+    source: 'Sequenceable',
     *,
     tempo: int = 120,
     time_signature: tuple[int, int] = (4, 4),
