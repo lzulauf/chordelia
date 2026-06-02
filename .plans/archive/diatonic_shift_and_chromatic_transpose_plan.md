@@ -1,7 +1,14 @@
 Diatonic shifting and chromatic transposing plan for chordelia.
 
 ## Status
-Drafting
+Done
+
+## Completion note
+Completed on 2026-05-30.
+1. Shift APIs are implemented for Degree, Scale, Note, and Chord.
+2. Note/Chord shift keeps explicit `scale=...` support and retains global scale-context fallback.
+3. Docs and examples were migrated to clearly distinguish diatonic shift from chromatic transpose.
+4. Validation: focused movement tests passed (418), full test suite passed (819), and coverage run passed (819).
 
 ## Goal
 Support two distinct movement models across the library with clear naming and consistent behavior:
@@ -17,7 +24,7 @@ Support two distinct movement models across the library with clear naming and co
 1. Define canonical terminology and API naming policy: shift or shifting for diatonic movement, transpose or transposing for chromatic movement.
 2. Audit existing movement and degree APIs and classify each under the new system.
 3. Implement first-class shift support for Scale and Degree.
-4. Implement context-aware shift support for Note and Chord with explicit, testable semantics.
+4. Implement context-aware shift support for Note and Chord with explicit `scale=...` semantics plus global fallback support.
 5. Support compound diatonic intervals (greater than 7, for example 9, 13) with consistent semantics across shift-capable APIs.
 6. Apply a breaking transpose contract where numeric transpose inputs are semitone steps (`1` means `+1` semitone).
 7. Update tests, examples, and docs to demonstrate both movement types.
@@ -49,7 +56,7 @@ Support two distinct movement models across the library with clear naming and co
 3. Cross-type consistency requirement:
    1. The same transpose contract applies to `Note`, `Chord`, `Scale`, and `Sequence` payload transposition.
 
-### Current-state audit and classification
+### Initial-state audit and classification
 1. Current movement APIs in src:
    1. src/chordelia/notes.py: Note.transpose(interval)
       1. Classification: transposing (chromatic), already aligned with new naming.
@@ -94,17 +101,20 @@ Support two distinct movement models across the library with clear naming and co
       2. Returns the corresponding mode rooted at shifted degree (same pitch collection).
       3. Negative, positive, and compound steps are supported.
 3. Note-level shifting with context:
-   1. Note.shift(steps: int, *, scale: Scale) -> Note
+   1. Note.shift(steps: int, *, scale: Scale | str | None = None) -> Note
    2. Behavior:
-      1. Finds note degree in scale by pitch class.
-      2. Raises ValueError when note is outside scale unless policy override is added in later phase.
-      3. Returns scale degree moved by steps, preserving octave with cycle-aware diatonic crossing rules.
+      1. Uses explicit scale input when provided, otherwise resolves scale from global context helpers.
+      2. Finds note degree in scale by pitch class.
+      3. Raises ValueError when no scale context is available.
+      4. Raises ValueError when note is outside scale unless policy override is added in later phase.
+      5. Returns scale degree moved by steps, preserving octave with cycle-aware diatonic crossing rules.
 4. Chord-level shifting with context:
-   1. Chord.shift(steps: int, *, scale: Scale, strategy: str = "root") -> Chord
-   2. Initial strategy values:
-      1. root: shift root by degree and rebuild chord from shifted root plus existing quality/extension metadata.
-      2. tones (phase-gated): shift each tone through the same scale context.
-   3. ValueError for ambiguous or out-of-scale tones in tones mode.
+   1. Chord.shift(steps: int, *, scale: Scale | str | None = None) -> Chord
+   2. Behavior:
+      1. Uses explicit scale input when provided, otherwise resolves scale from global context helpers.
+      2. Applies root-first shifting and preserves quality, extensions, and slash-bass intent.
+      3. Shifts custom-note chords tone-by-tone through the same resolved scale context.
+      4. Raises ValueError when no scale context is available or when required tones are out of scale.
 
 ### Compound diatonic interval model (>7)
 1. Canonical model: selector versus distance semantics
@@ -147,6 +157,10 @@ Support two distinct movement models across the library with clear naming and co
    1. Phase 1 through 3 use Option A (explicit scale parameter).
    2. Evaluate Option B and Option D as additive ergonomics after core semantics stabilize.
    3. Defer Option C unless a strong immutable-safe design is proven.
+7. Final resolution:
+   1. Keep explicit scale parameters as the preferred, deterministic API shape.
+   2. Keep the existing global context fallback (`with_global_scale_context`, `set_global_scale_context`) for ergonomic workflows.
+   3. Do not add a new public context service object in this rollout.
 
 ### Implementation pseudocode
 1. Shared diatonic resolver
@@ -329,16 +343,16 @@ transpose (chromatic) remains parallel and independent of scale context
 1. src/chordelia/degrees.py: add Degree.shift and related validation helpers.
 2. src/chordelia/scales.py: add Scale.shift and reuse mode_from_degree logic.
 3. src/chordelia/notes.py: add Note.shift with scale context semantics.
-4. src/chordelia/chords.py: add Chord.shift with strategy semantics and context requirement.
+4. src/chordelia/chords.py: add Chord.shift with root-first behavior and context resolution semantics.
 5. src/chordelia/__init__.py: export any new public helper types if introduced.
 6. tests/unit/chordelia/test_degrees.py: add degree shifting tests.
 7. tests/unit/chordelia/test_scales.py: add scale shifting tests.
 8. tests/unit/chordelia/test_notes.py: add note shifting tests with in-scale and out-of-scale coverage.
-9. tests/unit/chordelia/test_chords.py: add chord shifting tests for root and tones strategies.
+9. tests/unit/chordelia/test_chords.py: add chord shifting tests for root behavior, slash chords, custom-note chords, and fallback context handling.
 10. docs/quickstart.md, docs/guides/notes-and-intervals.md, docs/guides/scales-and-chords.md, examples/: update terminology and examples.
 
 ### Error and validation semantics
-1. shift methods require explicit scale context when target object does not contain enough harmonic context (Note, Chord).
+1. shift methods on Note and Chord accept explicit `scale=...` and otherwise use global scale context; they raise ValueError if neither is available.
 2. Out-of-scale shift input raises ValueError with guidance to transpose if chromatic behavior is intended.
 3. Negative and large-step (compound) shifts are supported without upper bound.
 4. Selector APIs (for example degree lookups) keep explicit in-span range validation.
@@ -380,23 +394,23 @@ Expected docs delta classification: both README updates and docs updates.
    3. Document the breaking transpose contract for numeric inputs and provide migration examples.
 2. Examples update:
    1. Add side-by-side examples demonstrating shift versus transpose outcomes.
-   2. Add note and chord shift examples that pass scale context explicitly.
+   2. Add note and chord shift examples that show explicit scale context and global fallback usage.
 3. Documentation validation:
    1. API names and signatures match implementation exactly.
    2. Terminology usage is consistent: no diatonic examples described as transposing.
    3. Example snippets execute against current behavior.
 
 ## Progress checklist
-- [ ] Phase 0: Audit and naming contract finalized
-- [ ] Phase 1: Degree and Scale shift APIs implemented
-- [ ] Phase 2: Note shift with explicit scale context implemented
-- [ ] Phase 3: Chord shift with explicit scale context implemented
-- [ ] Phase 4: Context ergonomics option evaluated (context manager or service)
-- [ ] Phase 5: Docs and examples migrated to shift or transpose terminology
-- [ ] Phase 6: Full regression and coverage validation completed
-- [ ] Milestone A complete
-- [ ] Milestone B complete
-- [ ] Milestone C complete
+- [x] Phase 0: Audit and naming contract finalized
+- [x] Phase 1: Degree and Scale shift APIs implemented
+- [x] Phase 2: Note shift with explicit scale context implemented
+- [x] Phase 3: Chord shift with explicit scale context implemented
+- [x] Phase 4: Context ergonomics option evaluated (context manager or service)
+- [x] Phase 5: Docs and examples migrated to shift or transpose terminology
+- [x] Phase 6: Full regression and coverage validation completed
+- [x] Milestone A complete
+- [x] Milestone B complete
+- [x] Milestone C complete
 
 ## Phases
 ### Phase 0: Finalize contract and audit baseline
@@ -413,22 +427,24 @@ Expected docs delta classification: both README updates and docs updates.
 4. Add focused tests for Degree and Scale shifting, including compound intervals.
 5. Milestone A: Degree and Scale shifting are stable and tested.
 
-### Phase 2: Implement Note.shift with explicit scale context
+### Phase 2: Implement Note.shift with explicit scale context and fallback
 1. Add Note.shift(steps, scale=...) with deterministic degree lookup and octave handling.
-2. Add clear ValueError messaging for out-of-scale notes.
-3. Add note-shift tests for positive, negative, compound, and error paths.
-4. Milestone B: Notes can shift diatonically with explicit scale context.
+2. Support global scale context fallback when explicit scale is not supplied.
+3. Add clear ValueError messaging for out-of-scale notes.
+4. Add note-shift tests for positive, negative, compound, and error paths.
+5. Milestone B: Notes can shift diatonically with explicit scale context or global fallback.
 
-### Phase 3: Implement Chord.shift with explicit scale context
+### Phase 3: Implement Chord.shift with explicit scale context and fallback
 1. Add Chord.shift root strategy first and preserve existing quality or extension metadata.
 2. Add optional tones strategy only if semantics are unambiguous and testable.
 3. Add tests for slash chords, extensions, and edge cases.
-4. Milestone C: Chords support practical diatonic shifting for progression workflows.
+4. Ensure global scale context fallback behavior is covered by tests.
+5. Milestone C: Chords support practical diatonic shifting for progression workflows.
 
 ### Phase 4: Evaluate context ergonomics
-1. Prototype context manager and service-object approaches behind internal helpers.
-2. Compare explicitness, testability, thread safety, and API clarity.
-3. Record recommendation in a decision doc if a new public context API is proposed.
+1. Evaluate explicit-only versus global-fallback ergonomics against current usage.
+2. Retain current API: explicit scale argument preferred, global fallback supported.
+3. No additional public context service API is introduced in this rollout.
 
 ### Phase 5: Documentation and examples migration
 1. Update README and docs guides with canonical terminology.
@@ -452,7 +468,7 @@ Expected docs delta classification: both README updates and docs updates.
 1. Risk: confusion between shift and transpose remains in docs and examples.
    1. Mitigation: enforce terminology checks during documentation updates and review.
 2. Risk: Note or Chord shift semantics are ambiguous for out-of-scale tones.
-   1. Mitigation: require explicit scale context and raise actionable ValueError.
+   1. Mitigation: require explicit or global scale context and raise actionable ValueError.
 3. Risk: Compound diatonic behavior is inconsistent between class-oriented and octave-oriented outputs.
    1. Mitigation: define and test a shared target-index plus cycles resolver used by all shift paths.
 4. Risk: Chord shifting may produce musically unexpected quality outcomes.
@@ -463,7 +479,7 @@ Expected docs delta classification: both README updates and docs updates.
 ## Acceptance criteria
 1. The library has explicit, documented terminology where shift means diatonic and transpose means chromatic.
 2. Degree and Scale expose shift APIs with deterministic behavior and passing tests.
-3. Note and Chord support diatonic shifting through explicit scale context.
+3. Note and Chord support diatonic shifting through explicit scale context or global fallback context.
 4. Compound diatonic intervals greater than 7 are supported consistently (for example 9th and 13th).
 5. Compound behavior preserves cycle semantics for octave-aware outputs and class semantics for selector-style outputs.
 6. Breaking transpose contract is fully implemented and tested, including `Note("C4").transpose("1") -> Note("C#4")` and equivalent cross-type behavior.

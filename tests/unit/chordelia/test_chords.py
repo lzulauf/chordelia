@@ -18,7 +18,7 @@ from chordelia.chords import (
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.intervals import Interval, IntervalQuality
 from chordelia.rhythm import Duration
-from chordelia.scale_context import reset_global_scale_context, with_global_scale_context
+from chordelia.scale_context import with_global_scale_context
 from chordelia.score import ScoreEventContext
 from chordelia.scales import Scale, ScaleType
 
@@ -923,25 +923,20 @@ class TestChordTransposition:
         assert g_major.root.name == NoteName.G
         assert g_major.quality == ChordQuality.MAJOR
 
-    def test_transpose_numeric_string_uses_semitones(self):
-        """Numeric transpose strings are interpreted as semitone displacements."""
+    def test_transpose_int_uses_semitones(self):
+        """Integer transpose inputs are interpreted as semitone displacements."""
         c_major = Chord("C", ChordQuality.MAJOR)
 
-        c_sharp_major = c_major.transpose("1")
+        c_sharp_major = c_major.transpose(1)
 
         assert c_sharp_major.root.name == NoteName.C
         assert c_sharp_major.root.accidental == Accidental.SHARP
         assert c_sharp_major.quality == ChordQuality.MAJOR
 
 
+@pytest.mark.usefixtures("reset_global_scale_context_state")
 class TestChordShift:
     """Test chord diatonic shifting behavior within explicit/global scale context."""
-
-    @pytest.fixture(autouse=True)
-    def _reset_global_scale_context(self):
-        reset_global_scale_context()
-        yield
-        reset_global_scale_context()
 
     def test_shift_moves_root_with_explicit_scale(self):
         c_major = Scale("C", ScaleType.MAJOR)

@@ -238,7 +238,7 @@ flowchart LR
 
 ## Cross-plan references
 1. [common musical interfaces plan](common_musical_interfaces_plan.md) for Sequenceable and Score conversion boundary behavior.
-2. [duration model unification plan](duration_model_unification_plan.md) for timing coercion alignment.
+2. [duration model unification plan](archive/duration_model_unification_plan.md) for timing coercion alignment.
 
 ## Testing approach
 Expected test delta classification: both new tests and updated tests.

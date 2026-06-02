@@ -6,6 +6,7 @@ This script shows how to work with notes, intervals, scales, and chords.
 
 from chordelia import Note, Interval, Scale, Chord
 from chordelia import NoteName, Accidental, IntervalQuality, ScaleType, ChordQuality
+from chordelia import with_global_scale_context
 
 
 def notes_example():
@@ -29,6 +30,18 @@ def notes_example():
     perfect_fifth = Interval(IntervalQuality.PERFECT, 5)
     g = c.transpose(perfect_fifth)
     print(f"C transposed up a perfect fifth: {g}")
+
+    c_major = Scale("C", ScaleType.MAJOR)
+    e4 = Note("E4")
+    diatonic_shift = e4.shift(2, scale=c_major)
+    semitone_shift = e4.transpose(1)
+
+    with with_global_scale_context(c_major):
+        diatonic_shift_fallback = e4.shift(2)
+
+    print(f"E4 shifted +2 diatonic steps in C major: {diatonic_shift}")
+    print(f"E4 shifted +2 with global fallback context: {diatonic_shift_fallback}")
+    print(f"E4 transposed by 1 semitone: {semitone_shift}")
     
     # Frequency calculation
     a4 = Note.from_string("A4")

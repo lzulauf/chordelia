@@ -16,6 +16,8 @@ from chordelia.scales import (
 from chordelia.chords import Chord, ChordQuality
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.intervals import Interval, IntervalQuality
+from chordelia.score import ScoreEventContext
+from chordelia.rhythm import Duration
 
 
 class TestScaleType:
@@ -203,6 +205,14 @@ class TestScaleNotes:
         
         assert actual == expected
 
+    def test_g_pentatonic_minor_uses_relative_major_spelling(self):
+        """G minor pentatonic should prefer Bb spelling from Bb-major key family."""
+        g_pent_minor = Scale("G", ScaleType.PENTATONIC_MINOR)
+
+        actual = [str(note) for note in g_pent_minor.notes]
+
+        assert actual == ["G", "Bb", "C", "D", "F"]
+
 
 class TestScaleWithOctave:
     """Test scales with octave information."""
@@ -220,6 +230,15 @@ class TestScaleWithOctave:
         assert notes[4].octave == 4  # G4
         assert notes[5].octave == 4  # A4
         assert notes[6].octave == 4  # B4
+
+    def test_c_sharp_major_with_octave_keeps_b_sharp_in_octave_four(self):
+        """Enharmonic spellings should follow diatonic octave progression."""
+        cs4_major = Scale("C#", ScaleType.MAJOR).with_octave(4)
+        notes = cs4_major.notes
+
+        assert notes[6].name == NoteName.B
+        assert notes[6].accidental == Accidental.SHARP
+        assert notes[6].octave == 4
     
     def test_scale_crossing_octave(self):
         """Test scales that cross octave boundaries."""
@@ -307,6 +326,24 @@ class TestScaleDegrees:
             c_pent.degree(6)  # Only 5 degrees in pentatonic
 
 
+class TestScaleKeySignatureNotes:
+    """Test key-signature note derivation from tonal key families."""
+
+    def test_major_scale_key_signature_notes(self):
+        d_major = Scale("D", ScaleType.MAJOR)
+
+        signature_notes = d_major.key_signature_notes()
+
+        assert [str(note) for note in signature_notes] == ["F#", "C#"]
+
+    def test_pentatonic_minor_key_signature_notes(self):
+        g_pent_minor = Scale("G", ScaleType.PENTATONIC_MINOR)
+
+        signature_notes = g_pent_minor.key_signature_notes()
+
+        assert [str(note) for note in signature_notes] == ["Bb", "Eb"]
+
+
 class TestScaleModes:
     """Test scale mode generation."""
     
@@ -377,7 +414,7 @@ class TestScaleTransposition:
         major_third = Interval(IntervalQuality.MAJOR, 3)
         
         c_sharp_minor = a_minor.transpose(major_third)
-        
+
         assert str(c_sharp_minor.root) == "C#"
         assert c_sharp_minor.scale_type == ScaleType.NATURAL_MINOR
 
@@ -390,14 +427,65 @@ class TestScaleTransposition:
         assert str(g_major.root) == "G"
         assert g_major.scale_type == ScaleType.MAJOR
 
-    def test_transpose_numeric_string_uses_semitones(self):
-        """Numeric transpose strings are interpreted as semitone displacements."""
+    def test_transpose_int_uses_semitones(self):
+        """Integer transpose inputs are interpreted as semitone displacements."""
         c_major = Scale("C", ScaleType.MAJOR)
 
-        c_sharp_major = c_major.transpose("1")
+        c_sharp_major = c_major.transpose(1)
 
         assert str(c_sharp_major.root) == "C#"
         assert c_sharp_major.scale_type == ScaleType.MAJOR
+
+
+class TestScaleSequenceableRendering:
+    """Scale values should render as sequenceable quarter-note progressions."""
+
+    def test_scale_render_for_context_emits_quarter_note_progression(self):
+        scale = Scale("C4", ScaleType.MAJOR)
+
+        render = scale.render_for_context(ScoreEventContext())
+
+        assert len(render.events) == 8
+        assert render.consumed_duration == Duration.from_beats(8)
+        assert [event.beat for event in render.events] == [
+            Duration.from_beats(0),
+            Duration.from_beats(1),
+            Duration.from_beats(2),
+            Duration.from_beats(3),
+            Duration.from_beats(4),
+            Duration.from_beats(5),
+            Duration.from_beats(6),
+            Duration.from_beats(7),
+        ]
+        assert all(event.duration == Duration.from_beats(1) for event in render.events)
+
+    def test_scale_render_for_context_defaults_to_middle_c_octave_when_missing(self):
+        scale = Scale("C", ScaleType.MAJOR)
+
+        render = scale.render_for_context(ScoreEventContext())
+
+        assert [event.pitches for event in render.events] == [
+            (60,),
+            (62,),
+            (64,),
+            (65,),
+            (67,),
+            (69,),
+            (71,),
+            (72,),
+        ]
+
+    def test_scale_render_for_context_uses_with_octave_for_missing_octaves(self):
+        scale = CustomScale("C", [0, 7, 2])
+
+        render = scale.render_for_context(ScoreEventContext())
+
+        assert [event.pitches for event in render.events] == [
+            (60,),
+            (67,),
+            (62,),
+            (72,),
+        ]
 
 
 class TestScaleShift:

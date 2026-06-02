@@ -1,0 +1,163 @@
+"""Tests for sequence-level randomization APIs and built-in algorithms."""
+
+from __future__ import annotations
+
+from fractions import Fraction
+
+import pytest
+
+from chordelia import (
+    ChordAnchorWalkSequenceAlgorithm,
+    MotifVariationSequenceAlgorithm,
+    PureRandomSequenceAlgorithm,
+    Random,
+    ScaleWalkSequenceAlgorithm,
+)
+from chordelia.chords import Chord
+from chordelia.notes import Note
+from chordelia.rhythm import Duration
+from chordelia.scales import Scale, ScaleType
+from chordelia.sequences import Sequence
+
+
+pytestmark = pytest.mark.usefixtures(
+    "reset_global_scale_context_state",
+    "reset_global_random_state",
+)
+
+
+def _consumed_beats(sequence: Sequence) -> Fraction:
+    return sum((entry.duration.as_beats() for entry in sequence.entries), Fraction(0, 1))
+
+
+class TestRandomSequenceValidation:
+    """Validation behavior for Random.sequence dispatch."""
+
+    @pytest.mark.parametrize("beat_length", [0, -1, -0.5])
+    def test_sequence_rejects_non_positive_beat_length(self, beat_length):
+        with pytest.raises(ValueError, match="beat_length must be > 0"):
+            Random(seed=1).sequence(beat_length)
+
+    def test_sequence_rejects_seconds_mode_length(self):
+        with pytest.raises(ValueError, match="beat-mode"):
+            Random(seed=1).sequence(Duration.from_seconds(1))
+
+    def test_sequence_rejects_unknown_algorithm_name(self):
+        with pytest.raises(ValueError, match="Unknown sequence algorithm"):
+            Random(seed=1).sequence(4, algorithm="missing")
+
+    def test_sequence_rejects_unknown_algorithm_weight_keys(self):
+        with pytest.raises(ValueError, match="Unknown sequence algorithm"):
+            Random(seed=1).sequence(4, algorithm_weights={"missing": 1.0})
+
+    def test_sequence_rejects_weights_with_explicit_algorithm(self):
+        with pytest.raises(ValueError, match="cannot be used with an explicit algorithm"):
+            Random(seed=1).sequence(
+                4,
+                algorithm=PureRandomSequenceAlgorithm(),
+                algorithm_weights={"pure_random": 1.0},
+            )
+
+
+class TestRandomSequenceDispatchAndDeterminism:
+    """Dispatch paths and deterministic behavior checks."""
+
+    def test_weighted_algorithm_selection_is_deterministic(self):
+        rng_a = Random(seed=202606)
+        rng_b = Random(seed=202606)
+        weights = {
+            "motif_variation": 40,
+            "scale_walk": 30,
+            "chord_anchor_walk": 20,
+            "pure_random": 10,
+        }
+
+        seq_a = rng_a.sequence(8, algorithm_weights=weights, scale="A natural_minor")
+        seq_b = rng_b.sequence(8, algorithm_weights=weights, scale="A natural_minor")
+
+        assert seq_a == seq_b
+
+    def test_motif_algorithm_instance_reuse_preserves_stateful_continuity(self):
+        rng = Random(seed=77)
+        motif = MotifVariationSequenceAlgorithm(motif_beats=2)
+
+        seq_a = rng.sequence(
+            8,
+            algorithm=motif,
+            scale="D minor",
+            mutation_probability=0,
+        )
+        seq_b = rng.sequence(
+            8,
+            algorithm=motif,
+            scale="D minor",
+            mutation_probability=0,
+        )
+
+        assert motif._motif_template is not None
+        assert seq_a == seq_b
+
+
+class TestBuiltInSequenceAlgorithms:
+    """Behavior checks for built-in sequence randomization algorithms."""
+
+    @pytest.mark.parametrize(
+        "algorithm, kwargs",
+        [
+            pytest.param(PureRandomSequenceAlgorithm(), {}, id="pure-random"),
+            pytest.param(MotifVariationSequenceAlgorithm(), {}, id="motif-variation"),
+            pytest.param(ScaleWalkSequenceAlgorithm(), {}, id="scale-walk"),
+            pytest.param(
+                ChordAnchorWalkSequenceAlgorithm(),
+                {"chord": "Am"},
+                id="chord-anchor-walk",
+            ),
+        ],
+    )
+    def test_algorithms_fill_exact_requested_beat_span(self, algorithm, kwargs):
+        sequence = Random(seed=5).sequence(
+            Fraction(15, 2),
+            algorithm=algorithm,
+            scale="C major",
+            **kwargs,
+        )
+
+        assert _consumed_beats(sequence) == Fraction(15, 2)
+
+    def test_scale_walk_notes_stay_in_scale(self):
+        scale = Scale("E", ScaleType.NATURAL_MINOR)
+        sequence = Random(seed=9).sequence(8, algorithm="scale_walk", scale=scale)
+
+        allowed = {note.pitch_class for note in scale.notes}
+        for entry in sequence.entries:
+            assert isinstance(entry.payload, Note)
+            assert entry.payload.pitch_class in allowed
+
+    def test_chord_anchor_walk_starts_and_ends_on_chord_tones(self):
+        sequence = Random(seed=13).sequence(
+            8,
+            algorithm="chord_anchor_walk",
+            scale="C major",
+            chord="Am",
+        )
+
+        chord_tones = {note.pitch_class for note in Chord.from_string("Am").notes}
+        first = sequence.entries[0].payload
+        last = sequence.entries[-1].payload
+        assert isinstance(first, Note)
+        assert isinstance(last, Note)
+        assert first.pitch_class in chord_tones
+        assert last.pitch_class in chord_tones
+
+    def test_pure_random_can_extend_prior_pitched_entry_via_continue(self):
+        sequence = Random(seed=1).sequence(
+            4,
+            algorithm=PureRandomSequenceAlgorithm(),
+            scale="C major",
+            event_type_weights={"note": 1.0, "continue": 100.0, "rest": 0.0, "chord": 0.0},
+            duration_weights={1: 1.0},
+        )
+
+        # At least one continuation should collapse events into fewer entries than durations.
+        assert len(sequence.entries) < 4
+        assert _consumed_beats(sequence) == Fraction(4, 1)

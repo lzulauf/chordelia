@@ -5,7 +5,7 @@ Back links: [Project README](../../README.md) | [Docs Index](../README.md)
 ## Working with Scales
 
 ```python
-from chordelia import Scale, ScaleType, Note, Interval, IntervalQuality, Degree
+from chordelia import Degree, Note, Scale, ScaleType
 
 c_major = Scale("C", ScaleType.MAJOR)
 print([str(note) for note in c_major.notes])
@@ -20,9 +20,10 @@ print(c_major.degree("ii"))  # D
 print(c_major.degree(Degree(7)))  # B
 
 # Methods return new immutable scales
-g_major = c_major.transpose(Interval(IntervalQuality.PERFECT, 5))
-d_dorian = c_major.mode_from_degree(2)
-e_phrygian = c_major.mode_from_degree("iii")
+d_dorian = c_major.shift(1)     # diatonic shift by one degree
+e_phrygian = c_major.shift(2)   # diatonic shift by two degrees
+g_major = c_major.transpose("P5")  # chromatic transpose by perfect fifth
+c_sharp_major = c_major.transpose(1)  # chromatic transpose by one semitone
 
 print(c_major.contains_note(Note("E")))   # True
 print(c_major.contains_note(Note("F#")))  # False
@@ -92,6 +93,22 @@ complex_chord = (
 
 modified = c_major.with_(root="G", extensions=["7", "9"], bass_note="B")
 f_major = c_major.transpose(Interval.from_semitones(5))
+```
+
+## Diatonic Chord Shift with Scale Context
+
+```python
+from chordelia import Chord, ChordQuality, Scale, ScaleType, with_global_scale_context
+
+c_major = Scale("C", ScaleType.MAJOR)
+e_minor = Chord("E", ChordQuality.MINOR)
+
+explicit = e_minor.shift(2, scale=c_major)
+print(explicit.name)  # Gm
+
+with with_global_scale_context(c_major):
+    fallback = e_minor.shift(2)
+    print(fallback.name)  # Gm
 ```
 
 ## Progression Example

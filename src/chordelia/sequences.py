@@ -284,6 +284,10 @@ class Sequence:
     def __iter__(self):
         return iter(self.entries)
 
+    def sheet_music_should_render_tempo_metadata(self) -> bool:
+        """Signal SheetMusic to render tempo metadata for sequence-backed sources."""
+        return True
+
 
 SequenceEntryLike: TypeAlias = (
     SequenceEntry

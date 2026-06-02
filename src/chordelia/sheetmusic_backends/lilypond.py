@@ -10,8 +10,6 @@ import subprocess
 import tempfile
 from typing import TYPE_CHECKING, Callable
 
-from chordelia.scales import ScaleType
-
 if TYPE_CHECKING:
     from chordelia.sheet_music import SheetMusic
 
@@ -167,8 +165,10 @@ def _sheet_to_lilypond_source(sheet: SheetMusic) -> str:
 
     numerator, denominator = sheet.score.metadata.time_signature
     tempo = sheet.score.metadata.tempo
-    key_line = _key_signature_line(sheet)
-    tokens = " ".join(_score_tokens(sheet))
+    tempo_line = f"    \\tempo 4 = {tempo}\\n" if getattr(sheet, "_render_tempo_metadata", False) else ""
+    scale_directives = _iterable_scale_directives(sheet)
+    key_line = "" if scale_directives else _key_signature_line(sheet)
+    tokens = " ".join(_score_tokens(sheet, directives=scale_directives))
 
     key_section = ""
     if key_line:
@@ -181,8 +181,10 @@ def _sheet_to_lilypond_source(sheet: SheetMusic) -> str:
         "\\score {\n"
         "  \\new Staff {\n"
         "    \\clef treble\n"
+        "    \\set Staff.printKeyCancellation = ##f\n"
+        "    \\omit Staff.KeyCancellation\n"
         f"    \\time {numerator}/{denominator}\n"
-        f"    \\tempo 4 = {tempo}\n"
+        f"{tempo_line}"
         f"{key_section}"
         f"    {tokens}\n"
         "  }\n"
@@ -197,47 +199,135 @@ def _key_signature_line(sheet: SheetMusic) -> str:
     if scale is None:
         return ""
 
-    if scale.scale_type in {ScaleType.MAJOR, ScaleType.IONIAN}:
-        mode = "major"
-    elif scale.scale_type in {ScaleType.NATURAL_MINOR, ScaleType.AEOLIAN}:
-        mode = "minor"
+    return _key_signature_line_for_scale(scale)
+
+
+def _key_signature_line_for_scale(scale) -> str:
+    """Build a LilyPond key directive for one scale from explicit accidental notes."""
+
+    key_signature_notes = getattr(scale, "key_signature_notes", None)
+    if callable(key_signature_notes):
+        notes = key_signature_notes()
     else:
+        notes = ()
+
+    alterations = _lily_key_alterations_from_notes(notes)
+    return f"\\set Staff.keyAlterations = #`({alterations})"
+
+
+def _iterable_scale_directives(sheet: SheetMusic) -> dict[Fraction, list[str]]:
+    """Return beat-indexed LilyPond directives for iterable scale annotations."""
+
+    annotations = getattr(sheet, "_measure_scale_annotations", ())
+    if not annotations:
+        return {}
+
+    directives: dict[Fraction, list[str]] = {}
+    for beat, scale, label in annotations:
+        marker_directives: list[str] = []
+
+        key_line = _key_signature_line_for_scale(scale)
+        if key_line:
+            marker_directives.append(key_line)
+
+        safe_label = str(label).replace('"', "'")
+        marker_directives.append(f'\\mark \\markup {{ "{safe_label}" }}')
+
+        if marker_directives:
+            directives[beat] = marker_directives
+
+    return directives
+
+
+def _lily_key_alterations_from_notes(notes) -> str:
+    """Convert accidental notes into a LilyPond keyAlterations list body."""
+
+    if not notes:
         return ""
 
-    key_root = _lily_key_pitch_from_note(scale.root)
-    return f"\\key {key_root} \\{mode}"
+    step_map = {
+        "C": 0,
+        "D": 1,
+        "E": 2,
+        "F": 3,
+        "G": 4,
+        "A": 5,
+        "B": 6,
+    }
+    accidental_map = {
+        -2: "DOUBLE-FLAT",
+        -1: "FLAT",
+        1: "SHARP",
+        2: "DOUBLE-SHARP",
+    }
+
+    tokens: list[str] = []
+    for note in notes:
+        step_name = note.name.name
+        if step_name not in step_map:
+            continue
+
+        accidental_value = int(note.accidental.value)
+        accidental_name = accidental_map.get(accidental_value)
+        if accidental_name is None:
+            continue
+
+        tokens.append(f"({step_map[step_name]} . ,{accidental_name})")
+
+    return " ".join(tokens)
 
 
-def _lily_key_pitch_from_note(note) -> str:
-    """Convert a root note to a LilyPond key pitch (no octave marks)."""
-
-    letter = note.name.name.lower()
-    accidental = int(note.accidental.value)
-    accidental_suffix = {
-        -2: "eses",
-        -1: "es",
-        0: "",
-        1: "is",
-        2: "isis",
-    }.get(accidental)
-    if accidental_suffix is None:
-        raise ValueError(f"Unsupported accidental for LilyPond key: {note}")
-    return f"{letter}{accidental_suffix}"
-
-
-def _score_tokens(sheet: SheetMusic) -> list[str]:
+def _score_tokens(
+    sheet: SheetMusic,
+    *,
+    directives: dict[Fraction, list[str]] | None = None,
+) -> list[str]:
     """Convert score events to a monophonic/chord LilyPond token stream."""
 
     events = list(sheet.score.events)
+    mode = events[0].beat.mode if events else "beats"
+
+    directive_points = sorted((directives or {}).items(), key=lambda item: item[0])
+    directive_index = 0
+
     if not events:
-        return ["r1"]
+        tokens: list[str] = []
+        if mode == "beats":
+            while directive_index < len(directive_points) and directive_points[directive_index][0] == 0:
+                tokens.extend(directive_points[directive_index][1])
+                directive_index += 1
+        if not tokens:
+            tokens.append("r1")
+        return tokens
 
     cursor = Fraction(0, 1)
     tokens: list[str] = []
 
+    def emit_directives_through(target: Fraction) -> None:
+        nonlocal cursor, directive_index
+        while directive_index < len(directive_points):
+            marker, marker_directives = directive_points[directive_index]
+            if marker > target:
+                break
+
+            if marker > cursor:
+                gap_before_marker = marker - cursor
+                for part in _split_duration(gap_before_marker):
+                    tokens.append(f"r{_DURATION_TO_LILYPOND[part]}")
+                cursor = marker
+
+            tokens.extend(marker_directives)
+            directive_index += 1
+
+    if mode == "beats":
+        emit_directives_through(Fraction(0, 1))
+
     for event in events:
         beat = event.beat.as_beats()
         duration = event.duration.as_beats()
+
+        if mode == "beats":
+            emit_directives_through(beat)
 
         if beat > cursor:
             gap = beat - cursor
@@ -246,6 +336,9 @@ def _score_tokens(sheet: SheetMusic) -> list[str]:
 
         tokens.append(_event_token(event))
         cursor = max(cursor, beat + duration)
+
+    if mode == "beats":
+        emit_directives_through(cursor)
 
     return tokens
 

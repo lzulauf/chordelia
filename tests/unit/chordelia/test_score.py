@@ -6,17 +6,14 @@ from chordelia.degrees import Degree
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
 from chordelia.scales import Scale
-from chordelia.scale_context import reset_chordelia_context, with_chordelia_context
+from chordelia.scale_context import (
+    with_chordelia_context,
+)
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
 from chordelia.sequenceable import SequenceRender
 
 
-@pytest.fixture(autouse=True)
-def clear_runtime_context_between_tests():
-    """Keep runtime context isolated to each test."""
-    reset_chordelia_context()
-    yield
-    reset_chordelia_context()
+pytestmark = pytest.mark.usefixtures("reset_chordelia_context_state")
 
 
 class TestScoreEvent:

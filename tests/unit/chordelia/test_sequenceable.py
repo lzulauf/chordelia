@@ -6,7 +6,7 @@ from chordelia.chords import Chord
 from chordelia.intervals import Interval
 from chordelia.notes import Note
 from chordelia.rhythm import Duration
-from chordelia.scale_context import reset_global_scale_context, with_global_scale_context
+from chordelia.scale_context import with_global_scale_context
 from chordelia.sequences import Rest, Sequence, SequenceEntry
 from chordelia.score import Score, ScoreEvent, ScoreEventContext
 from chordelia.sequenceable import (
@@ -495,14 +495,9 @@ class TestSequenceScheduling:
         assert render.consumed_duration == Duration.from_beats(1)
 
 
+@pytest.mark.usefixtures("reset_global_scale_context_state")
 class TestSequenceTransforms:
     """Sequence transform behavior and recursive transpose semantics."""
-
-    @pytest.fixture(autouse=True)
-    def _reset_global_scale_context(self):
-        reset_global_scale_context()
-        yield
-        reset_global_scale_context()
 
     def test_sequence_transpose_preserves_timing_and_updates_pitches(self):
         seq = Sequence(
@@ -575,10 +570,10 @@ class TestSequenceTransforms:
         assert [event.pitches for event in render.events] == [(62, 66, 69), (69,)]
         assert [event.beat for event in render.events] == [Duration.from_beats(0), Duration.from_beats(0)]
 
-    def test_sequence_transpose_numeric_string_uses_semitones(self):
+    def test_sequence_transpose_int_uses_semitones(self):
         seq = Sequence(((Note("C4"), 1),))
 
-        transposed = seq.transpose("1")
+        transposed = seq.transpose(1)
         render = transposed.render_for_context(ScoreEventContext())
 
         assert [event.pitches for event in render.events] == [(61,)]

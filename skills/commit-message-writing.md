@@ -57,9 +57,15 @@ Companion skills: readme-writing when docs changes are a meaningful part of the 
 - Group bullets by meaningful outcomes, not file-by-file noise.
 - Include key behavior changes first.
 - Include API contract changes and defaults explicitly.
-- Include tests and docs updates when present.
+- Include docs updates when present.
+- Include test updates when they represent meaningful behavior or contract coverage changes.
 
-5. Add compatibility notes when needed.
+5. Handle validation notes conservatively.
+- Treat passing tests/lint/format checks as baseline expectations.
+- Do not add generic validation bullets such as "tests pass" unless explicitly requested.
+- Include validation details only when they add material context: failing-then-fixed scenarios, newly introduced critical coverage, required release gates, or when a user/repo template asks for them.
+
+6. Add compatibility notes when needed.
 - If behavior is breaking, mark it clearly.
 - Use `!` in summary and/or include `BREAKING CHANGE:` details in body when applicable.
 
@@ -77,6 +83,7 @@ Companion skills: readme-writing when docs changes are a meaningful part of the 
 - Message reflects current workspace changes accurately.
 - Summary line is specific and action-oriented.
 - Body includes important behavior/API/test/docs information.
+- Body avoids baseline-only validation noise unless requested.
 - User-requested structure is followed exactly.
 - Final message is wrapped in a fenced code block unless plain text was explicitly requested.
 - No fabricated changes or unsupported claims.

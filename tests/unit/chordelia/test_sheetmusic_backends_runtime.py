@@ -6,30 +6,17 @@ import chordelia.sheetmusic_backends.runtime as runtime
 from chordelia.notes import Note
 from chordelia.scale_context import (
     get_global_scale_context,
-    reset_global_scale_context,
     set_global_scale_context,
 )
 from chordelia.scales import Scale
 from chordelia.sheet_music import SheetMusic
 
 
-@pytest.fixture(autouse=True)
-def _restore_runtime_state():
-    """Keep runtime rendering state isolated across tests."""
-
-    previous_config = runtime.get_sheetmusic_rendering_config()
-    previous_adapters = dict(SheetMusic._RENDER_BACKEND_ADAPTERS)
-
-    runtime.uninstall_sequenceable_sheetmusic_display_hooks()
-    runtime.reset_sheetmusic_rendering_config()
-    reset_global_scale_context()
-    yield
-
-    runtime.uninstall_sequenceable_sheetmusic_display_hooks()
-    runtime._RENDERING_CONFIG.set(previous_config)  # type: ignore[attr-defined]
-    set_global_scale_context(previous_config.scale)
-    SheetMusic._RENDER_BACKEND_ADAPTERS.clear()
-    SheetMusic._RENDER_BACKEND_ADAPTERS.update(previous_adapters)
+pytestmark = pytest.mark.usefixtures(
+    "restore_sheetmusic_runtime_rendering_config_state",
+    "reset_global_scale_context_state",
+    "restore_sheetmusic_backend_adapters_state",
+)
 
 
 class TestSheetMusicRuntimeConfig:
@@ -110,6 +97,23 @@ class TestSequenceableDisplayHooks:
         assert "image/svg+xml" in mimebundle
         assert mimebundle["image/svg+xml"].count('class="key-accidental"') == 2
 
+    def test_install_sequenceable_hooks_renders_scale_as_sheetmusic(self):
+        runtime.configure_sheetmusic_rendering(scale="C")
+        runtime.install_sequenceable_sheetmusic_display_hooks(target_types=(Scale,))
+
+        mimebundle = Scale("C", "major")._repr_mimebundle_()
+
+        assert "image/svg+xml" in mimebundle
+        assert "text/plain" in mimebundle
+
+    def test_scale_display_uses_wrapped_scale_over_global_scale_context(self):
+        runtime.configure_sheetmusic_rendering(scale="C")
+        runtime.install_sequenceable_sheetmusic_display_hooks(target_types=(Scale,))
+
+        mimebundle = Scale("G", "pentatonic_minor")._repr_mimebundle_()
+
+        assert mimebundle["image/svg+xml"].count('class="key-accidental"') == 2
+
     def test_configure_sheetmusic_rendering_hook_install_is_idempotent(self):
         runtime.configure_sheetmusic_rendering(
             enable_notebook_hooks=True,
@@ -147,3 +151,44 @@ class TestSequenceableDisplayHooks:
         mimebundle = Note("C4")._repr_mimebundle_()
 
         assert "runtime-dispatch" in mimebundle["image/svg+xml"]
+
+
+class TestSheetMusicIterableRendering:
+    """Notebook helper behavior for rendering iterable collections."""
+
+    def test_sheetmusic_for_sequenceable_list(self):
+        sheet = SheetMusic([Scale("C", "major"), Scale("D", "major")])
+
+        mimebundle = sheet._repr_mimebundle_()
+
+        assert "image/svg+xml" in mimebundle
+        assert "text/plain" in mimebundle
+        assert mimebundle["image/svg+xml"].count("<svg") == 1
+
+    def test_sheetmusic_for_sheetmusic_list(self):
+        sheets = [SheetMusic(Scale("C", "major")), SheetMusic(Scale("D", "major"))]
+
+        sheet = SheetMusic(sheets)
+        mimebundle = sheet._repr_mimebundle_()
+
+        assert "image/svg+xml" in mimebundle
+        assert mimebundle["image/svg+xml"].count("<svg") == 1
+
+    def test_sheetmusic_iterable_to_file_writes_svg(self, tmp_path):
+        sheet = SheetMusic([Scale("C", "major"), Scale("D", "major")])
+
+        output_path = sheet.to_file(tmp_path / "iterable.svg")
+        content = output_path.read_text(encoding="utf-8")
+
+        assert output_path.suffix == ".svg"
+        assert content.count("<svg") == 1
+
+    def test_sheetmusic_iterable_to_file_rejects_non_svg(self, tmp_path):
+        sheet = SheetMusic([Scale("C", "major")])
+
+        with pytest.raises(ValueError, match="Supported formats: svg"):
+            sheet.to_file(tmp_path / "iterable.html", format="html")
+
+    def test_sheetmusic_rejects_non_sequenceable_string(self):
+        with pytest.raises(TypeError, match="not Sequenceable"):
+            SheetMusic("not-a-renderable-list")

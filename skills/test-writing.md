@@ -81,6 +81,13 @@ Companion skills: function-naming for canonical API naming, immutable-types for 
 - If a test delta confirms user-visible behavior/API changes, ensure matching README/docs updates are included or document a "No docs delta rationale".
 - Load readme-writing when behavior/API changes alter examples, contracts, or usage guidance.
 
+10. Restore mutable global state in fixtures
+- For fixtures that mutate process/global runtime state, always snapshot previous state first, reset to a clean test baseline, then restore previous state in a finally block after yield.
+- Prefer one fixture per mutable state domain (for example context, random singleton, backend adapters) and compose them via fixture dependencies when a test needs multiple domains isolated.
+- Prefer whole-object restoration over piecemeal field restoration to avoid brittleness when context objects gain new fields.
+- For Chordelia runtime context specifically, restore with positional context calls (for example `set_chordelia_context(previous_context)`) instead of setting `scale` and `default_note_duration` separately.
+- Apply the same pattern to other mutable singletons/config stores (for example randomization singleton, backend runtime config), restoring full prior objects where possible.
+
 ## Checklist for New Test Work
 
 - [ ] Canonical API names used in new tests
@@ -91,6 +98,9 @@ Companion skills: function-naming for canonical API naming, immutable-types for 
 - [ ] Parameterization used for repetitive case matrices
 - [ ] Non-obvious parameterized cases use pytest.param with clear ids
 - [ ] Fixture scope is appropriate (local file vs conftest.py)
+- [ ] Fixtures that mutate global state snapshot, reset, and restore previous state
+- [ ] Fixtures are split by state domain and composed for tests that need multiple domains
+- [ ] Context restoration uses whole-context/object restore (for example positional set_chordelia_context)
 - [ ] Immutability checks included where relevant
 - [ ] Slow markers used only when needed
 - [ ] Behavior/API changes include test additions or updates in the same change

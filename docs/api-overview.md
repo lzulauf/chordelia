@@ -36,6 +36,42 @@ Related deep docs:
 
 - [Rhythm and Timing](guides/rhythm-and-timing.md)
 
+## Randomization
+
+Main APIs:
+
+- `Random(seed=None, engine=None)`
+- `Random.choice(...)`, `Random.weighted_choice(...)`, `Random.weighted_choice_map(...)`
+- `Random.scale(...)`, `Random.degree(...)`, `Random.note(...)`, `Random.chord(...)`
+- `Random.chromatic_note(...)`, `Random.chromatic_chord(...)`, `Random.interval(...)`
+- `Random.sequence(...)`
+- `SequenceRandomizationAlgorithm`
+- `PureRandomSequenceAlgorithm`, `MotifVariationSequenceAlgorithm`, `ScaleWalkSequenceAlgorithm`, `ChordAnchorWalkSequenceAlgorithm`
+- `get_global_random()`, `configure_global_random(...)`, `reset_global_random()`
+
+Key behaviors:
+
+- Uniform selectors sample from non-empty candidate sets.
+- Weighted selectors use relative numeric values (integers are fine; totals do not need to sum to 1 or 100) and reject negative, non-finite, or all-zero inputs.
+- Scale-aware selectors (`degree`, `note`, `chord`) resolve scale in this order: explicit `scale=...`, then global context helpers.
+- Chromatic selectors ignore scale context by design.
+- `Random.engine` exposes the wrapped stdlib engine so direct engine calls share state with Random selectors.
+- Selector methods support both instance and class calls; class calls route through the lazy global singleton.
+- `Random.sequence(...)` requires a positive beat-length timeline value and returns a `Sequence` that consumes exactly that beat span.
+- Sequence algorithm resolution order is: explicit algorithm instance, algorithm name token, then weighted random selection (only when `algorithm` is omitted).
+- Built-in sequence algorithms accept optional tuning parameters, but each works with no required algorithm-specific arguments.
+- Reusing the same algorithm object instance allows stateful continuity across calls (for example motif carry-forward).
+- Sequence continuation behavior is playback-equivalent duration extension of the previous pitched entry, not notation-specific tie modeling.
+
+Usage note:
+
+- Prefer `rng = Random(seed=...)` for isolated reproducible workflows.
+- Use `Random.scale(...)` and other class calls when a shared process-global random stream is desired.
+
+Related deep docs:
+
+- [Cookbook](cookbook.md)
+
 ## Sequence, Score, and Conversion
 
 Timeline and conversion types:
@@ -61,6 +97,7 @@ Key behaviors:
 - `Sequence.appended(...)` composes forms immutably.
 - `Sequence.transpose(...)` is chromatic (semitones).
 - `Sequence.shift(...)` is diatonic (scale steps).
+- `Note.shift(...)` and `Chord.shift(...)` use `scale=...` when provided and otherwise use global scale context helpers.
 - `Score.duration` returns normalized timeline span.
 - `Score.with_(...)` returns immutable metadata/source/event updates.
 - `MidiFile(...)` and `SheetMusic(...)` both normalize through the same score-first conversion path.

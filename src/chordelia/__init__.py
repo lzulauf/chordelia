@@ -37,6 +37,17 @@ from chordelia.rhythm import (
     Duration, TimeSignature, Tempo, Beat,
     dotted, triplet, COMMON_TIME, WALTZ_TIME, COMPOUND_DUPLE
 )
+from chordelia.randomization import (
+    ChordAnchorWalkSequenceAlgorithm,
+    MotifVariationSequenceAlgorithm,
+    PureRandomSequenceAlgorithm,
+    Random,
+    ScaleWalkSequenceAlgorithm,
+    SequenceRandomizationAlgorithm,
+    configure_global_random,
+    get_global_random,
+    reset_global_random,
+)
 
 # Audio playback module - optional import (requires sounddevice and numpy)
 try:
@@ -101,6 +112,15 @@ __all__ = [
     "COMMON_TIME",
     "WALTZ_TIME", 
     "COMPOUND_DUPLE",
+    "Random",
+    "SequenceRandomizationAlgorithm",
+    "PureRandomSequenceAlgorithm",
+    "MotifVariationSequenceAlgorithm",
+    "ScaleWalkSequenceAlgorithm",
+    "ChordAnchorWalkSequenceAlgorithm",
+    "get_global_random",
+    "configure_global_random",
+    "reset_global_random",
 ]
 
 # Add audio playback exports if available
