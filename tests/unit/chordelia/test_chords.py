@@ -8,6 +8,7 @@ extensions, inversions, and enharmonic spelling.
 import pytest
 from chordelia import notes
 from chordelia import intervals
+from chordelia.degrees import Degree
 from chordelia.chords import Chord, ChordQuality, ChordExtension
 from chordelia.chords import (
     major_chord, minor_chord, diminished_chord, augmented_chord,
@@ -842,6 +843,38 @@ class TestChordTransposition:
         assert eb_maj7.root.accidental == Accidental.FLAT
         assert eb_maj7.quality == ChordQuality.MAJOR
         assert eb_maj7.extension == ChordExtension.MAJOR_SEVENTH
+
+
+class TestChordDegreeHelpers:
+    """Test DegreeLike helpers on Chord APIs."""
+
+    def test_tone_at_accepts_degree_like(self):
+        c_major = Chord("C", ChordQuality.MAJOR)
+
+        assert str(c_major.tone_at(1)) == "C"
+        assert str(c_major.tone_at(Degree(2))) == "E"
+        assert str(c_major.tone_at("III")) == "G"
+
+    def test_tone_at_invalid_degree_raises(self):
+        c_major = Chord("C", ChordQuality.MAJOR)
+
+        with pytest.raises(ValueError):
+            c_major.tone_at(0)
+
+        with pytest.raises(ValueError):
+            c_major.tone_at(4)
+
+        with pytest.raises(ValueError):
+            c_major.tone_at("bIII")
+
+    def test_degree_for_tone_returns_degree(self):
+        g7 = Chord("G", ChordQuality.MAJOR, extension=ChordExtension.SEVENTH)
+
+        assert g7.degree_for_tone(Note("G")) == Degree(1)
+        assert g7.degree_for_tone(Note("B")) == Degree(2)
+        assert g7.degree_for_tone(Note("D")) == Degree(3)
+        assert g7.degree_for_tone(Note("F")) == Degree(4)
+        assert g7.degree_for_tone(Note("C")) is None
 
 
 class TestChordFactoryFunctions:

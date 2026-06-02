@@ -6,6 +6,7 @@ arithmetic operations, and edge cases.
 """
 
 import pytest
+from chordelia.degrees import Degree
 from chordelia.intervals import Interval, IntervalQuality
 from chordelia.intervals import (
     UNISON, MINOR_SECOND, MAJOR_SECOND, MINOR_THIRD, MAJOR_THIRD,
@@ -263,6 +264,17 @@ class TestIntervalProperties:
         assert Interval(IntervalQuality.MINOR, 7).name == "Minor 7th"
         assert Interval(IntervalQuality.PERFECT, 8).name == "Perfect Octave"
         assert Interval(IntervalQuality.MAJOR, 9).name == "Major 9th"
+
+    def test_degree_properties(self):
+        """Interval should expose degree and simple_degree helpers."""
+        major_ninth = Interval(IntervalQuality.MAJOR, 9)
+
+        assert major_ninth.degree == Degree(9)
+        assert major_ninth.simple_degree == Degree(2)
+
+        diminished_fifth = Interval(IntervalQuality.DIMINISHED, 5)
+        assert diminished_fifth.degree == Degree(5)
+        assert diminished_fifth.simple_degree == Degree(5)
 
 
 class TestIntervalArithmetic:

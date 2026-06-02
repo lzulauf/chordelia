@@ -10,12 +10,16 @@ from enum import Enum
 from functools import lru_cache, cached_property
 import logging
 import re
-from typing import Iterable, List, Optional, Union, Dict, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from chordelia import intervals
+from chordelia.degrees import Degree, DegreeLike
 from chordelia.intervals import Interval, IntervalQuality
 from chordelia.notes import Note, NoteName, Accidental
 from chordelia.scales import Scale, ScaleType
+
+if TYPE_CHECKING:
+    from chordelia.score import ScoreEvent, ScoreEventContext
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
@@ -717,6 +721,60 @@ class Chord:
         new_bass = self.bass_note.transpose(interval) if self.bass_note else None
         
         return self.with_(root=new_root, bass_note=new_bass)
+
+    def score_events_for_context(self, context: 'ScoreEventContext') -> tuple['ScoreEvent', ...]:
+        """Emit a single score event containing all chord tones."""
+        midi_pitches: list[int] = []
+        spelling: list[str] = []
+
+        for note in self.notes:
+            midi_number = note.midi_number
+            if midi_number is None:
+                raise ValueError(
+                    "Chord.score_events_for_context requires octave information on all chord tones."
+                )
+            midi_pitches.append(midi_number)
+            spelling.append(str(note))
+
+        from chordelia.score import ScoreEvent
+
+        return (
+            ScoreEvent(
+                beat=context.start_offset,
+                duration=context.default_duration,
+                pitches=tuple(midi_pitches),
+                velocity=context.velocity,
+                channel=context.channel,
+                voice=context.voice,
+                spelling=tuple(spelling),
+            ),
+        )
+
+    def tone_at(self, degree: DegreeLike) -> Note:
+        """Get the chord tone at the provided degree index (1-based)."""
+        degree_obj = Degree.coerce(degree)
+        degree_number = degree_obj.to_int()
+
+        if degree_obj.has_alteration:
+            raise ValueError(
+                "Chord.tone_at currently supports only unaltered degrees. "
+                "Examples: 1, 2, 3, I, ii."
+            )
+
+        if not 1 <= degree_number <= len(self.notes):
+            raise ValueError(
+                f"Chord.tone_at requires a degree in range 1-{len(self.notes)}, "
+                f"got {degree_number}"
+            )
+
+        return self.notes[degree_number - 1]
+
+    def degree_for_tone(self, note: Note) -> Optional[Degree]:
+        """Return the chord-tone degree for a note, or None when absent."""
+        for index, tone in enumerate(self.notes, start=1):
+            if tone.pitch_class == note.pitch_class:
+                return Degree(index)
+        return None
     
     @property
     def name(self) -> str:

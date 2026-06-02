@@ -18,6 +18,14 @@ Companion skills: plan-use for documentation migration planning and test-writing
 - Defining ownership boundaries between README and docs/
 - Reducing duplicated examples across documentation files
 - Updating navigation and cross-links after docs moves
+- Updating documentation after public API, behavior, or user-workflow changes
+
+## Change-Triggered Documentation Rules
+
+- If a change affects public APIs, parsing/validation behavior, user-visible output, or documented examples, update README/docs in the same change.
+- For API and behavior changes, prioritize updates to docs/api-overview.md and relevant guides before merging.
+- Keep top-level README onboarding-focused; move details to docs/ and link from README rather than duplicating full content.
+- If no documentation changes are needed, include a brief "No docs delta rationale" note in the task summary or plan update.
 
 ## Ownership Rules
 
@@ -80,3 +88,5 @@ Move detailed material into docs/:
 - Links between README and docs are valid and discoverable.
 - No orphan docs pages remain.
 - No high-value content was dropped during restructuring.
+- Public API/behavior changes are reflected in docs and README summaries where relevant.
+- If no docs changed, a "No docs delta rationale" is explicitly documented.

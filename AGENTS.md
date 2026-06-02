@@ -16,6 +16,7 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 	- Adding regression coverage for bug fixes
 	- Expanding edge-case/validation matrices with parametrization
 	- Testing optional dependency paths with deterministic mocks
+	- Implementing behavior or public contract changes that require test deltas
 
 ### test-running
 
@@ -34,6 +35,7 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 	- Breaking initiatives into phases, milestones, and checklists
 	- Defining scope, out-of-scope, prerequisites, and acceptance criteria
 	- Coordinating dependency order between multiple plans
+	- Declaring expected test delta (new, updated, none-with-rationale) for planned code changes
 
 ### readme-writing
 
@@ -43,6 +45,7 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 	- Splitting a large README into focused docs pages
 	- Defining ownership boundaries between README.md and docs/
 	- Reducing duplicated documentation content and improving cross-links
+	- Updating README/docs for public API, behavior, or usage changes
 
 ### skill-writing
 
@@ -84,8 +87,10 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 ### Skill Selection Rule
 
 - If a task is primarily about test coverage or test refactoring, load test-writing.
+- If a task changes behavior, parsing, validation, or public contracts, load test-writing even if the user did not explicitly request tests.
 - If a task is primarily about running tests, triaging failures, or checking coverage, load test-running.
 - If a task is primarily about creating, updating, or restructuring execution plans, load plan-use.
+- If a task changes public APIs, parsing/validation behavior, or user-facing workflows/examples, load readme-writing to update docs/README or record a no-docs-delta rationale.
 - If a task is primarily about choosing between implementation approaches, load decision-writing.
 - If a task is primarily about README/docs structure or documentation ownership boundaries, load readme-writing.
 - If a task is primarily about creating or reviewing skill files, load skill-writing.
@@ -93,6 +98,7 @@ Use skills as the primary source of detailed implementation conventions. Keep th
 - If a task is primarily about immutable model design, load immutable-types.
 - If both apply, load both skills: function-naming for global naming and immutable-types for immutable-specific constraints.
 - If plan work includes naming or immutable model constraints, load plan-use with the relevant companion skill(s).
+- If plan work includes user-facing API or behavior changes, load plan-use with readme-writing.
 - If plan work includes documentation restructuring, load plan-use with readme-writing.
 - If plan work includes skill creation or skill refactoring, load plan-use with skill-writing.
 - If plan work includes unresolved approach choices, load plan-use with decision-writing and create a decision doc in decisions/.

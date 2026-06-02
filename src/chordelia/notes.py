@@ -7,10 +7,14 @@ All calculations are done algorithmically for efficiency.
 """
 
 from enum import Enum
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 import re
 from functools import lru_cache
+from chordelia.accidentals import Accidental
 from chordelia.intervals import Interval, IntervalQuality
+
+if TYPE_CHECKING:
+    from chordelia.score import ScoreEvent, ScoreEventContext
 
 # Pre-compiled regex for faster note parsing
 _NOTE_PATTERN = re.compile(r'^([A-G])(#{1,2}|b{1,2})?(\d+)?$')
@@ -50,38 +54,6 @@ class NoteName(Enum):
         """Get semitones from C for this note name."""
         return self.value
 
-
-# Master mapping of accidentals to their string symbols
-# (defined before the Accidental class so it can be used in __str__)
-_ACCIDENTAL_TO_SYMBOL = {
-    # Will be populated after Accidental class is defined
-}
-
-
-class Accidental(Enum):
-    """Enumeration of accidentals."""
-    DOUBLE_FLAT = -2
-    FLAT = -1
-    NATURAL = 0
-    SHARP = 1
-    DOUBLE_SHARP = 2
-    
-    def __str__(self) -> str:
-        """String representation of accidental."""
-        return _ACCIDENTAL_TO_SYMBOL[self]
-
-
-# Populate the symbols mapping now that Accidental enum is defined
-_ACCIDENTAL_TO_SYMBOL.update({
-    Accidental.DOUBLE_FLAT: "bb",
-    Accidental.FLAT: "b", 
-    Accidental.NATURAL: "",
-    Accidental.SHARP: "#",
-    Accidental.DOUBLE_SHARP: "##"
-})
-
-# Inverse mapping - string to enum (generated from accidental-to-symbol)
-_SYMBOL_TO_ACCIDENTAL = {symbol: accidental for accidental, symbol in _ACCIDENTAL_TO_SYMBOL.items()}
 
 # MIDI pitch class to note mappings with None for black keys (will be resolved to sharp/flat)
 _PITCH_CLASS_TO_NOTE_BASE = [
@@ -169,11 +141,8 @@ class Note:
                 if octave is None and octave_str:
                     octave = int(octave_str)
         
-        # Convert accidental to enum if needed
-        if isinstance(accidental, str):
-            accidental = _SYMBOL_TO_ACCIDENTAL[accidental]
-        elif isinstance(accidental, int):
-            accidental = Accidental(accidental)
+        # Convert accidental representations to canonical accidental enum member.
+        accidental = Accidental.coerce(accidental)
         
         # Set the attributes directly - rely on Python conventions for "private" attributes
         self._name = name
@@ -387,6 +356,28 @@ class Note:
         
         # Adjust enharmonic spelling based on the interval
         return self._get_enharmonic_for_interval(base_note, interval)
+
+    def score_events_for_context(self, context: 'ScoreEventContext') -> tuple['ScoreEvent', ...]:
+        """Emit a single score event for this note under the provided context."""
+        midi_number = self.midi_number
+        if midi_number is None:
+            raise ValueError(
+                "Note.score_events_for_context requires octave information to emit MIDI pitch values."
+            )
+
+        from chordelia.score import ScoreEvent
+
+        return (
+            ScoreEvent(
+                beat=context.start_offset,
+                duration=context.default_duration,
+                pitches=(midi_number,),
+                velocity=context.velocity,
+                channel=context.channel,
+                voice=context.voice,
+                spelling=(str(self),),
+            ),
+        )
     
     def _get_enharmonic_for_interval(self, target_note: 'Note', interval: Interval) -> 'Note':
         """
@@ -421,7 +412,7 @@ class Note:
         
         # Create accidental if valid
         try:
-            required_accidental = Accidental(accidental_semitones)
+            required_accidental = Accidental.from_offset(accidental_semitones)
             return target_note.with_(name=expected_name, accidental=required_accidental)
         except ValueError:
             # If we can't create the required accidental, return the original

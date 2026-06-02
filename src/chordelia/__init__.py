@@ -13,9 +13,13 @@ and clarity, making it suitable for low-end hardware.
 """
 
 from chordelia.intervals import Interval, IntervalQuality
-from chordelia.notes import Note, NoteName, Accidental
+from chordelia.degrees import Degree, DegreeLike, RomanCase
+from chordelia.accidentals import Accidental
+from chordelia.notes import Note, NoteName
 from chordelia.scales import Scale, ScaleType
 from chordelia.chords import Chord, ChordQuality, ChordExtension
+from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
+from chordelia.sequenceable import Sequenceable
 from chordelia.rhythm import (
     Duration, TimeSignature, Tempo, Beat, NoteValue,
     whole_note, half_note, quarter_note, eighth_note, sixteenth_note,
@@ -42,6 +46,9 @@ __version__ = "0.3.1"
 __all__ = [
     "Interval",
     "IntervalQuality", 
+    "Degree",
+    "DegreeLike",
+    "RomanCase",
     "Note",
     "NoteName",
     "Accidental",
@@ -50,6 +57,12 @@ __all__ = [
     "Chord",
     "ChordQuality",
     "ChordExtension",
+    "Score",
+    "ScoreEvent",
+    "ScoreEventContext",
+    "ScoreMetadata",
+    "score_from_sequenceable",
+    "Sequenceable",
     "Duration",
     "TimeSignature", 
     "Tempo",

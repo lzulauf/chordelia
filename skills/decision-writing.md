@@ -55,12 +55,33 @@ Include these sections in order unless there is a strong reason not to:
   - Primary approach category
   - Via options (specific technologies/products)
 
+## Option Expansion Rules
+
+- For each option, include a short "What this means" description in plain language.
+- For each option, include implementation shape details:
+  - API or interface sketch (signatures or data contracts)
+  - Execution/data flow summary
+  - Dependency/runtime expectations
+- Include at least one concrete example per option when practical (code, config, or pseudo-flow).
+- Explain why listed pros/cons follow from the option mechanics, not just outcomes.
+- Avoid one-line options; each option should be detailed enough that a reviewer can imagine implementation boundaries.
+
+## Communication Aids Rules
+
+- For medium/high-impact decisions, include at least one visual aid:
+  - Mermaid diagram for architecture/flow, or
+  - ASCII diagram when Mermaid is not suitable.
+- For API/model decisions, include a small sample code sketch to demonstrate intended usage.
+- Keep visuals scoped to decision points; avoid decorative diagrams.
+- If scoring is used, include a compact comparison table with criteria and brief rationale.
+
 ## Tradeoff Rules
 
 - Compare options using explicit criteria (for example complexity, cost, performance, maintainability, portability, delivery speed).
 - Call out short-term vs long-term consequences.
 - Separate facts, assumptions, and unknowns.
 - Identify which risks are acceptable and which are blockers.
+- Ensure each criterion references concrete option behavior (for example dependency model, migration cost, runtime path).
 
 ## Analysis Depth Rules
 
@@ -87,6 +108,7 @@ Use a standard comparison for routine decisions and require deeper analysis for 
 - One small feasibility spike/prototype for the top candidate(s) when practical.
 - Dependency and operations notes: packaging, CI/CD, runtime footprint, and portability.
 - A migration or rollback path if the recommendation underperforms.
+- Option-level examples (code/config/flow) and at least one architecture or data-flow diagram.
 
 ## Recommendation Rules
 
@@ -106,6 +128,9 @@ Use a standard comparison for routine decisions and require deeper analysis for 
 - Document is in decisions/ and uses .md format.
 - Problem statement and urgency are explicit.
 - Options include both do-nothing and out-of-the-box alternatives.
+- Options are detailed enough to understand implementation shape and dependency impact.
 - Tradeoffs are criteria-based and non-redundant.
+- Pros/cons are justified by concrete option mechanics.
+- At least one diagram and one usage sketch are included for medium/high-impact decisions.
 - Recommendation is clear, justified, and actionable.
 - Plan linkage exists when implementation should proceed.

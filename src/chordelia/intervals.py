@@ -9,6 +9,7 @@ from enum import Enum
 import re
 from typing import Union
 from functools import lru_cache
+from chordelia.degrees import Degree
 
 _INTERVAL_REGEX = re.compile(r'^(?P<quality>[a-zA-Z#]*)(?P<number>\d+)$')
 
@@ -196,6 +197,16 @@ class Interval:
             The number of semitones
         """
         return self._calculate_semitones()
+
+    @property
+    def degree(self) -> Degree:
+        """Return interval number semantics as a Degree value object."""
+        return Degree(self.number)
+
+    @property
+    def simple_degree(self) -> Degree:
+        """Return the interval's simple (1-7) degree representation."""
+        return Degree(_simple_number(self.number))
     
     @classmethod
     def from_semitones(cls, semitones: int, prefer_simple: bool = True) -> 'Interval':

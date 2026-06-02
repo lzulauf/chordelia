@@ -5,10 +5,13 @@ Chordelia is a Python library for music theory and timing workflows. It emphasiz
 ## Features
 
 - Intervals with quality/number math and naming
+- Degrees with int/Roman coercion and context-aware Roman case semantics
 - Notes with accidentals, enharmonics, octave, MIDI, and frequency support
 - Scales with theory-correct enharmonic spelling
 - Chords with parsing, extensions, inversions, and slash-chord handling
 - Rhythm and timing utilities for duration, meter, tempo, and beat tracking
+- Sequenceable conversion boundary for score-producing musical objects
+- Canonical score model with normalized events for downstream rendering/export
 
 ## Installation
 
@@ -31,16 +34,22 @@ For full install details, see [docs/installation.md](docs/installation.md).
 ## Quick Start
 
 ```python
-from chordelia import Note, Scale, ScaleType, Chord
+from chordelia import Note, Scale, ScaleType, Chord, Score
 
 c_major = Scale("C", ScaleType.MAJOR)
 print([str(n) for n in c_major.notes])
+
+ii_v_i = c_major.chords_for_degrees("ii", "V", "I")
+print([chord.name for chord in ii_v_i])
 
 c_chord = Chord("C").with_extension("maj7").with_inversion(1)
 print(c_chord.name)
 
 middle_c = Note("C4")
 print(middle_c.midi_number, middle_c.frequency)
+
+score = Score.from_sequenceable(Chord("C4"))
+print(len(score.events), score.events[0].pitches)
 ```
 
 For a fuller walkthrough, see [docs/quickstart.md](docs/quickstart.md).
