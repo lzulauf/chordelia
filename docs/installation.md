@@ -44,7 +44,7 @@ pip install chordelia[all]
 ```bash
 git clone https://github.com/yourusername/chordelia.git
 cd chordelia
-uv sync --group dev --group all
+uv sync --group dev --extra all
 ```
 
 ## Installation Matrix
