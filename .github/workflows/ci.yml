@@ -65,6 +65,12 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install PortAudio system dependencies
+        if: ${{ matrix.profile == 'audio' || matrix.profile == 'all' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends portaudio19-dev libportaudio2 libasound-dev
+
       - name: Install package and test dependencies
         run: |
           python -m pip install --upgrade pip
