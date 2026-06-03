@@ -80,7 +80,7 @@ try:
 except ImportError:
     _MIDI_AVAILABLE = False
 
-__version__ = "0.4.0-rc1"
+__version__ = "0.4.0-rc2"
 __all__ = [
     "Interval",
     "IntervalLike",
