@@ -23,11 +23,19 @@ All notable changes to this project will be documented in this file.
 - Scale context handling was unified to make diatonic transformations and context-driven workflows more predictable.
 - Sequence rendering and score-backed playback controls were refined for deterministic normalization.
 - Parallel composition validation and error reporting were hardened with better child-level context.
+- Runtime support policy now targets Python 3.10+ (required CI: 3.10-3.13, preview CI: 3.14).
+- Optional features now use install extras (`audio`, `midi`, `all`) under `project.optional-dependencies`, with dev tooling retained in dependency groups.
+- Optional dependency test behavior was tightened so audio-specific tests auto-skip when optional audio dependencies are unavailable.
+
+### CI and Packaging
+- Added CI install-profile coverage for bare, `audio`, `midi`, and `all` installation variants.
+- Added Linux system dependency provisioning for optional audio/MIDI builds (`libasound2-dev`, `portaudio19-dev`, `libportaudio2`) to stabilize python-rtmidi and audio installs.
 
 ### Documentation
 - Added broad docs coverage including API overview, quickstart, cookbook, installation/development guides, and tutorials.
 - Added explicit guidance for sequential vs simultaneous composition and immutable path-based recomposition.
 - Added upgrade guidance around score-first workflows and composition boundaries.
+- Added explicit Python support policy and install-profile guidance in README and installation/development docs.
 
 ### Testing
 - Expanded unit coverage across theory, rhythm/timing, score conversion, playback/MIDI, randomization, and sequence algorithms.
