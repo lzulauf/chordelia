@@ -65,11 +65,16 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install ALSA system dependencies
+        if: ${{ matrix.profile == 'audio' || matrix.profile == 'midi' || matrix.profile == 'all' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2-dev
+
       - name: Install PortAudio system dependencies
         if: ${{ matrix.profile == 'audio' || matrix.profile == 'all' }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends portaudio19-dev libportaudio2 libasound-dev
+          sudo apt-get install -y --no-install-recommends portaudio19-dev libportaudio2
 
       - name: Install package and test dependencies
         run: |
