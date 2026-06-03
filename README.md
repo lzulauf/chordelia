@@ -26,7 +26,10 @@ pip install chordelia[midi]
 pip install chordelia[all]
 ```
 
-Python requirement: 3.13+
+Python requirement: 3.10+
+
+Tested in CI: 3.10-3.13.
+Preview support: 3.14 (non-blocking CI signal).
 
 ## Quick Feature Tour
 

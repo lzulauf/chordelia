@@ -4,7 +4,12 @@ Back links: [Project README](../README.md) | [Docs Index](README.md)
 
 ## Requirements
 
-- Python 3.13+
+- Python 3.10+
+
+Runtime support policy:
+
+- CI-required support: Python 3.10, 3.11, 3.12, 3.13
+- Preview support: Python 3.14 (non-blocking CI signal)
 
 ## Core Library
 
@@ -39,7 +44,7 @@ pip install chordelia[all]
 ```bash
 git clone https://github.com/yourusername/chordelia.git
 cd chordelia
-uv sync --group dev --group all
+uv sync --group dev --extra all
 ```
 
 ## Installation Matrix

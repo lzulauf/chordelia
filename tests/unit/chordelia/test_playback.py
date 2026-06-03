@@ -11,6 +11,8 @@ from unittest.mock import Mock, patch, MagicMock
 
 import pytest
 
+pytestmark = pytest.mark.optional_audio
+
 from chordelia.notes import Note
 from chordelia.rhythm import Duration, Tempo
 from chordelia.scales import Scale, ScaleType

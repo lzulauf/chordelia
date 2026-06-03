@@ -8,6 +8,7 @@ to run when desired.
 """
 
 import pytest
+import importlib.util
 
 
 def pytest_addoption(parser):
@@ -29,14 +30,27 @@ def pytest_collection_modifyitems(config, items):
 
 	This is a common pattern to keep slow tests out of default runs.
 	"""
-	if config.getoption("runslow"):
-		# User explicitly asked to run slow tests; do nothing.
-		return
+	runslow = config.getoption("runslow")
+	missing_audio_dependencies = [
+		module_name
+		for module_name in ("numpy", "sounddevice")
+		if importlib.util.find_spec(module_name) is None
+	]
 
 	skip_marker = pytest.mark.skip(reason="skipped slow test (use --runslow to run)")
 	for item in items:
-		if "slow" in item.keywords:
+		if "slow" in item.keywords and not runslow:
 			item.add_marker(skip_marker)
+
+		if "optional_audio" in item.keywords and missing_audio_dependencies:
+			item.add_marker(
+				pytest.mark.skip(
+					reason=(
+						"missing optional dependencies for 'optional_audio': "
+						+ ", ".join(missing_audio_dependencies)
+					)
+				)
+			)
 
 
 @pytest.fixture
