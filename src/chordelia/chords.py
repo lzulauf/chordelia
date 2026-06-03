@@ -641,6 +641,12 @@ class Chord:
             _logger.debug(f"  Notes after inversion {self.inversion}: {notes}")
         
         return tuple(notes)
+
+    @staticmethod
+    def _octave_for_spelling_at_midi(spelled_note: Note, target_midi: int) -> int:
+        """Derive octave so a spelled note maps exactly to a target MIDI number."""
+        semitone_offset = spelled_note.name.semitones_from_c + spelled_note.accidental.value
+        return ((target_midi - semitone_offset) // 12) - 1
     
     def _calculate_notes_with_voice_leading(self, base_pattern: List[int], reference_scale: Scale) -> Tuple[Note, ...]:
         """
@@ -672,7 +678,7 @@ class Chord:
             found_in_scale = False
             for scale_note in reference_scale.notes:
                 if scale_note.pitch_class == target_pitch_class:
-                    target_octave = target_midi // 12 - 1
+                    target_octave = self._octave_for_spelling_at_midi(scale_note, target_midi)
                     notes.append(scale_note.with_octave(target_octave))
                     found_in_scale = True
                     break
@@ -699,6 +705,8 @@ class Chord:
         # Try to find the note in the reference scale first
         for scale_note in reference_scale.notes:
             if scale_note.pitch_class == target_pitch_class:
+                if self.root.octave is not None:
+                    target_octave = self._octave_for_spelling_at_midi(scale_note, target_midi)
                 return scale_note.with_octave(target_octave)
         
         # If not in reference scale, use standard enharmonic spelling

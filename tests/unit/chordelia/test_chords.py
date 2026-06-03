@@ -561,6 +561,7 @@ class TestChordNotesWithOctaves:
     @pytest.mark.parametrize("root,quality,extension,additions,expected", [
         ("A3", ChordQuality.MINOR, None, None, ["A3", "C4", "E4"]),
         ("D4", ChordQuality.MINOR, None, None, ["D4", "F4", "A4"]),
+        ("E#3", ChordQuality.MINOR, None, None, ["E#3", "G#3", "B#3"]),
     ])
     def test_minor_chord_octave_distribution(self, root, quality, extension, additions, expected):
         """Test minor chord octave distribution follows proper voice leading."""

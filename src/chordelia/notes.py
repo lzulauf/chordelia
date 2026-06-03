@@ -290,9 +290,11 @@ class Note:
             return None
         
         # MIDI note 60 = C4 (middle C)
-        # Each octave spans 12 semitones
+        # Each octave spans 12 semitones. Compute from the natural letter
+        # plus accidental so accidentals can cross octave boundaries
+        # (e.g. B#3 == C4, Cb4 == B3).
         base_midi = (self.octave + 1) * 12  # C0 = MIDI 12
-        return base_midi + self.pitch_class
+        return base_midi + self.name.semitones_from_c + self.accidental.value
     
     @classmethod
     def from_midi_number(cls, midi_number: int, prefer_sharps: bool = True) -> 'Note':

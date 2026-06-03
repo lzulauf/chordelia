@@ -253,6 +253,13 @@ class TestNotePitchClass:
 
 class TestNoteMIDI:
     """Test MIDI number conversion."""
+
+    def test_enharmonic_octave_boundary_midi_numbers(self):
+        """Enharmonics that cross C/B boundaries should map to the same MIDI pitch."""
+        assert Note("B#3").midi_number == 60
+        assert Note("C4").midi_number == 60
+        assert Note("Cb4").midi_number == 59
+        assert Note("B3").midi_number == 59
     
     def test_midi_numbers_without_octave(self):
         """Test that notes without octave return None for MIDI number."""
