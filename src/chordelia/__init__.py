@@ -27,7 +27,7 @@ from chordelia.sequences import (
     SequenceEntryLike,
 )
 from chordelia.score import Score, ScoreEvent, ScoreEventContext, ScoreMetadata, score_from_sequenceable
-from chordelia.sheet_music import SheetMusic
+from chordelia.sheet_music import SheetClef, SheetMusic
 from chordelia.sequenceable import (
     NotesLike,
     PlayableSource,
@@ -112,6 +112,7 @@ __all__ = [
     "ScoreEventContext",
     "ScoreMetadata",
     "score_from_sequenceable",
+    "SheetClef",
     "SheetMusic",
     "Sequenceable",
     "NotesLike",

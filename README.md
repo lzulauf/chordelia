@@ -119,7 +119,11 @@ composition tree.
 ```python
 # Continue from block 1 in the same Python session.
 SheetMusic(score, scale=scale).to_file("song.svg")
+SheetMusic(score, clef="bass", scale=scale).to_file("song_bass.svg")
 ```
+
+`SheetMusic(..., clef="auto")` is the default and chooses clef from the median
+of unique pitches: below middle C (MIDI 60) uses bass; middle C or higher uses treble.
 
 ### 5) Export and play that same song via MIDI
 

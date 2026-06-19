@@ -92,7 +92,7 @@ MidiFile(score).to_file("song.mid")
 ## 7) Configure LilyPond rendering once
 
 ```python
-from chordelia.sheetmusic_backends import configure_sheetmusic_rendering
+from chordelia.sheetmusic_runtime import configure_sheetmusic_rendering
 
 configure_sheetmusic_rendering(
     backend_name="lilypond",

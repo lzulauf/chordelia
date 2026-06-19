@@ -1,7 +1,7 @@
 Additional clef rendering support plan for sheet music.
 
 ## Status
-Drafting
+Done
 
 ## Goal
 Add support for additional clefs in sheet-music rendering, starting with bass clef, while keeping current treble-clef behavior stable and backward compatible.
@@ -49,7 +49,7 @@ Add support for additional clefs in sheet-music rendering, starting with bass cl
    2. `src/chordelia/sheetmusic_backends/lilypond.py`
    3. `src/chordelia/__init__.py` (exports if clef enum is public)
    4. `tests/unit/chordelia/test_sheet_music.py`
-   5. `tests/unit/chordelia/test_sheetmusic_backends_lilypond.py`
+   5. `tests/unit/chordelia/test_sheet_music.py` (LilyPond backend assertions live here)
    6. `docs/api-overview.md`
    7. `docs/tutorials/sheet-music-rendering.md`
 
@@ -140,13 +140,13 @@ Expected docs delta classification: both README updates and docs updates.
 4. Validate examples consistently use canonical "bass clef" terminology.
 
 ## Progress checklist
-- [ ] Phase 0: Clef API and compatibility contract locked
-- [ ] Phase 1: Core clef model and validation added
-- [ ] Phase 2: SVG renderer made clef-aware
-- [ ] Phase 3: LilyPond backend clef support added
-- [ ] Phase 4: Tests updated and passing
-- [ ] Phase 5: Documentation and examples updated
-- [ ] Additional clef rendering support accepted
+- [x] Phase 0: Clef API and compatibility contract locked
+- [x] Phase 1: Core clef model and validation added
+- [x] Phase 2: SVG renderer made clef-aware
+- [x] Phase 3: LilyPond backend clef support added
+- [x] Phase 4: Tests updated and passing
+- [x] Phase 5: Documentation and examples updated
+- [x] Additional clef rendering support accepted
 
 ## Phases
 ### Phase 0: Contract lock
@@ -181,7 +181,16 @@ Expected docs delta classification: both README updates and docs updates.
 4. Complete tests before docs final polish.
 
 ## Implementation notes
-- No implementation notes yet.
+### 2026-06-05 - Phase 0-5
+- Scope completed: Implemented SheetMusic clef support (`treble`, `bass`, `auto`) with auto selection based on all pitches below MIDI 60, integrated clef-aware SVG/LilyPond rendering, and exported `SheetClef` publicly.
+- Code touchpoints: `src/chordelia/sheet_music.py`, `src/chordelia/sheetmusic_backends/lilypond.py`, `src/chordelia/__init__.py`, `tests/unit/chordelia/test_sheet_music.py`.
+- Tests: Focused suite passed (`pytest tests/unit/chordelia/test_sheet_music.py` equivalent, 57 passed) and full suite passed (`pytest`, 963 passed).
+- Docs: Updated `docs/api-overview.md`, `docs/tutorials/sheet-music-rendering.md`, and README sheet-music usage snippet.
+- Commit/PR: Not committed in this step.
+- Follow-ups: Grand staff plan can now treat additional clef support as satisfied prerequisite.
+
+### 2026-06-18 - Correction note
+- Auto-clef behavior was later updated after archival: selection now uses the median of unique pitches, with bass for median below MIDI 60 and treble for MIDI 60 or above.
 
 ## Risks and mitigations
 1. Risk: treble baseline regressions from shared helper refactor.

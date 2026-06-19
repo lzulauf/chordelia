@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable as IterableABC
+from enum import Enum
 from fractions import Fraction
 from pathlib import Path
 import re
@@ -24,11 +25,25 @@ SheetMusicGalleryItem: TypeAlias = Union[SheetMusicAtomSource, "SheetMusic"]
 SheetMusicSource: TypeAlias = Union[SheetMusicAtomSource, Iterable[SheetMusicGalleryItem]]
 
 
+def _render_sheet_music_svg_backend(sheet: "SheetMusic") -> str:
+    """Load and dispatch to the dedicated built-in SVG backend renderer."""
+    from chordelia.sheetmusic_backends.svg import render_sheet_music_svg
+
+    return render_sheet_music_svg(sheet)
+
+
+class SheetClef(str, Enum):
+    """Supported clefs for sheet rendering."""
+
+    TREBLE = "treble"
+    BASS = "bass"
+
+
 class SheetMusic:
     """Canonical sheet-rendering wrapper around a normalized Score."""
 
     _RENDER_BACKEND_ADAPTERS: dict[str, str | Callable[["SheetMusic"], str]] = {
-        "svg": "_render_svg",
+        "svg": _render_sheet_music_svg_backend,
     }
 
     _LETTER_INDEX = {"C": 0, "D": 1, "E": 2, "F": 3, "G": 4, "A": 5, "B": 6}
@@ -49,29 +64,56 @@ class SheetMusic:
     _SPELLING_PATTERN = re.compile(r"^\s*([A-Ga-g])([#b]{0,2})?(-?\d+)?\s*$")
     _KEY_SHARP_ORDER = ("F", "C", "G", "D", "A", "E", "B")
     _KEY_FLAT_ORDER = ("B", "E", "A", "D", "G", "C", "F")
-    _TREBLE_SHARP_STEPS = {
-        "F": 8,
-        "C": 5,
-        "G": 9,
-        "D": 6,
-        "A": 3,
-        "E": 7,
-        "B": 4,
+    _KEY_SHARP_STEPS_BY_CLEF = {
+        SheetClef.TREBLE: {
+            "F": 8,
+            "C": 5,
+            "G": 9,
+            "D": 6,
+            "A": 3,
+            "E": 7,
+            "B": 4,
+        },
+        SheetClef.BASS: {
+            "F": 6,
+            "C": 3,
+            "G": 7,
+            "D": 4,
+            "A": 1,
+            "E": 5,
+            "B": 2,
+        },
     }
-    _TREBLE_FLAT_STEPS = {
-        "B": 4,
-        "E": 7,
-        "A": 3,
-        "D": 6,
-        "G": 2,
-        "C": 5,
-        "F": 1,
+    _KEY_FLAT_STEPS_BY_CLEF = {
+        SheetClef.TREBLE: {
+            "B": 4,
+            "E": 7,
+            "A": 3,
+            "D": 6,
+            "G": 2,
+            "C": 5,
+            "F": 1,
+        },
+        SheetClef.BASS: {
+            "B": 2,
+            "E": 5,
+            "A": 1,
+            "D": 4,
+            "G": 0,
+            "C": 3,
+            "F": -1,
+        },
+    }
+    _CLEF_BOTTOM_LINE_INDEX = {
+        SheetClef.TREBLE: (4 * 7) + _LETTER_INDEX["E"],
+        SheetClef.BASS: (2 * 7) + _LETTER_INDEX["G"],
     }
 
     def __init__(
         self,
         source: SheetMusicSource,
         *,
+        clef: str | SheetClef = "auto",
         tempo: int = 120,
         time_signature: tuple[int, int] = (4, 4),
         key_signature: str | None = None,
@@ -99,6 +141,8 @@ class SheetMusic:
                 key_signature=key_signature,
                 ppq=ppq,
             )
+
+        self.clef = self._resolve_clef(clef)
 
         self._staff_scale = self._resolve_staff_scale(
             source=source,
@@ -286,18 +330,56 @@ class SheetMusic:
         return Duration.from_beats(whole_measures * measure_beats, None)
 
     @classmethod
+    def _coerce_requested_clef(cls, value: str | SheetClef) -> str:
+        """Normalize user clef input to treble/bass/auto tokens."""
+        if isinstance(value, SheetClef):
+            return value.value
+
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"treble", "bass", "auto"}:
+                return normalized
+
+        raise ValueError(
+            f"Invalid clef {value!r}. Expected one of: 'treble', 'bass', or 'auto'."
+        )
+
+    def _resolve_clef(self, requested_clef: str | SheetClef) -> SheetClef:
+        """Resolve a concrete clef for rendering, including auto mode."""
+        normalized = self._coerce_requested_clef(requested_clef)
+        if normalized == "treble":
+            return SheetClef.TREBLE
+        if normalized == "bass":
+            return SheetClef.BASS
+
+        unique_pitches = sorted({pitch for event in self.score.events for pitch in event.pitches})
+        if not unique_pitches:
+            return SheetClef.TREBLE
+
+        midpoint = len(unique_pitches) // 2
+        if len(unique_pitches) % 2 == 1:
+            median_pitch = float(unique_pitches[midpoint])
+        else:
+            median_pitch = (unique_pitches[midpoint - 1] + unique_pitches[midpoint]) / 2.0
+
+        if median_pitch < 60.0:
+            return SheetClef.BASS
+        return SheetClef.TREBLE
+
+    @classmethod
     def score_to_file(
         cls,
         score: Score,
         file_path: str | Path,
         *,
+        clef: str | SheetClef = "auto",
         format: str = "svg",
     ) -> Path:
         """Write a score to a sheet-music output file and return the resulting path."""
         if not isinstance(score, Score):
             raise TypeError(f"score must be a Score instance, got {type(score).__name__}")
 
-        sheet = cls(score)
+        sheet = cls(score, clef=clef)
         return sheet.to_file(file_path, format=format)
 
     def to_file(self, file_path: str | Path, *, format: str = "svg") -> Path:
@@ -355,287 +437,8 @@ class SheetMusic:
         }
 
     def _render_svg(self) -> str:
-        """Render a deterministic SVG representation of score events."""
-        score = self.score
-        width = self._svg_width()
-        height = 220
-        left_margin = 68.0
-        right_margin = 30.0
-        top_margin = 24.0
-        staff_top = 80.0
-        staff_spacing = 12.0
-        staff_bottom = staff_top + (4 * staff_spacing)
-        timing_mode = score.events[0].beat.mode if score.events else "beats"
-
-        end_beats = Fraction(1, 1)
-        if score.events:
-            end_duration = max(event.beat + event.duration for event in score.events)
-            if timing_mode == "beats":
-                end_beats = end_duration.as_beats()
-                if end_beats <= 0:
-                    end_beats = Fraction(1, 1)
-                end_time = float(end_beats)
-            else:
-                end_time = self._duration_value(end_duration)
-                if end_time <= 0:
-                    end_time = 1.0
-        else:
-            end_time = 1.0
-
-        default_key_sig_accidentals = self._key_signature_accidentals_for_render()
-        scale_annotation_entries = self._scale_measure_annotations_for_render()
-
-        measure_key_signatures: dict[Fraction, list[tuple[str, int]]] = {}
-        measure_labels: dict[Fraction, str] = {}
-        if timing_mode == "beats":
-            for beat, accidentals, label in scale_annotation_entries:
-                measure_key_signatures[beat] = accidentals
-                measure_labels[beat] = label
-
-            if Fraction(0, 1) not in measure_key_signatures and default_key_sig_accidentals:
-                measure_key_signatures[Fraction(0, 1)] = default_key_sig_accidentals
-
-        key_width_by_measure: dict[Fraction, float] = {}
-        if timing_mode == "beats":
-            for beat, accidentals in measure_key_signatures.items():
-                width_value = (len(accidentals) * 10.0) + (8.0 if accidentals else 0.0)
-                if width_value > 0:
-                    key_width_by_measure[beat] = width_value
-            sorted_key_markers = tuple(sorted(key_width_by_measure))
-            total_key_width = sum(
-                key_width_by_measure[marker]
-                for marker in sorted_key_markers
-                if marker < end_beats
-            )
-            content_start_x = left_margin
-            timeline_width = max(1.0, width - left_margin - right_margin - total_key_width)
-        else:
-            key_sig_width = (len(default_key_sig_accidentals) * 10.0) + (
-                8.0 if default_key_sig_accidentals else 0.0
-            )
-            content_start_x = left_margin + key_sig_width
-            sorted_key_markers = ()
-            timeline_width = max(1.0, width - left_margin - right_margin)
-
-        pixels_per_unit = timeline_width / end_time
-
-        def _cumulative_key_width(beat: Fraction, *, include_current: bool) -> float:
-            if not sorted_key_markers:
-                return 0.0
-
-            total = 0.0
-            for marker in sorted_key_markers:
-                if include_current:
-                    if marker <= beat:
-                        total += key_width_by_measure[marker]
-                else:
-                    if marker < beat:
-                        total += key_width_by_measure[marker]
-            return total
-
-        def _x_for_beat(beat: Duration) -> float:
-            if beat.mode != "beats":
-                return content_start_x + (self._duration_value(beat) * pixels_per_unit)
-
-            beat_value = beat.as_beats()
-            return (
-                content_start_x
-                + (float(beat_value) * pixels_per_unit)
-                + _cumulative_key_width(beat_value, include_current=True)
-            )
-
-        def _x_for_measure_start(beat: Fraction) -> float:
-            return (
-                content_start_x
-                + (float(beat) * pixels_per_unit)
-                + _cumulative_key_width(beat, include_current=False)
-            )
-
-        lines: list[str] = [
-            '<?xml version="1.0" encoding="UTF-8"?>',
-            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
-            f'<rect x="0" y="0" width="{width}" height="{height}" fill="#fffdf8"/>',
-            f'<text x="{left_margin:.2f}" y="{top_margin:.2f}" font-family="Georgia, serif" font-size="14" fill="#1a1a1a">CHORDELIA SHEET</text>',
-            (
-                f'<text x="{left_margin - 30:.2f}" y="{staff_bottom + 4:.2f}" '
-                'font-family="Bravura, Noto Music, serif" font-size="44" fill="#111">&#119070;</text>'
-            ),
-        ]
-
-        if self._render_tempo_metadata:
-            lines.insert(
-                4,
-                (
-                    f'<text x="{left_margin:.2f}" y="{top_margin + 18:.2f}" '
-                    'font-family="Georgia, serif" font-size="12" fill="#444">'
-                    f'tempo {score.metadata.tempo} | meter {score.metadata.time_signature[0]}/{score.metadata.time_signature[1]}'
-                    "</text>"
-                ),
-            )
-
-        for line_index in range(5):
-            y = staff_top + (line_index * staff_spacing)
-            lines.append(
-                f'<line class="staff-line" x1="{left_margin:.2f}" y1="{y:.2f}" x2="{width - right_margin:.2f}" y2="{y:.2f}" stroke="#222" stroke-width="1"/>'
-            )
-
-        lines.append(
-            f'<line class="staff-barline" x1="{content_start_x:.2f}" y1="{staff_top:.2f}" x2="{content_start_x:.2f}" y2="{staff_bottom:.2f}" stroke="#222" stroke-width="1.2"/>'
-        )
-        lines.append(
-            f'<line class="staff-barline" x1="{width - right_margin:.2f}" y1="{staff_top:.2f}" x2="{width - right_margin:.2f}" y2="{staff_bottom:.2f}" stroke="#222" stroke-width="1.2"/>'
-        )
-
-        if timing_mode == "beats":
-            for marker, accidentals in sorted(measure_key_signatures.items(), key=lambda item: item[0]):
-                if marker < 0 or marker >= end_beats:
-                    continue
-
-                key_start_x = _x_for_measure_start(marker) + 6.0
-                lines.extend(
-                    self._render_key_signature(
-                        accidentals,
-                        x_start=key_start_x,
-                        staff_bottom=staff_bottom,
-                        staff_spacing=staff_spacing,
-                    )
-                )
-
-                scale_label = measure_labels.get(marker)
-                if scale_label is not None:
-                    lines.append(
-                        f'<text class="scale-label" x="{key_start_x:.2f}" y="{top_margin + 34:.2f}" font-family="Georgia, serif" font-size="11" fill="#444">{scale_label}</text>'
-                    )
-
-            numerator, _denominator = score.metadata.time_signature
-            if numerator > 0:
-                marker = Fraction(numerator, 1)
-                while marker < end_beats:
-                    x = _x_for_measure_start(marker)
-                    if x >= (width - right_margin):
-                        break
-                    lines.append(
-                        f'<line class="measure-barline" x1="{x:.2f}" y1="{staff_top:.2f}" x2="{x:.2f}" y2="{staff_bottom:.2f}" stroke="#444" stroke-width="1"/>'
-                    )
-                    marker += Fraction(numerator, 1)
-        else:
-            lines.extend(
-                self._render_key_signature(
-                    default_key_sig_accidentals,
-                    x_start=left_margin + 6.0,
-                    staff_bottom=staff_bottom,
-                    staff_spacing=staff_spacing,
-                )
-            )
-
-            lines.extend(
-                self._render_measure_barlines(
-                    content_start_x,
-                    width - right_margin,
-                    staff_top,
-                    staff_bottom,
-                    pixels_per_unit,
-                )
-            )
-
-        rendered_events: list[dict[str, Any]] = []
-        for event in score.events:
-            x = _x_for_beat(event.beat)
-            event_key_accidental_map = self._key_accidental_map_for_beat(event.beat)
-            note_render_data = self._event_note_render_data(
-                event,
-                staff_bottom=staff_bottom,
-                staff_spacing=staff_spacing,
-                key_accidental_map=event_key_accidental_map,
-            )
-            steps = tuple(int(item["step"]) for item in note_render_data)
-            duration_beats = self._duration_beats(event.duration)
-            stem_up = self._stem_up_for_steps(steps)
-            positioned_notes = self._position_noteheads(
-                note_render_data,
-                base_x=x,
-                stem_up=stem_up,
-            )
-            duration_beats_value = duration_beats
-            beat_beats = event.beat.as_beats() if event.beat.mode == "beats" else None
-
-            notehead_open, has_stem = self._notehead_style(duration_beats)
-            notehead_class = "notehead-open" if notehead_open else "notehead-filled"
-            if notehead_open:
-                notehead_style = 'fill="#fffdf8" stroke="#111" stroke-width="1.1"'
-            else:
-                notehead_style = 'fill="#111"'
-
-            stem_line = ""
-            stem_geometry = None
-            if has_stem:
-                stem_line, stem_geometry = self._render_stem(
-                    positioned_notes=positioned_notes,
-                    stem_up=stem_up,
-                )
-
-            rendered_events.append(
-                {
-                    "event": event,
-                    "positioned_notes": positioned_notes,
-                    "steps": steps,
-                    "duration_beats": duration_beats_value,
-                    "beat_beats": beat_beats,
-                    "stem_up": stem_up,
-                    "notehead_class": notehead_class,
-                    "notehead_style": notehead_style,
-                    "stem_line": stem_line,
-                    "stem_geometry": stem_geometry,
-                    "flag_count": self._flag_count(duration_beats_value),
-                    "has_stem": has_stem,
-                }
-            )
-
-        beam_lines, beamed_levels = self._render_beams(
-            rendered_events,
-            measure_beats=score.metadata.time_signature[0],
-        )
-
-        for index, layout in enumerate(rendered_events):
-            positioned_notes = layout["positioned_notes"]
-            duration_beats = layout["duration_beats"]
-
-            lines.extend(
-                self._render_ledger_lines(
-                    positioned_notes=positioned_notes,
-                    staff_bottom=staff_bottom,
-                    staff_spacing=staff_spacing,
-                )
-            )
-
-            lines.extend(self._render_note_accidentals(note_render_data=positioned_notes))
-
-            for note in sorted(positioned_notes, key=lambda item: (float(item["y"]), float(item["x"]))):
-                lines.append(
-                    (
-                        f'<ellipse class="notehead {layout["notehead_class"]}" '
-                        f'cx="{float(note["x"]):.2f}" cy="{float(note["y"]):.2f}" '
-                        f'rx="5" ry="3.6" {layout["notehead_style"]}/>'
-                    )
-                )
-
-            if self._is_dotted_duration(duration_beats):
-                lines.extend(self._render_dots(positioned_notes=positioned_notes))
-
-            if layout["has_stem"]:
-                lines.append(layout["stem_line"])
-
-                flag_count = int(layout["flag_count"])
-                beamed_level_count = beamed_levels.get(index, 0)
-                remaining_flags = max(0, flag_count - beamed_level_count)
-                stem_geometry = layout["stem_geometry"]
-                if remaining_flags > 0 and stem_geometry is not None:
-                    lines.extend(self._render_flags(stem_geometry, count=remaining_flags))
-
-        lines.extend(beam_lines)
-
-        lines.append("</svg>")
-        return "\n".join(lines)
+        """Compatibility wrapper that delegates to the built-in SVG backend module."""
+        return _render_sheet_music_svg_backend(self)
 
     def _resolve_staff_scale(
         self,
@@ -841,15 +644,17 @@ class SheetMusic:
         staff_bottom: float,
         staff_spacing: float,
     ) -> list[str]:
-        """Render key signature accidental symbols in treble clef."""
+        """Render key signature accidental symbols in the active clef."""
+        sharp_steps = self._KEY_SHARP_STEPS_BY_CLEF[self.clef]
+        flat_steps = self._KEY_FLAT_STEPS_BY_CLEF[self.clef]
         lines: list[str] = []
         for index, (letter, accidental_value) in enumerate(accidentals):
             x = x_start + (index * 10.0)
             if accidental_value == 1:
-                step = self._TREBLE_SHARP_STEPS[letter]
+                step = sharp_steps[letter]
                 symbol = "&#9839;"
             else:
-                step = self._TREBLE_FLAT_STEPS[letter]
+                step = flat_steps[letter]
                 symbol = "&#9837;"
 
             y = staff_bottom - (step * (staff_spacing / 2.0)) + 4.0
@@ -857,6 +662,24 @@ class SheetMusic:
                 f'<text class="key-accidental" x="{x:.2f}" y="{y:.2f}" font-family="Bravura, Noto Music, serif" font-size="18" fill="#111">{symbol}</text>'
             )
         return lines
+
+    def _render_clef_symbol(
+        self,
+        *,
+        left_margin: float,
+        staff_top: float,
+        staff_bottom: float,
+    ) -> str:
+        """Render the leading clef glyph for the active clef."""
+        if self.clef is SheetClef.BASS:
+            return (
+                f'<text x="{left_margin - 28:.2f}" y="{staff_top + 38:.2f}" '
+                'font-family="Bravura, Noto Music, serif" font-size="40" fill="#111">&#119074;</text>'
+            )
+        return (
+            f'<text x="{left_margin - 30:.2f}" y="{staff_bottom + 4:.2f}" '
+            'font-family="Bravura, Noto Music, serif" font-size="44" fill="#111">&#119070;</text>'
+        )
 
     def _render_measure_barlines(
         self,
@@ -952,11 +775,11 @@ class SheetMusic:
 
             if parsed is not None:
                 letter_index, accidental_offset, octave = parsed
-                step = (octave * 7 + letter_index) - self._treble_bottom_line_index()
+                step = (octave * 7 + letter_index) - self._bottom_line_index_for_clef(self.clef)
                 letter_name = "CDEFGAB"[letter_index]
                 note_accidental = accidental_offset
             else:
-                step = self._staff_step_for_pitch(pitch, None)
+                step = self._staff_step_for_pitch(pitch, None, clef=self.clef)
                 pitch_class = pitch % 12
                 letter_index = self._MIDI_TO_LETTER_INDEX[pitch_class]
                 letter_name = "CDEFGAB"[letter_index]
@@ -1086,23 +909,29 @@ class SheetMusic:
         return 4
 
     @classmethod
-    def _treble_bottom_line_index(cls) -> int:
-        """Return the absolute diatonic index for treble-clef bottom line E4."""
-        return (4 * 7) + cls._LETTER_INDEX["E"]
+    def _bottom_line_index_for_clef(cls, clef: SheetClef) -> int:
+        """Return the absolute diatonic index for the active clef bottom line."""
+        return cls._CLEF_BOTTOM_LINE_INDEX[clef]
 
     @classmethod
-    def _staff_step_for_pitch(cls, pitch: int, spelling: str | None) -> int:
-        """Map a pitch to a diatonic staff step relative to treble E4."""
+    def _staff_step_for_pitch(
+        cls,
+        pitch: int,
+        spelling: str | None,
+        *,
+        clef: SheetClef,
+    ) -> int:
+        """Map a pitch to a diatonic staff step relative to the active clef."""
         if spelling is not None:
             parsed = cls._parse_spelling(spelling)
             if parsed is not None:
                 letter_index, octave = parsed
-                return (octave * 7 + letter_index) - cls._treble_bottom_line_index()
+                return (octave * 7 + letter_index) - cls._bottom_line_index_for_clef(clef)
 
         pitch_class = pitch % 12
         letter_index = cls._MIDI_TO_LETTER_INDEX[pitch_class]
         octave = (pitch // 12) - 1
-        return (octave * 7 + letter_index) - cls._treble_bottom_line_index()
+        return (octave * 7 + letter_index) - cls._bottom_line_index_for_clef(clef)
 
     @classmethod
     def _parse_spelling(cls, spelling: str) -> tuple[int, int] | None:
@@ -1143,7 +972,7 @@ class SheetMusic:
         spellings = event.spelling if event.spelling is not None else ()
         for index, pitch in enumerate(event.pitches):
             spelling = spellings[index] if index < len(spellings) else None
-            step = self._staff_step_for_pitch(pitch, spelling)
+            step = self._staff_step_for_pitch(pitch, spelling, clef=self.clef)
             y = staff_bottom - (step * (staff_spacing / 2.0))
             positions.append((step, y))
         return positions

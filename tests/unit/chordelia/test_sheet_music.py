@@ -16,7 +16,7 @@ from chordelia.rhythm import Duration
 from chordelia.scales import Scale
 from chordelia.score import Score, ScoreEvent, ScoreMetadata
 from chordelia.sequences import Rest, Sequence
-from chordelia.sheet_music import SheetMusic
+from chordelia.sheet_music import SheetClef, SheetMusic
 
 
 def _normalize_newlines(text: str) -> str:
@@ -98,6 +98,15 @@ class TestSheetMusicConstruction:
 
         assert isinstance(sheet.score, Score)
         assert len(sheet.score.events) == 8
+
+    def test_constructor_accepts_explicit_clef_enum(self):
+        sheet = SheetMusic(Note("E2"), clef=SheetClef.BASS)
+
+        assert sheet.clef is SheetClef.BASS
+
+    def test_constructor_rejects_invalid_clef_value(self):
+        with pytest.raises(ValueError, match="Invalid clef"):
+            SheetMusic(Note("C4"), clef="alto")
 
     @pytest.mark.parametrize(
         "source",
@@ -243,6 +252,43 @@ class TestSheetMusicFileOutput:
         assert content.count('class="note-accidental"') == 1
         assert "&#9838;" in content
 
+    def test_auto_clef_selects_bass_when_median_unique_pitch_is_below_middle_c(self, tmp_path: Path):
+        sequence = Sequence(((Note("E2"), 1), (Note("A2"), 1), (Note("B2"), 1)))
+
+        output_path = SheetMusic(sequence).to_file(tmp_path / "auto_bass.svg")
+
+        content = output_path.read_text(encoding="utf-8")
+        assert "&#119074;" in content
+        assert "&#119070;" not in content
+
+    def test_auto_clef_uses_bass_when_median_unique_pitch_is_below_middle_c(self):
+        sequence = Sequence(((Note("B2"), 1), (Note("C4"), 1)))
+
+        sheet = SheetMusic(sequence)
+
+        assert sheet.clef is SheetClef.BASS
+
+    def test_auto_clef_uses_treble_when_median_unique_pitch_is_middle_c(self):
+        sequence = Sequence(((Note("B3"), 1), (Note("C4"), 1), (Note("C#4"), 1)))
+
+        sheet = SheetMusic(sequence)
+
+        assert sheet.clef is SheetClef.TREBLE
+
+    def test_auto_clef_uses_bass_for_even_median_between_b3_and_c4(self):
+        sequence = Sequence(((Note("B3"), 1), (Note("C4"), 1)))
+
+        sheet = SheetMusic(sequence)
+
+        assert sheet.clef is SheetClef.BASS
+
+    def test_auto_clef_defaults_to_treble_for_empty_scores(self):
+        empty_score = Score(source="empty", metadata=ScoreMetadata(), events=())
+
+        sheet = SheetMusic(empty_score)
+
+        assert sheet.clef is SheetClef.TREBLE
+
     def test_constructor_rejects_invalid_scale_type(self):
         sequence = Sequence(((Note("C4"), 1),))
 
@@ -303,8 +349,9 @@ class TestSheetMusicFileOutput:
             sheet.to_file(tmp_path / "broken.svg")
 
     def test_configure_lilypond_backend_sets_svg_adapter(self, monkeypatch):
-        def fake_renderer_factory(_path, *, crop):
+        def fake_renderer_factory(_path, *, crop, background):
             assert crop is True
+            assert background == "white"
             return lambda _sheet: "<svg data-renderer=\"lilypond\"></svg>"
 
         monkeypatch.setattr(
@@ -345,6 +392,7 @@ class TestSheetMusicFileOutput:
         renderer = lilypond_backend.make_lilypond_svg_renderer("C:/tools/lilypond.exe")
         rendered = renderer(sheet)
         assert "lilypond-cropped" in rendered
+        assert 'class="chordelia-lilypond-bg"' in rendered
 
     def test_lilypond_renderer_can_disable_cropping(self, monkeypatch):
         sheet = SheetMusic(Note("C4"))
@@ -370,6 +418,40 @@ class TestSheetMusicFileOutput:
         )
         rendered = renderer(sheet)
         assert "lilypond-uncropped" in rendered
+        assert 'class="chordelia-lilypond-bg"' in rendered
+
+    def test_lilypond_renderer_can_use_transparent_background(self, monkeypatch):
+        sheet = SheetMusic(Note("C4"))
+
+        monkeypatch.setattr(lilypond_backend.shutil, "which", lambda _name: None)
+
+        def fake_run(command, **kwargs):
+            assert kwargs["capture_output"] is True
+            assert kwargs["text"] is True
+            assert kwargs["check"] is False
+            out_index = command.index("-o") + 1
+            output_prefix = Path(command[out_index])
+            svg_path = output_prefix.parent / f"{output_prefix.name}.cropped.svg"
+            svg_path.write_text("<svg id=\"lilypond-transparent\"/>", encoding="utf-8")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        monkeypatch.setattr(lilypond_backend.subprocess, "run", fake_run)
+
+        renderer = lilypond_backend.make_lilypond_svg_renderer(
+            "C:/tools/lilypond.exe",
+            background="transparent",
+        )
+        rendered = renderer(sheet)
+
+        assert "lilypond-transparent" in rendered
+        assert 'class="chordelia-lilypond-bg"' not in rendered
+
+    def test_lilypond_renderer_rejects_unsupported_background(self):
+        with pytest.raises(ValueError, match="Unsupported background"):
+            lilypond_backend.make_lilypond_svg_renderer(
+                "C:/tools/lilypond.exe",
+                background="cream",
+            )
 
     def test_lilypond_source_for_iterable_scales_includes_measure_keys_and_labels(self):
         sheet = SheetMusic([Scale("D", "major"), Scale("Bb", "major")])
@@ -383,6 +465,16 @@ class TestSheetMusicFileOutput:
         assert source.count("\\mark \\markup") >= 2
         assert "D Major" in source
         assert "Bb Major" in source
+
+    def test_lilypond_source_emits_bass_clef_when_selected(self):
+        source = lilypond_backend._sheet_to_lilypond_source(SheetMusic(Note("E2"), clef="bass"))
+
+        assert "\\clef bass" in source
+
+    def test_lilypond_source_keeps_treble_clef_when_explicitly_selected(self):
+        source = lilypond_backend._sheet_to_lilypond_source(SheetMusic(Note("C4"), clef="treble"))
+
+        assert "\\clef treble" in source
 
     def test_lilypond_source_for_pentatonic_minor_scale_uses_custom_key_alterations(self):
         sheet = SheetMusic([Scale("G", "pentatonic_minor")])
@@ -414,6 +506,14 @@ class TestSheetMusicFileOutput:
         from_classmethod = SheetMusic.score_to_file(score, tmp_path / "classmethod.svg")
 
         assert from_instance.read_text(encoding="utf-8") == from_classmethod.read_text(encoding="utf-8")
+
+    def test_score_to_file_supports_explicit_clef_override(self, tmp_path: Path):
+        score = Score.from_sequenceable(Note("E2"))
+
+        output_path = SheetMusic.score_to_file(score, tmp_path / "bass_score.svg", clef="bass")
+
+        content = output_path.read_text(encoding="utf-8")
+        assert "&#119074;" in content
 
     def test_sequenceable_and_prebuilt_score_render_identical_svg(self, tmp_path: Path):
         sequence = Sequence(

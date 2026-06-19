@@ -96,7 +96,7 @@ def reset_global_random_state():
 @pytest.fixture
 def restore_sheetmusic_runtime_rendering_config_state():
 	"""Reset and restore sheetmusic runtime rendering configuration and hooks."""
-	import chordelia.sheetmusic_backends.runtime as runtime
+	import chordelia.sheetmusic_runtime as runtime
 
 	previous_config = runtime.get_sheetmusic_rendering_config()
 	runtime.uninstall_sequenceable_sheetmusic_display_hooks()

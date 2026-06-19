@@ -2,7 +2,8 @@
 
 import pytest
 
-import chordelia.sheetmusic_backends.runtime as runtime
+import chordelia.sheetmusic_backends.runtime as backend_runtime
+import chordelia.sheetmusic_runtime as runtime
 from chordelia.notes import Note
 from chordelia.scale_context import (
     get_global_scale_context,
@@ -38,6 +39,16 @@ class TestSheetMusicRuntimeConfig:
         assert isinstance(config.scale, Scale)
         assert str(config.scale.root) == "F"
 
+    def test_configure_sheetmusic_rendering_updates_clef(self):
+        config = runtime.configure_sheetmusic_rendering(clef="bass")
+
+        assert config.clef == "bass"
+        assert runtime.get_sheetmusic_rendering_config().clef == "bass"
+
+    def test_configure_sheetmusic_rendering_rejects_invalid_clef(self):
+        with pytest.raises(ValueError, match="Invalid clef"):
+            runtime.configure_sheetmusic_rendering(clef="alto")
+
     def test_with_sheetmusic_rendering_restores_previous_state(self):
         runtime.configure_sheetmusic_rendering(scale="C")
 
@@ -49,12 +60,13 @@ class TestSheetMusicRuntimeConfig:
     def test_configure_sheetmusic_rendering_lilypond_delegates_backend_setup(self, monkeypatch):
         captured = {}
 
-        def fake_configure_lilypond(executable, *, format_name, crop):
+        def fake_configure_lilypond(executable, *, format_name, crop, background):
             captured["executable"] = executable
             captured["format_name"] = format_name
             captured["crop"] = crop
+            captured["background"] = background
 
-        monkeypatch.setattr(runtime, "configure_sheet_music_lilypond_backend", fake_configure_lilypond)
+        monkeypatch.setattr(backend_runtime, "configure_sheet_music_lilypond_backend", fake_configure_lilypond)
 
         config = runtime.configure_sheetmusic_rendering(
             backend_name="lilypond",
@@ -67,7 +79,28 @@ class TestSheetMusicRuntimeConfig:
             "executable": "C:/tools/lilypond.exe",
             "format_name": "svg",
             "crop": False,
+            "background": "white",
         }
+
+    def test_configure_sheetmusic_rendering_lilypond_allows_transparent_background(self, monkeypatch):
+        captured = {}
+
+        def fake_configure_lilypond(executable, *, format_name, crop, background):
+            captured["executable"] = executable
+            captured["format_name"] = format_name
+            captured["crop"] = crop
+            captured["background"] = background
+
+        monkeypatch.setattr(backend_runtime, "configure_sheet_music_lilypond_backend", fake_configure_lilypond)
+
+        config = runtime.configure_sheetmusic_rendering(
+            backend_name="lilypond",
+            lilypond_executable="C:/tools/lilypond.exe",
+            background="transparent",
+        )
+
+        assert config.backend_options["background"] == "transparent"
+        assert captured["background"] == "transparent"
 
 
 class TestSequenceableDisplayHooks:
@@ -127,6 +160,23 @@ class TestSequenceableDisplayHooks:
 
         mimebundle = Note("D4")._repr_mimebundle_()
         assert "image/svg+xml" in mimebundle
+
+    def test_sequenceable_hooks_respect_configured_clef(self):
+        runtime.configure_sheetmusic_rendering(clef="treble")
+        runtime.install_sequenceable_sheetmusic_display_hooks(target_types=(Note,))
+
+        mimebundle = Note("E2")._repr_mimebundle_()
+
+        assert "&#119070;" in mimebundle["image/svg+xml"]
+        assert "&#119074;" not in mimebundle["image/svg+xml"]
+
+    def test_sequenceable_hooks_default_to_auto_clef_when_unspecified(self):
+        runtime.configure_sheetmusic_rendering()
+        runtime.install_sequenceable_sheetmusic_display_hooks(target_types=(Note,))
+
+        mimebundle = Note("E2")._repr_mimebundle_()
+
+        assert "&#119074;" in mimebundle["image/svg+xml"]
 
     def test_uninstall_sequenceable_hooks_restores_original_methods(self):
         had_original = hasattr(Note, "_repr_mimebundle_")

@@ -140,11 +140,11 @@ Related deep docs:
 
 Core rendering API:
 
-- `SheetMusic(source, scale=None)`
+- `SheetMusic(source, clef="auto", scale=None)`
 - `SheetMusic.to_file(path, format="svg")`
-- `SheetMusic.score_to_file(score, path, format="svg")`
+- `SheetMusic.score_to_file(score, path, clef="auto", format="svg")`
 
-Runtime backend APIs (from `chordelia.sheetmusic_backends`):
+Runtime APIs (from `chordelia.sheetmusic_runtime`):
 
 - `configure_sheetmusic_rendering(...)`
 - `with_sheetmusic_rendering(...)`
@@ -153,10 +153,17 @@ Runtime backend APIs (from `chordelia.sheetmusic_backends`):
 - `install_sequenceable_sheetmusic_display_hooks()`
 - `uninstall_sequenceable_sheetmusic_display_hooks()`
 
+Runtime option highlights:
+
+- `configure_sheetmusic_rendering(...)` and `with_sheetmusic_rendering(...)` accept `clef` (`"treble"`, `"bass"`, `"auto"`) for global hook-driven sequenceable rendering.
+- LilyPond runtime options include `background` (`"white"` or `"transparent"`) and `crop`.
+
 Notes:
 
 - Built-in SVG rendering is part of the core package.
 - `SheetMusic` is write-only in v1 (render/export, no parse/load API).
+- Supported clef values are `"treble"`, `"bass"`, and `"auto"` (default).
+- Auto clef resolves from the median of unique pitches: below middle C (MIDI 60) chooses bass; middle C or above chooses treble.
 
 Related deep docs:
 

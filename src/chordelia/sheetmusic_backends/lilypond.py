@@ -48,21 +48,26 @@ _MIDI_PC_TO_LILYPOND = (
     "b",
 )
 
+_SUPPORTED_BACKGROUNDS = {"white", "transparent"}
+
 
 def make_lilypond_svg_renderer(
     lilypond_executable: str | Path,
     *,
     crop: bool = True,
+    background: str = "white",
 ) -> Callable[[SheetMusic], str]:
     """Create a SheetMusic renderer callable backed by LilyPond."""
 
     executable = _resolve_lilypond_executable(lilypond_executable)
+    normalized_background = _normalize_background(background)
 
     def _renderer(sheet: SheetMusic) -> str:
         return render_sheet_music_via_lilypond(
             sheet,
             lilypond_executable=executable,
             crop=crop,
+            background=normalized_background,
         )
 
     return _renderer
@@ -73,6 +78,7 @@ def configure_sheet_music_lilypond_backend(
     *,
     format_name: str = "svg",
     crop: bool = True,
+    background: str = "white",
 ) -> None:
     """Configure SheetMusic format output to use the LilyPond SVG backend."""
 
@@ -82,6 +88,7 @@ def configure_sheet_music_lilypond_backend(
     SheetMusic._RENDER_BACKEND_ADAPTERS[normalized_format] = make_lilypond_svg_renderer(
         lilypond_executable,
         crop=crop,
+        background=background,
     )
 
 
@@ -90,10 +97,12 @@ def render_sheet_music_via_lilypond(
     *,
     lilypond_executable: str | Path,
     crop: bool = True,
+    background: str = "white",
 ) -> str:
     """Render one SheetMusic instance to SVG through LilyPond."""
 
     executable = _resolve_lilypond_executable(lilypond_executable)
+    normalized_background = _normalize_background(background)
     lilypond_source = _sheet_to_lilypond_source(sheet)
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -142,7 +151,37 @@ def render_sheet_music_via_lilypond(
         if not svg_candidates:
             raise RuntimeError("LilyPond did not produce an SVG output file.")
 
-        return svg_candidates[0].read_text(encoding="utf-8")
+        rendered_svg = svg_candidates[0].read_text(encoding="utf-8")
+        if normalized_background == "transparent":
+            return rendered_svg
+        return _with_white_svg_background(rendered_svg)
+
+
+def _normalize_background(background: str) -> str:
+    """Validate and normalize supported background modes."""
+    normalized = background.strip().lower()
+    if normalized not in _SUPPORTED_BACKGROUNDS:
+        supported = ", ".join(sorted(_SUPPORTED_BACKGROUNDS))
+        raise ValueError(
+            f"Unsupported background {background!r}. Supported values: {supported}"
+        )
+    return normalized
+
+
+def _with_white_svg_background(svg_text: str) -> str:
+    """Ensure rendered SVG has a white background rect under the score."""
+    if 'class="chordelia-lilypond-bg"' in svg_text:
+        return svg_text
+
+    match = re.search(r"<svg\b[^>]*>", svg_text)
+    if match is None:
+        return svg_text
+
+    rect = (
+        '<rect class="chordelia-lilypond-bg" x="0" y="0" '
+        'width="100%" height="100%" fill="#ffffff"/>'
+    )
+    return f"{svg_text[:match.end()]}{rect}{svg_text[match.end():]}"
 
 
 def _resolve_lilypond_executable(lilypond_executable: str | Path) -> str:
@@ -165,6 +204,8 @@ def _sheet_to_lilypond_source(sheet: SheetMusic) -> str:
 
     numerator, denominator = sheet.score.metadata.time_signature
     tempo = sheet.score.metadata.tempo
+    clef = getattr(sheet, "clef", None)
+    clef_value = getattr(clef, "value", "treble")
     tempo_line = f"    \\tempo 4 = {tempo}\\n" if getattr(sheet, "_render_tempo_metadata", False) else ""
     scale_directives = _iterable_scale_directives(sheet)
     key_line = "" if scale_directives else _key_signature_line(sheet)
@@ -180,7 +221,7 @@ def _sheet_to_lilypond_source(sheet: SheetMusic) -> str:
         "\\layout { ragged-right = ##t }\n"
         "\\score {\n"
         "  \\new Staff {\n"
-        "    \\clef treble\n"
+        f"    \\clef {clef_value}\n"
         "    \\set Staff.printKeyCancellation = ##f\n"
         "    \\omit Staff.KeyCancellation\n"
         f"    \\time {numerator}/{denominator}\n"
