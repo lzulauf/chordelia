@@ -30,7 +30,7 @@ Companion skills: plan-implementation for phase-by-phase execution, function-nam
 ## Plan Location and Naming
 
 - Store plan files in .plans.
-- Keep active (Drafting or Implementing) plans at the .plans root.
+- Keep active (Drafting, Approved, or Implementing) plans at the .plans root.
 - Archive finished plans under .plans/archive/.
 - Use concise snake_case names ending in _plan.md when possible.
 - Keep one primary goal per plan.
@@ -64,17 +64,21 @@ Include these sections in order unless there is a strong reason not to:
 - Include an explicit section named "Status" at the top of every plan, immediately before "Goal".
 - Allowed values are exactly:
 	- Drafting
+	- Approved
 	- Implementing
 	- Done
 	- Rejected
 - Lifecycle rules:
 	- Default new-plan state is Drafting.
+	- When a draft is accepted and ready to execute, update status to Approved.
+	- Approved indicates implementation can start without further design edits unless scope changes.
 	- When implementation begins, update status to Implementing as the first implementation step.
 	- When implementation completes successfully, update status to Done and move the plan to .plans/archive/.
 	- If the plan is declined, update status to Rejected and move the plan to .plans/archive/.
-- Active plans in .plans/ should use Drafting or Implementing only.
+- Active plans in .plans/ should use Drafting, Approved, or Implementing only.
 - Archived plans in .plans/archive/ must use Done or Rejected only.
 - Update status whenever checklist state or plan lifecycle changes.
+- For plans that remain in Drafting, include at least 1-3 concrete draft-improvement suggestions in planning updates.
 
 ## Technical Design Details Rules
 
@@ -167,7 +171,7 @@ Checklist style example:
 ## Plan Review Checklist
 
 - Status section exists at the top and reflects current lifecycle state.
-- Status value is one of: Drafting, Implementing, Done, Rejected.
+- Status value is one of: Drafting, Approved, Implementing, Done, Rejected.
 - Archived plans explicitly show Done or Rejected status.
 - Sections are complete and in logical order.
 - Scope and out-of-scope are explicit.
@@ -213,3 +217,13 @@ Checklist style example:
 - Update references from active plans so links point to the archived file path.
 - Keep archived plans as historical records and avoid substantive rewrites after archival.
 - If implementation notes exist, preserve them verbatim as the execution record.
+
+## Drafting Improvement Guidance
+
+- When a plan is still Drafting, provide concrete suggestions to improve execution readiness.
+- Suggest improvements in these categories when applicable:
+	- missing API signatures/contracts,
+	- unclear validation/test strategy,
+	- missing docs delta classification,
+	- ambiguous phase boundaries or dependencies.
+- Keep suggestions concise and actionable (1-3 items by default).

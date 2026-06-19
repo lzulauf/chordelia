@@ -33,7 +33,7 @@ Companion skills: plan-use for plan authoring/re-scoping, plan-implementation fo
 
 2. Apply prioritization gates
 - Exclude plans already marked Done/Complete.
-- Prefer Implementing plans over Drafting plans.
+- Prefer Implementing plans over Approved plans over Drafting plans.
 - Prefer plans with low remaining checklist count when closeout is cheap.
 - Prefer plans explicitly marked "Why this comes first" when present.
 - Respect dependency order from cross-plan references and execution-order sections.
@@ -51,15 +51,17 @@ Companion skills: plan-use for plan authoring/re-scoping, plan-implementation fo
 ## Prioritization Rules
 
 - Rule 1: Finish nearly complete active work before starting broad new initiatives.
-- Rule 2: Resolve foundation plans that reduce cross-module inconsistency before feature expansion.
-- Rule 3: Prefer plans that unblock multiple downstream plans.
-- Rule 4: Defer large speculative plans when smaller high-leverage plans are available.
-- Rule 5: Keep plan lifecycle clean (Done plans archived, active plans in root).
+- Rule 2: Prioritize by lifecycle readiness: Implementing > Approved > Drafting.
+- Rule 3: Resolve foundation plans that reduce cross-module inconsistency before feature expansion.
+- Rule 4: Prefer plans that unblock multiple downstream plans.
+- Rule 5: Defer large speculative plans when smaller high-leverage plans are available.
+- Rule 6: Keep plan lifecycle clean (Done plans archived, active plans in root).
 
 ## Output Format
 
 - Top recommendation first with one-sentence reason.
 - Follow with 2-5 ranked options.
+- For any Drafting option listed, include 1-3 concise suggestions to improve draft readiness.
 - End with a proposed "start now" action that can be executed immediately.
 
 ## Review Checklist

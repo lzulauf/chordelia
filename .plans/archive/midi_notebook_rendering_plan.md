@@ -1,7 +1,7 @@
 MIDI notebook rendering plan for chordelia.
 
 ## Status
-Drafting
+Rejected
 
 ## Goal
 Provide optional notebook rich-display support for `MidiFile` using `_repr_mimebundle_`, including graceful fallback behavior when notebook extras are unavailable.
@@ -98,6 +98,17 @@ Expected docs delta classification: docs updates.
    1. Mitigation: strict optional import boundaries and fallback tests.
 2. Risk: inconsistent notebook output across environments.
    1. Mitigation: deterministic fallback and narrow MIME contract.
+
+## Implementation notes
+### 2026-06-05 - Rejection rationale
+- Decision: reject this plan and archive it without shipping browser-embedded MIDI player behavior.
+- Primary blocker: modern browsers (including Chrome) do not provide reliable native General MIDI audio decoding for raw `.mid` payloads in standard HTML audio controls.
+- Technical challenges identified:
+   - Browser playback requires a separate synth layer (WebAudio + SoundFont/sample engine), not just MIME embedding.
+   - Cross-browser behavior is inconsistent; UI controls may render while playback remains inactive.
+   - Optional dependency boundary would grow significantly to support a robust JS synth path and asset management.
+   - Maintenance complexity is high for timing/scheduling, instrument mapping, and notebook integration compared to project value.
+- Outcome: defer notebook audio playback to future work that explicitly scopes a JS synth or server-side MIDI-to-audio rendering strategy.
 
 ## Acceptance criteria
 1. Notebook MIME rendering works when optional extras are installed.

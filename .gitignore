@@ -41,6 +41,7 @@ docs/_build/
 # Jupyter notebooks
 .ipynb_checkpoints/
 *.ipynb
+.jupyter/
 
 # Temporary files
 *.tmp

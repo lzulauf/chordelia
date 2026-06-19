@@ -30,10 +30,11 @@ Companion skills: plan-use for plan authoring/re-scoping, test-writing for requi
 Before coding any phase:
 
 1. Open the plan file in `.plans/` and verify required sections exist.
-2. Confirm `Status` is set to `Implementing`.
-3. Confirm the target phase has explicit deliverables and acceptance checks.
-4. Confirm test/docs expectations for the phase are explicit.
-5. If these are missing or stale, update the plan with `plan-use` first.
+2. Confirm `Status` is set to `Approved` or `Implementing`.
+3. If status is `Approved`, update it to `Implementing` as the first execution step before code changes.
+4. Confirm the target phase has explicit deliverables and acceptance checks.
+5. Confirm test/docs expectations for the phase are explicit.
+6. If these are missing or stale, update the plan with `plan-use` first.
 
 ## Phase-By-Phase Execution Loop
 
@@ -79,6 +80,7 @@ Repeat this loop for each phase, in order:
 
 ## Status and Archival Rules During Implementation
 
+- `Approved` means the plan is accepted and ready to execute but coding has not started.
 - Keep `Status: Implementing` while any plan phase remains open.
 - When all acceptance criteria are met:
   - set `Status: Done`,
