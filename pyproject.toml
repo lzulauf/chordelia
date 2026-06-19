@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chordelia"
-version = "0.4.0"
+version = "0.5.0-rc0"
 description = "A comprehensive music theory library built around algorithmic approaches"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,7 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 # Audio playback support
 audio = [
-    "sounddevice>=0.4.0",
+    "sounddevice>=0.5.0-rc0",
     "numpy>=1.20.0",
 ]
 
@@ -34,7 +34,7 @@ notebook = [
 
 # Complete audio experience (playback + MIDI)
 all = [
-    "sounddevice>=0.4.0",
+    "sounddevice>=0.5.0-rc0",
     "numpy>=1.20.0",
     "mido>=1.3.0",
     "python-rtmidi>=1.4.0",
@@ -53,7 +53,7 @@ where = ["src"]
 
 
 [tool.bumpversion]
-current_version = "0.4.0"
+current_version = "0.5.0-rc0"
 files = [
     { filename = "pyproject.toml" },
     { filename = "src/chordelia/__init__.py" }
