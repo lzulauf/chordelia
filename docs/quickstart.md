@@ -88,6 +88,7 @@ Install optional features when needed:
 ```bash
 pip install chordelia[audio]
 pip install chordelia[midi]
+pip install chordelia[notebook]
 ```
 
 Immutable composition (`Sequence`, `ParallelSequence`) is separate from future

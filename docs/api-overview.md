@@ -180,6 +180,7 @@ Audio APIs (audio extra):
 MIDI APIs (midi extra):
 
 - `MidiPlayback`, `MidiFile`, `MidiTrackInfo`
+- `MidiPlaybackPanel`, `MidiPlaybackPanelDisplayHandle`
 - `get_midi_ports()`, `is_midi_available()`
 - `midi_play_chord(...)`, `midi_play_melody(...)`
 - `MidiMonitorSession`, `MidiMonitorEvent`, `MidiMonitorDisplayHandle`
@@ -198,6 +199,9 @@ Notes:
 - Notebook rendering remains tracked separately in [MIDI Notebook Rendering Plan](../.plans/midi_notebook_rendering_plan.md).
 - Real-time monitor workflows are additive and optional; playback behavior is unchanged when no monitor is attached.
 - `MidiMonitorSession.display_live(...)` provides a notebook updater when `IPython.display` is available and falls back to a no-failure text handle otherwise.
+- `MidiPlaybackPanel` is the canonical notebook MIDI control surface for interactive port/channel selection while delegating playback to an underlying `MidiPlayback` transport.
+- Install notebook UI dependencies with `pip install chordelia[notebook]`.
+- `MidiPlaybackPanel` supports IPython auto-display via `_ipython_display_()` when evaluated in notebook cells.
 
 Monitor session highlights:
 

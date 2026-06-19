@@ -81,6 +81,7 @@ try:
         MidiMonitorSession,
     )
     from chordelia.midifile import MidiFile, MidiTrackInfo
+    from chordelia.notebook import MidiPlaybackPanel, MidiPlaybackPanelDisplayHandle
     _MIDI_AVAILABLE = True
 except ImportError:
     _MIDI_AVAILABLE = False
@@ -170,6 +171,8 @@ if _MIDI_AVAILABLE:
         "MidiMonitorDisplayHandle",
         "MidiMonitorEvent",
         "MidiMonitorSession",
+        "MidiPlaybackPanel",
+        "MidiPlaybackPanelDisplayHandle",
         "MidiFile",
         "MidiTrackInfo",
         "get_midi_ports", 

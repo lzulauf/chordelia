@@ -23,6 +23,7 @@ Optional extras:
 ```bash
 pip install chordelia[audio]
 pip install chordelia[midi]
+pip install chordelia[notebook]
 pip install chordelia[all]
 ```
 

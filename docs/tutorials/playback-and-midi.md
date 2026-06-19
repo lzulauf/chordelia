@@ -12,6 +12,7 @@ Install optional dependencies:
 ```bash
 pip install chordelia[audio]
 pip install chordelia[midi]
+pip install chordelia[notebook]
 ```
 
 ## 1) Build a Score Once
@@ -101,6 +102,7 @@ if ports:
             gate_width=1.0,
             retrigger_policy="delta",
         )
+```
 
 ## 7) Runtime MIDI Monitoring
 
@@ -154,7 +156,34 @@ if ports:
         # Stop live refresh explicitly if needed.
         live.stop()
 ```
+
+## 9) Notebook MIDI Port/Channel Panel
+
+Use `MidiPlaybackPanel` as the canonical notebook UI surface for selecting output
+port and channel while retaining direct `play_score(...)` control.
+
+```python
+from chordelia import MidiPlaybackPanel
+
+panel = MidiPlaybackPanel(score=score, auto_connect=True)
+panel.display()
+
+# Or simply evaluate `panel` in a notebook cell to auto-render controls.
+panel
+
+# Plays through the current panel selection.
+panel.play_score(blocking=False)
+
+# Programmatic access remains available for advanced transport calls.
+active_playback = panel.playback
 ```
+
+Notes:
+
+- Channel slider updates the active `MidiPlayback` instance in place.
+- Changing output port reconnects and replaces the underlying `MidiPlayback` transport.
+- UI changes continue to affect the same panel instance unless you re-run construction
+    and create a new panel object.
 
 ## Related
 

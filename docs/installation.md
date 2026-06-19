@@ -33,6 +33,12 @@ MIDI file support:
 pip install chordelia[midi]
 ```
 
+Notebook UI support:
+
+```bash
+pip install chordelia[notebook]
+```
+
 Complete audio experience:
 
 ```bash
@@ -54,6 +60,7 @@ uv sync --group dev --extra all
 | `chordelia` | Core music theory + sequence/score + built-in SVG sheet rendering (`SheetMusic`) |
 | `chordelia[audio]` | Audio playback with multiple waveforms |
 | `chordelia[midi]` | MIDI interface playback and MIDI file workflows |
+| `chordelia[notebook]` | Notebook UI dependencies for interactive panels/widgets |
 | `chordelia[all]` | Audio + MIDI optional workflows |
 
 ## Verify Optional Feature Availability
