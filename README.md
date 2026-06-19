@@ -127,7 +127,14 @@ SheetMusic(score, scale=scale).to_file("song.svg")
 # Continue from block 1 in the same Python session.
 MidiFile(score).to_file("song.mid")
 
-MidiPlayback().play_score(score, blocking=True)
+playback = MidiPlayback()
+playback.play_score(score, blocking=True)
+
+# Optional: inspect outbound MIDI messages in real time.
+monitor = MidiMonitorSession(playback=playback, max_events=200).start()
+# ...run playback calls...
+recent_events = monitor.snapshot(limit=20)
+monitor.stop()
 ```
 
 Note: immutable composition models (`Sequence`, `ParallelSequence`) are separate

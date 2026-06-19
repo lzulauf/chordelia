@@ -1,7 +1,7 @@
 Real-time MIDI message monitoring plan for notebook and runtime workflows.
 
 ## Status
-Approved
+Done
 
 ## Goal
 Add a real-time MIDI message monitoring feature that works both in notebooks and in non-notebook Python runtimes, with optional log-file output that can include wall-clock timestamps and/or offset times in seconds and beats.
@@ -229,14 +229,14 @@ Expected docs delta classification: both README updates and docs updates.
 5. Document file logging fields and timestamp/offset toggles.
 
 ## Progress checklist
-- [ ] Phase 0: Monitoring API contract locked
-- [ ] Phase 1: MidiPlayback event hook integration complete
-- [ ] Phase 2: Monitor session core implemented
-- [ ] Phase 3: File logging with timestamp/offset options implemented
-- [ ] Phase 4: Notebook live display adapter implemented
-- [ ] Phase 5: Focused and regression tests passing
-- [ ] Phase 6: Documentation and examples updated
-- [ ] Real-time MIDI monitoring accepted for notebook and runtime workflows
+- [x] Phase 0: Monitoring API contract locked
+- [x] Phase 1: MidiPlayback event hook integration complete
+- [x] Phase 2: Monitor session core implemented
+- [x] Phase 3: File logging with timestamp/offset options implemented
+- [x] Phase 4: Notebook live display adapter implemented
+- [x] Phase 5: Focused and regression tests passing
+- [x] Phase 6: Documentation and examples updated
+- [x] Real-time MIDI monitoring accepted for notebook and runtime workflows
 
 ## Phases
 ### Phase 0: Contract lock
@@ -281,7 +281,69 @@ Expected docs delta classification: both README updates and docs updates.
 4. Complete tests before docs finalization.
 
 ## Implementation notes
-- No implementation notes yet.
+### 2026-06-03 - Phase 1
+- Scope completed: Added `MidiPlayback` listener registration/removal APIs and structured outbound event emission from `_send_note_on`/`_send_note_off` with source tagging (`play_note`, `update_chord`, `play_score`, `stop`, `set_channel`).
+- Code touchpoints: `src/chordelia/midi_playback.py`.
+- Tests: Added focused listener coverage in `tests/unit/chordelia/test_midi_playback.py` for registration/type validation, event payload emission, unknown-id removal no-op behavior, and listener exception isolation. Ran: `pytest tests/unit/chordelia/test_midi_playback.py` (pass).
+- Docs: None in this phase (docs planned for Phase 6).
+- Commit/PR: not created yet.
+- Follow-ups: Complete remaining Phase 0 contract decisions for monitor-session lifecycle semantics before Phase 2 module implementation.
+
+### 2026-06-03 - Phase 2
+- Scope completed: Added `MidiMonitorSession` and `MidiMonitorEvent` with bounded queue retention, start/stop lifecycle, snapshot/clear APIs, message-type filtering, tempo-aware beat offsets, and `start_midi_monitor` helper.
+- Code touchpoints: `src/chordelia/midi_monitor.py`, `src/chordelia/__init__.py`.
+- Tests: Added `tests/unit/chordelia/test_midi_monitor.py` and reran focused playback+monitor tests. Ran: `pytest tests/unit/chordelia/test_midi_monitor.py tests/unit/chordelia/test_midi_playback.py` (pass).
+- Docs: None in this phase (docs planned for Phase 6).
+- Commit/PR: not created yet.
+- Follow-ups: Implement Phase 3 logging fields/toggles and persist records in deterministic line-oriented format.
+
+### 2026-06-05 - Phase 0
+- Scope completed: Locked monitoring contract decisions for lifecycle and offset behavior.
+- Contract decisions: starting an already running session raises `ValueError`; `stop()` remains idempotent; `include_elapsed_beats=True` without tempo emits `None` beat offsets; notebook display remains optional and deferred to Phase 4.
+- Code touchpoints: `src/chordelia/midi_monitor.py` (constructor/start semantics), `tests/unit/chordelia/test_midi_monitor.py` (contract validation coverage).
+- Tests: Focused monitor+playback tests remain passing.
+- Docs: None in this phase (docs planned for Phase 6).
+- Commit/PR: not created yet.
+- Follow-ups: none for contract lock.
+
+### 2026-06-05 - Phase 3
+- Scope completed: Added optional JSONL file logging with deterministic row ordering and field toggles for wall time, elapsed seconds, and elapsed beats.
+- Code touchpoints: `src/chordelia/midi_monitor.py`.
+- API updates: `MidiMonitorSession`, `start_midi_monitor`, and `midi_monitor` now accept `log_file`, `include_wall_time`, `include_elapsed_seconds`, and `include_elapsed_beats`.
+- Tests: Added logging/toggle coverage in `tests/unit/chordelia/test_midi_monitor.py`, including ordered record assertions and directory-path validation. Ran: `pytest tests/unit/chordelia/test_midi_monitor.py tests/unit/chordelia/test_midi_playback.py` (pass).
+- Docs: None in this phase (docs planned for Phase 6).
+- Commit/PR: not created yet.
+- Follow-ups: implement Phase 4 notebook live display adapter and fallback path.
+
+### 2026-06-05 - Phase 4
+- Scope completed: Replaced display placeholder with a non-blocking live display adapter that uses `IPython.display` when available and returns a no-failure text fallback handle otherwise.
+- Code touchpoints: `src/chordelia/midi_monitor.py`, `src/chordelia/__init__.py`.
+- API updates: Added `MidiMonitorDisplayHandle`; `display_live()` now validates `refresh_hz`/`max_rows`, returns notebook/text mode handles, and supports explicit stop for refresh loops.
+- Tests: Added live-display coverage in `tests/unit/chordelia/test_midi_monitor.py` for validation, fallback behavior, and notebook-handle path; reran focused monitor/playback suites. Ran: `pytest tests/unit/chordelia/test_midi_monitor.py tests/unit/chordelia/test_midi_playback.py` (pass).
+- Docs: None in this phase (docs planned for Phase 6).
+- Commit/PR: not created yet.
+- Follow-ups: Phase 5 full validation and Phase 6 docs/examples.
+
+### 2026-06-05 - Phase 5
+- Scope completed: Ran focused monitor/playback suites and full project regression validation.
+- Validation commands:
+   - `pytest tests/unit/chordelia/test_midi_monitor.py tests/unit/chordelia/test_midi_playback.py`
+   - `pytest`
+- Results: both focused and full suites passed with no failures.
+- Commit/PR: not created yet.
+- Follow-ups: finalize docs/examples updates (Phase 6).
+
+### 2026-06-05 - Phase 6
+- Scope completed: documented monitor APIs and workflows across README/tutorial/API docs and added runnable runtime/notebook examples.
+- Code/docs touchpoints:
+   - `README.md`
+   - `docs/api-overview.md`
+   - `docs/tutorials/playback-and-midi.md`
+   - `examples/midi_monitor_runtime_example.py`
+   - `examples/midi_monitor_notebook_example.py`
+- Validation: monitor and playback tests remained green after docs/example updates.
+- Commit/PR: not created yet.
+- Follow-ups: none.
 
 ## Risks and mitigations
 1. Risk: listener overhead affects playback timing.

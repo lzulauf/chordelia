@@ -175,6 +175,7 @@ MIDI APIs (midi extra):
 - `MidiPlayback`, `MidiFile`, `MidiTrackInfo`
 - `get_midi_ports()`, `is_midi_available()`
 - `midi_play_chord(...)`, `midi_play_melody(...)`
+- `MidiMonitorSession`, `MidiMonitorEvent`, `MidiMonitorDisplayHandle`
 
 Canonical `MidiFile` workflow:
 
@@ -188,6 +189,16 @@ Notes:
 
 - MIDI read/write workflows are class-based via `MidiFile`; legacy helper delegates are intentionally not part of the canonical API surface.
 - Notebook rendering remains tracked separately in [MIDI Notebook Rendering Plan](../.plans/midi_notebook_rendering_plan.md).
+- Real-time monitor workflows are additive and optional; playback behavior is unchanged when no monitor is attached.
+- `MidiMonitorSession.display_live(...)` provides a notebook updater when `IPython.display` is available and falls back to a no-failure text handle otherwise.
+
+Monitor session highlights:
+
+- `MidiMonitorSession.start(...)` / `stop()` lifecycle controls
+- `snapshot(...)`, `events`, `to_rows(...)`
+- Optional JSONL logging via `log_file=...`
+- Field toggles: `include_wall_time`, `include_elapsed_seconds`, `include_elapsed_beats`
+- Context-manager usage with `with MidiMonitorSession(playback=...) as monitor:`
 
 Articulation controls:
 

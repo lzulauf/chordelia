@@ -101,6 +101,59 @@ if ports:
             gate_width=1.0,
             retrigger_policy="delta",
         )
+
+## 7) Runtime MIDI Monitoring
+
+Use a monitor session to inspect outbound MIDI messages in scripts, tests, or REPL workflows.
+
+```python
+from chordelia import MidiMonitorSession, MidiPlayback
+
+if ports:
+    with MidiPlayback(output_name=ports[0]) as playback:
+        monitor = MidiMonitorSession(
+            playback=playback,
+            max_events=2000,
+            log_file="midi_monitor.jsonl",
+            include_wall_time=True,
+            include_elapsed_seconds=True,
+            include_elapsed_beats=True,
+            tempo_bpm=score.metadata.tempo,
+        ).start()
+
+        playback.play_score(score, blocking=True)
+        latest = monitor.snapshot(limit=10)
+        monitor.stop()
+
+        print(len(latest))
+```
+
+`midi_monitor.jsonl` contains deterministic line-oriented event records.
+
+## 8) Notebook Live Monitoring
+
+For notebooks, use `display_live(...)` to keep a live event panel while later cells run playback calls.
+
+```python
+from chordelia import MidiMonitorSession, MidiPlayback
+
+if ports:
+    playback = MidiPlayback(output_name=ports[0])
+
+    with MidiMonitorSession(
+        playback=playback,
+        max_events=3000,
+        tempo_bpm=score.metadata.tempo,
+    ) as monitor:
+        live = monitor.display_live(refresh_hz=8.0, max_rows=30)
+        playback.play_score(score, blocking=True)
+
+        # Use this in notebook cells to inspect captured events.
+        monitor.snapshot(limit=20)
+
+        # Stop live refresh explicitly if needed.
+        live.stop()
+```
 ```
 
 ## Related

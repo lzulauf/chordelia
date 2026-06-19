@@ -75,6 +75,11 @@ except ImportError:
 try:
     from chordelia.midi_playback import MidiPlayback, get_midi_ports, is_midi_available
     from chordelia.midi_playback import play_chord as midi_play_chord, play_melody as midi_play_melody
+    from chordelia.midi_monitor import (
+        MidiMonitorDisplayHandle,
+        MidiMonitorEvent,
+        MidiMonitorSession,
+    )
     from chordelia.midifile import MidiFile, MidiTrackInfo
     _MIDI_AVAILABLE = True
 except ImportError:
@@ -161,6 +166,9 @@ if _PLAYBACK_AVAILABLE:
 if _MIDI_AVAILABLE:
     __all__.extend([
         "MidiPlayback",
+        "MidiMonitorDisplayHandle",
+        "MidiMonitorEvent",
+        "MidiMonitorSession",
         "MidiFile",
         "MidiTrackInfo",
         "get_midi_ports", 

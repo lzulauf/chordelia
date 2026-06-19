@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 import threading
 import time
-from typing import Dict, Iterable, List, Optional, Sequence, Set
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set
 
 from chordelia.chords import Chord
 from chordelia.notes import Note
@@ -18,6 +18,10 @@ try:
 except ImportError:
     _MIDI_AVAILABLE = False
     mido = None
+
+
+MidiMessageEvent = dict[str, object]
+MidiMessageListener = Callable[[MidiMessageEvent], None]
 
 
 class MidiPlayback:
@@ -42,11 +46,14 @@ class MidiPlayback:
         self.default_velocity = default_velocity
 
         self._lock = threading.Lock()
+        self._message_listener_lock = threading.Lock()
         self._stop_event = threading.Event()
         self._output_port = None
         self._stop_timers: List[threading.Timer] = []
         self._active_thread: Optional[threading.Thread] = None
         self._current_notes: Set[tuple[int, int]] = set()
+        self._message_listeners: dict[int, MidiMessageListener] = {}
+        self._next_message_listener_id = 1
 
         self._setup_midi_output(output_name)
 
@@ -91,19 +98,97 @@ class MidiPlayback:
             note = note.with_octave(self.base_octave)
         return note.midi_number
 
-    def _send_note_on(self, channel: int, midi_note: int, velocity: int) -> None:
+    def add_message_listener(self, listener: MidiMessageListener) -> int:
+        """Register a callback for outbound MIDI note events and return its listener id."""
+        if not callable(listener):
+            raise TypeError("listener must be callable")
+
+        with self._message_listener_lock:
+            listener_id = self._next_message_listener_id
+            self._next_message_listener_id += 1
+            self._message_listeners[listener_id] = listener
+
+        return listener_id
+
+    def remove_message_listener(self, listener_id: int) -> None:
+        """Remove a previously registered listener id; unknown ids are ignored."""
+        with self._message_listener_lock:
+            self._message_listeners.pop(listener_id, None)
+
+    def _emit_message_event(
+        self,
+        *,
+        source_method: str,
+        message_type: str,
+        channel: int,
+        note: int,
+        velocity: int,
+        raw_message: object,
+    ) -> None:
+        if not self._message_listeners:
+            return
+
+        with self._message_listener_lock:
+            listeners_snapshot = tuple(self._message_listeners.values())
+
+        if not listeners_snapshot:
+            return
+
+        event: MidiMessageEvent = {
+            "direction": "outbound",
+            "source_method": source_method,
+            "message_type": message_type,
+            "channel": channel,
+            "note": note,
+            "velocity": velocity,
+            "port_name": getattr(self._output_port, "name", None),
+            "monotonic_time_seconds": time.monotonic(),
+            "raw_message_repr": repr(raw_message),
+        }
+
+        for listener in listeners_snapshot:
+            try:
+                listener(event)
+            except Exception:
+                # Listener failures must not interrupt playback paths.
+                continue
+
+    def _send_note_on(
+        self,
+        channel: int,
+        midi_note: int,
+        velocity: int,
+        *,
+        source_method: str,
+    ) -> None:
         if self._output_port:
             msg = mido.Message('note_on', channel=channel, note=midi_note, velocity=velocity)
             self._output_port.send(msg)
+            self._emit_message_event(
+                source_method=source_method,
+                message_type="note_on",
+                channel=channel,
+                note=midi_note,
+                velocity=velocity,
+                raw_message=msg,
+            )
 
-    def _send_note_off(self, channel: int, midi_note: int) -> None:
+    def _send_note_off(self, channel: int, midi_note: int, *, source_method: str) -> None:
         if self._output_port:
             msg = mido.Message('note_off', channel=channel, note=midi_note, velocity=0)
             self._output_port.send(msg)
+            self._emit_message_event(
+                source_method=source_method,
+                message_type="note_off",
+                channel=channel,
+                note=midi_note,
+                velocity=0,
+                raw_message=msg,
+            )
 
-    def _stop_all_notes(self) -> None:
+    def _stop_all_notes(self, *, source_method: str) -> None:
         for channel, midi_note in tuple(self._current_notes):
-            self._send_note_off(channel, midi_note)
+            self._send_note_off(channel, midi_note, source_method=source_method)
         self._current_notes.clear()
 
     def update_chord(
@@ -123,7 +208,7 @@ class MidiPlayback:
 
         with self._lock:
             if chord is None:
-                self._stop_all_notes()
+                self._stop_all_notes(source_method="update_chord")
                 return
 
             new_notes = {(active_channel, self._coerce_note_to_midi(note)) for note in chord.notes}
@@ -132,10 +217,15 @@ class MidiPlayback:
             notes_to_start = new_notes - self._current_notes
 
             for stop_channel, midi_note in notes_to_stop:
-                self._send_note_off(stop_channel, midi_note)
+                self._send_note_off(stop_channel, midi_note, source_method="update_chord")
 
             for start_channel, midi_note in notes_to_start:
-                self._send_note_on(start_channel, midi_note, active_velocity)
+                self._send_note_on(
+                    start_channel,
+                    midi_note,
+                    active_velocity,
+                    source_method="update_chord",
+                )
 
             self._current_notes = new_notes
 
@@ -178,7 +268,12 @@ class MidiPlayback:
         stop_timer: Optional[threading.Timer] = None
 
         with self._lock:
-            self._send_note_on(active_channel, midi_note, active_velocity)
+            self._send_note_on(
+                active_channel,
+                midi_note,
+                active_velocity,
+                source_method="play_note",
+            )
             self._current_notes.add((active_channel, midi_note))
 
             if duration is not None:
@@ -189,7 +284,11 @@ class MidiPlayback:
 
                 def _timed_note_off() -> None:
                     with self._lock:
-                        self._send_note_off(active_channel, midi_note)
+                        self._send_note_off(
+                            active_channel,
+                            midi_note,
+                            source_method="play_note",
+                        )
                         self._current_notes.discard((active_channel, midi_note))
 
                 stop_timer = threading.Timer(duration_seconds, _timed_note_off)
@@ -355,14 +454,23 @@ class MidiPlayback:
                 self._sleep_until(started_at + event_time)
                 with self._lock:
                     if is_on:
-                        self._send_note_on(channel, pitch, velocity)
+                        self._send_note_on(
+                            channel,
+                            pitch,
+                            velocity,
+                            source_method="play_score",
+                        )
                         self._current_notes.add((channel, pitch))
                     else:
-                        self._send_note_off(channel, pitch)
+                        self._send_note_off(
+                            channel,
+                            pitch,
+                            source_method="play_score",
+                        )
                         self._current_notes.discard((channel, pitch))
         finally:
             with self._lock:
-                self._stop_all_notes()
+                self._stop_all_notes(source_method="play_score")
 
     def play_score(
         self,
@@ -403,7 +511,7 @@ class MidiPlayback:
     def set_channel(self, channel: int) -> None:
         self._validate_channel(channel)
         with self._lock:
-            self._stop_all_notes()
+            self._stop_all_notes(source_method="set_channel")
             self.channel = channel
 
     def stop(self) -> None:
@@ -413,7 +521,7 @@ class MidiPlayback:
             for timer in self._stop_timers:
                 timer.cancel()
             self._stop_timers.clear()
-            self._stop_all_notes()
+            self._stop_all_notes(source_method="stop")
 
             if self._output_port is not None:
                 self._output_port.close()

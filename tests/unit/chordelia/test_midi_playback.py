@@ -58,6 +58,73 @@ class TestMidiPlayback:
         with pytest.raises(ValueError, match="not found"):
             MidiPlayback(output_name="Missing Port")
 
+    def test_message_listener_receives_note_on_and_note_off_events(self, mock_midi):
+        from chordelia.midi_playback import MidiPlayback
+
+        class ImmediateTimer:
+            def __init__(self, _seconds, callback):
+                self._callback = callback
+
+            def start(self):
+                self._callback()
+
+            def cancel(self):
+                return None
+
+        with patch("chordelia.midi_playback.threading.Timer", ImmediateTimer):
+            playback = MidiPlayback()
+            listener = Mock()
+            listener_id = playback.add_message_listener(listener)
+
+            playback.play_note(C.with_octave(4), duration=Duration.from_beats(1, None))
+
+            assert listener.call_count == 2
+            emitted_events = [call[0][0] for call in listener.call_args_list]
+            assert [event["message_type"] for event in emitted_events] == ["note_on", "note_off"]
+            assert all(event["source_method"] == "play_note" for event in emitted_events)
+            assert all(event["channel"] == 0 for event in emitted_events)
+            assert all(event["note"] == 60 for event in emitted_events)
+            assert all(event["direction"] == "outbound" for event in emitted_events)
+            assert all("monotonic_time_seconds" in event for event in emitted_events)
+            assert all("raw_message_repr" in event for event in emitted_events)
+
+            playback.remove_message_listener(listener_id)
+            playback.stop()
+
+    def test_message_listener_rejects_non_callable(self, mock_midi):
+        from chordelia.midi_playback import MidiPlayback
+
+        playback = MidiPlayback()
+        with pytest.raises(TypeError, match="callable"):
+            playback.add_message_listener("not-a-callback")
+        playback.stop()
+
+    def test_listener_exceptions_do_not_break_playback(self, mock_midi):
+        from chordelia.midi_playback import MidiPlayback
+
+        playback = MidiPlayback()
+        healthy_listener = Mock()
+
+        def failing_listener(_event):
+            raise RuntimeError("boom")
+
+        playback.add_message_listener(failing_listener)
+        playback.add_message_listener(healthy_listener)
+
+        playback.play_note(C.with_octave(4), duration=None)
+
+        assert healthy_listener.call_count == 1
+        sent_types = [call[0][0]["type"] for call in mock_midi["port"].send.call_args_list]
+        assert "note_on" in sent_types
+        playback.stop()
+
+    def test_remove_unknown_message_listener_id_is_noop(self, mock_midi):
+        from chordelia.midi_playback import MidiPlayback
+
+        playback = MidiPlayback()
+        playback.remove_message_listener(999)
+        playback.stop()
+
     def test_update_chord_delta_behavior(self, mock_midi):
         from chordelia.midi_playback import MidiPlayback
 
