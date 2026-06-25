@@ -1,40 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1492" height="220" viewBox="0 0 1492 220">
-<rect x="0" y="0" width="1492" height="220" fill="#fffdf8"/>
-<text x="68.00" y="24.00" font-family="Georgia, serif" font-size="14" fill="#1a1a1a">CHORDELIA SHEET</text>
-<text x="68.00" y="42.00" font-family="Georgia, serif" font-size="12" fill="#444">tempo 120 | meter 4/4</text>
-<text x="38.00" y="132.00" font-family="Bravura, Noto Music, serif" font-size="44" fill="#111">&#119070;</text>
-<line class="staff-line" x1="68.00" y1="80.00" x2="1462.00" y2="80.00" stroke="#222" stroke-width="1"/>
-<line class="staff-line" x1="68.00" y1="92.00" x2="1462.00" y2="92.00" stroke="#222" stroke-width="1"/>
-<line class="staff-line" x1="68.00" y1="104.00" x2="1462.00" y2="104.00" stroke="#222" stroke-width="1"/>
-<line class="staff-line" x1="68.00" y1="116.00" x2="1462.00" y2="116.00" stroke="#222" stroke-width="1"/>
-<line class="staff-line" x1="68.00" y1="128.00" x2="1462.00" y2="128.00" stroke="#222" stroke-width="1"/>
-<line class="staff-barline" x1="68.00" y1="80.00" x2="68.00" y2="128.00" stroke="#222" stroke-width="1.2"/>
-<line class="staff-barline" x1="1462.00" y1="80.00" x2="1462.00" y2="128.00" stroke="#222" stroke-width="1.2"/>
-<line class="measure-barline" x1="662.77" y1="80.00" x2="662.77" y2="128.00" stroke="#444" stroke-width="1"/>
-<line class="measure-barline" x1="1257.55" y1="80.00" x2="1257.55" y2="128.00" stroke="#444" stroke-width="1"/>
-<line class="ledger-line" x1="60.00" y1="152.00" x2="76.00" y2="152.00" stroke="#111" stroke-width="1"/>
-<line class="ledger-line" x1="60.00" y1="140.00" x2="76.00" y2="140.00" stroke="#111" stroke-width="1"/>
-<ellipse class="notehead notehead-filled" cx="68.00" cy="152.00" rx="5" ry="3.6" fill="#111"/>
-<line class="note-stem" x1="72.80" y1="152.00" x2="72.80" y2="124.00" stroke="#111" stroke-width="1"/>
-<line class="ledger-line" x1="78.59" y1="140.00" x2="94.59" y2="140.00" stroke="#111" stroke-width="1"/>
-<ellipse class="notehead notehead-filled" cx="86.59" cy="146.00" rx="5" ry="3.6" fill="#111"/>
-<line class="note-stem" x1="91.39" y1="146.00" x2="91.39" y2="118.00" stroke="#111" stroke-width="1"/>
-<line class="ledger-line" x1="115.76" y1="140.00" x2="131.76" y2="140.00" stroke="#111" stroke-width="1"/>
-<text class="note-accidental" x="110.76" y="144.00" font-family="Bravura, Noto Music, serif" font-size="16" fill="#111">&#9839;</text>
-<ellipse class="notehead notehead-filled" cx="123.76" cy="140.00" rx="5" ry="3.6" fill="#111"/>
-<line class="note-stem" x1="128.56" y1="140.00" x2="128.56" y2="112.00" stroke="#111" stroke-width="1"/>
-<ellipse class="notehead notehead-filled" cx="198.11" cy="134.00" rx="5" ry="3.6" fill="#111"/>
-<line class="note-stem" x1="202.91" y1="134.00" x2="202.91" y2="106.00" stroke="#111" stroke-width="1"/>
-<ellipse class="notehead notehead-filled" cx="346.80" cy="128.00" rx="5" ry="3.6" fill="#111"/>
-<circle class="note-dot" cx="356.80" cy="128.00" r="1.4" fill="#111"/>
-<line class="note-stem" x1="351.60" y1="128.00" x2="351.60" y2="100.00" stroke="#111" stroke-width="1"/>
-<text class="note-accidental" x="556.84" y="126.00" font-family="Bravura, Noto Music, serif" font-size="16" fill="#111">&#9839;</text>
-<ellipse class="notehead notehead-open" cx="569.84" cy="122.00" rx="5" ry="3.6" fill="#fffdf8" stroke="#111" stroke-width="1.1"/>
-<line class="note-stem" x1="574.64" y1="122.00" x2="574.64" y2="94.00" stroke="#111" stroke-width="1"/>
-<text class="note-accidental" x="854.23" y="120.00" font-family="Bravura, Noto Music, serif" font-size="16" fill="#111">&#9839;</text>
-<ellipse class="notehead notehead-open" cx="867.23" cy="116.00" rx="5" ry="3.6" fill="#fffdf8" stroke="#111" stroke-width="1.1"/>
-<polygon class="note-beam" points="72.80,124.00 128.56,112.00 128.56,114.80 72.80,126.80" fill="#111"/>
-<polygon class="note-beam" points="72.80,119.00 91.39,113.00 91.39,115.80 72.80,121.80" fill="#111"/>
-<polygon class="note-beam note-beam-hook" points="72.80,114.00 81.80,114.00 81.80,116.80 72.80,116.80" fill="#111"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="638" height="117" viewBox="0 0 638 117">
+<rect x="0" y="0" width="638" height="117" fill="#ffffff"/>
+<text x="22.55" y="57.75" font-family="Bravura, Noto Music, serif" font-size="46" fill="#111" dominant-baseline="middle">&#119070;</text>
+<text x="52.55" y="17.27" font-family="Times New Roman, serif" font-size="11" fill="#222">q = 120</text>
+<line class="staff-line" x1="52.55" y1="27.27" x2="612.63" y2="27.27" stroke="#111" stroke-width="0.92"/>
+<line class="staff-line" x1="52.55" y1="37.43" x2="612.63" y2="37.43" stroke="#111" stroke-width="0.92"/>
+<line class="staff-line" x1="52.55" y1="47.59" x2="612.63" y2="47.59" stroke="#111" stroke-width="0.92"/>
+<line class="staff-line" x1="52.55" y1="57.75" x2="612.63" y2="57.75" stroke="#111" stroke-width="0.92"/>
+<line class="staff-line" x1="52.55" y1="67.91" x2="612.63" y2="67.91" stroke="#111" stroke-width="0.92"/>
+<line class="staff-barline" x1="52.55" y1="27.27" x2="52.55" y2="67.91" stroke="#111" stroke-width="0.88"/>
+<line class="staff-barline" x1="612.63" y1="27.27" x2="612.63" y2="67.91" stroke="#111" stroke-width="1.23"/>
+<line class="measure-barline" x1="291.52" y1="27.27" x2="291.52" y2="67.91" stroke="#222" stroke-width="0.88"/>
+<line class="measure-barline" x1="530.48" y1="27.27" x2="530.48" y2="67.91" stroke="#222" stroke-width="0.88"/>
+<line class="ledger-line" x1="44.55" y1="88.23" x2="60.55" y2="88.23" stroke="#111" stroke-width="1"/>
+<line class="ledger-line" x1="44.55" y1="78.07" x2="60.55" y2="78.07" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="52.55" cy="88.23" rx="5.32" ry="3.56" transform="rotate(-21.25 52.55 88.23)" fill="#111"/>
+<line class="note-stem" x1="57.35" y1="88.23" x2="57.35" y2="60.24" stroke="#111" stroke-width="1"/>
+<line class="ledger-line" x1="52.02" y1="78.07" x2="68.02" y2="78.07" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="60.02" cy="83.15" rx="5.32" ry="3.56" transform="rotate(-21.25 60.02 83.15)" fill="#111"/>
+<line class="note-stem" x1="64.82" y1="83.15" x2="64.82" y2="55.16" stroke="#111" stroke-width="1"/>
+<line class="ledger-line" x1="66.95" y1="78.07" x2="82.95" y2="78.07" stroke="#111" stroke-width="1"/>
+<text class="note-accidental" x="61.95" y="82.07" font-family="Bravura, Noto Music, serif" font-size="16" fill="#111">&#9839;</text>
+<ellipse class="notehead notehead-filled" cx="74.95" cy="78.07" rx="5.32" ry="3.56" transform="rotate(-21.25 74.95 78.07)" fill="#111"/>
+<line class="note-stem" x1="79.75" y1="78.07" x2="79.75" y2="50.08" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="104.82" cy="72.99" rx="5.32" ry="3.56" transform="rotate(-21.25 104.82 72.99)" fill="#111"/>
+<line class="note-stem" x1="109.62" y1="72.99" x2="109.62" y2="45.00" stroke="#111" stroke-width="1"/>
+<ellipse class="notehead notehead-filled" cx="164.57" cy="67.91" rx="5.32" ry="3.56" transform="rotate(-21.25 164.57 67.91)" fill="#111"/>
+<circle class="note-dot" cx="174.57" cy="67.91" r="1.4" fill="#111"/>
+<line class="note-stem" x1="169.37" y1="67.91" x2="169.37" y2="39.92" stroke="#111" stroke-width="1"/>
+<text class="note-accidental" x="241.18" y="66.83" font-family="Bravura, Noto Music, serif" font-size="16" fill="#111">&#9839;</text>
+<ellipse class="notehead notehead-open" cx="254.18" cy="62.83" rx="5.32" ry="3.56" transform="rotate(-21.25 254.18 62.83)" fill="#ffffff" stroke="#111" stroke-width="1.0"/>
+<line class="note-stem" x1="258.98" y1="62.83" x2="258.98" y2="34.84" stroke="#111" stroke-width="1"/>
+<text class="note-accidental" x="360.66" y="61.75" font-family="Bravura, Noto Music, serif" font-size="16" fill="#111">&#9839;</text>
+<ellipse class="notehead notehead-open" cx="373.66" cy="57.75" rx="5.32" ry="3.56" transform="rotate(-21.25 373.66 57.75)" fill="#ffffff" stroke="#111" stroke-width="1.0"/>
+<polygon class="note-beam" points="57.35,60.24 79.75,50.08 79.75,52.88 57.35,63.04" fill="#111"/>
+<polygon class="note-beam" points="57.35,55.24 64.82,50.16 64.82,52.96 57.35,58.04" fill="#111"/>
+<polygon class="note-beam note-beam-hook" points="57.35,50.24 66.35,50.24 66.35,53.04 57.35,53.04" fill="#111"/>
 </svg>

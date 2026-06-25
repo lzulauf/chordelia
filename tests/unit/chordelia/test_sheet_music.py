@@ -134,7 +134,7 @@ class TestSheetMusicFileOutput:
         content = output_path.read_text(encoding="utf-8")
         assert content.startswith("<?xml")
         assert "<svg" in content
-        assert "CHORDELIA SHEET" in content
+        assert 'class="staff-line"' in content
 
     def test_svg_renders_tempo_only_for_score_sources(self, tmp_path: Path):
         score_sheet = SheetMusic(Score.from_sequenceable(Note("C4"), tempo=104))
@@ -143,8 +143,8 @@ class TestSheetMusicFileOutput:
         score_content = score_sheet.to_file(tmp_path / "score_source.svg").read_text(encoding="utf-8")
         note_content = note_sheet.to_file(tmp_path / "note_source.svg").read_text(encoding="utf-8")
 
-        assert "tempo 104" in score_content
-        assert "tempo 104" not in note_content
+        assert "q = 104" in score_content
+        assert "q = 104" not in note_content
 
     def test_to_file_supports_seconds_mode_timeline(self, tmp_path: Path):
         score = Score(

@@ -10,10 +10,14 @@ import subprocess
 import tempfile
 from typing import TYPE_CHECKING, Callable
 
+from chordelia.sheetmusic_backends.helpers import (
+    key_accidental_map_from_scale,
+    ordered_key_signature_accidentals,
+    parse_spelling,
+)
+
 if TYPE_CHECKING:
     from chordelia.sheet_music import SheetMusic
-
-_SPELLING_PATTERN = re.compile(r"^\s*([A-Ga-g])([#b]{0,2})?(-?\d+)?\s*$")
 
 _DURATION_TO_LILYPOND = {
     Fraction(4, 1): "1",
@@ -246,6 +250,12 @@ def _key_signature_line(sheet: SheetMusic) -> str:
 def _key_signature_line_for_scale(scale) -> str:
     """Build a LilyPond key directive for one scale from explicit accidental notes."""
 
+    accidental_map = key_accidental_map_from_scale(scale)
+    ordered_accidentals = ordered_key_signature_accidentals(accidental_map)
+    if ordered_accidentals:
+        alterations = _lily_key_alterations_from_accidental_pairs(ordered_accidentals)
+        return f"\\set Staff.keyAlterations = #`({alterations})"
+
     key_signature_notes = getattr(scale, "key_signature_notes", None)
     if callable(key_signature_notes):
         notes = key_signature_notes()
@@ -254,6 +264,39 @@ def _key_signature_line_for_scale(scale) -> str:
 
     alterations = _lily_key_alterations_from_notes(notes)
     return f"\\set Staff.keyAlterations = #`({alterations})"
+
+
+def _lily_key_alterations_from_accidental_pairs(accidentals: list[tuple[str, int]]) -> str:
+    """Convert (letter, accidental) pairs into a LilyPond keyAlterations body."""
+
+    if not accidentals:
+        return ""
+
+    step_map = {
+        "C": 0,
+        "D": 1,
+        "E": 2,
+        "F": 3,
+        "G": 4,
+        "A": 5,
+        "B": 6,
+    }
+    accidental_map = {
+        -2: "DOUBLE-FLAT",
+        -1: "FLAT",
+        1: "SHARP",
+        2: "DOUBLE-SHARP",
+    }
+
+    tokens: list[str] = []
+    for step_name, accidental_value in accidentals:
+        lily_step = step_map.get(step_name)
+        accidental_name = accidental_map.get(accidental_value)
+        if lily_step is None or accidental_name is None:
+            continue
+        tokens.append(f"({lily_step} . ,{accidental_name})")
+
+    return " ".join(tokens)
 
 
 def _iterable_scale_directives(sheet: SheetMusic) -> dict[Fraction, list[str]]:
@@ -412,30 +455,26 @@ def _event_pitches(event) -> list[str]:
 def _lily_pitch_from_spelling(spelling: str, *, fallback_midi: int) -> str:
     """Convert note spelling text to a LilyPond pitch token."""
 
-    match = _SPELLING_PATTERN.match(spelling)
-    if match is None:
+    parsed = parse_spelling(spelling)
+    if parsed is None:
         return _lily_pitch_from_midi(fallback_midi)
 
-    letter = match.group(1).lower()
-    accidental_text = match.group(2) or ""
-    octave_text = match.group(3)
+    letter, accidental_offset, octave = parsed
 
     accidental_suffix = {
-        "": "",
-        "#": "is",
-        "##": "isis",
-        "b": "es",
-        "bb": "eses",
-    }.get(accidental_text)
+        0: "",
+        1: "is",
+        2: "isis",
+        -1: "es",
+        -2: "eses",
+    }.get(accidental_offset)
     if accidental_suffix is None:
         return _lily_pitch_from_midi(fallback_midi)
 
-    if octave_text is None:
+    if octave is None:
         octave = (fallback_midi // 12) - 1
-    else:
-        octave = int(octave_text)
 
-    return f"{letter}{accidental_suffix}{_lily_octave_marks(octave)}"
+    return f"{letter.lower()}{accidental_suffix}{_lily_octave_marks(octave)}"
 
 
 def _lily_pitch_from_midi(pitch: int) -> str:
